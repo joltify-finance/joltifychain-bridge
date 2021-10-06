@@ -1,10 +1,15 @@
 package bridge
+
 import (
-	"google.golang.org/grpc"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
 )
 
-type InvChainBridge struct{
-	GrpcClient *grpc.ClientConn
-	Keyring    keyring.Keyring
+const chainID = "invoiceChain"
+
+type InvChainBridge struct {
+	grpcClient *grpc.ClientConn
+	keyring    keyring.Keyring
+	logger     zerolog.Logger
 }

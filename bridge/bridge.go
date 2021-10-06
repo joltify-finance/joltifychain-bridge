@@ -1,30 +1,203 @@
 package bridge
 
 import (
-	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	"google.golang.org/grpc"
+	"context"
+	"fmt"
 	"io/ioutil"
 	"log"
+
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	"github.com/cosmos/cosmos-sdk/types/tx"
+	zlog "github.com/rs/zerolog/log"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	"google.golang.org/grpc"
+
+	xauthsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
 
 func NewInvoiceBridge(grpcAddr, keyringPath, passcode string) (*InvChainBridge, error) {
 	var invoiceBridge InvChainBridge
 	var err error
-	invoiceBridge.GrpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
+	invoiceBridge.grpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
 
-	invoiceBridge.Keyring = keyring.NewInMemory()
+	invoiceBridge.keyring = keyring.NewInMemory()
 
 	dat, err := ioutil.ReadFile(keyringPath)
 	if err != nil {
 		log.Fatalln("error in read keyring file")
 		return nil, err
 	}
-	err = invoiceBridge.Keyring.ImportPrivKey("operator", string(dat), passcode)
+	err = invoiceBridge.keyring.ImportPrivKey("operator", string(dat), passcode)
 	if err != nil {
 		return nil, err
 	}
+
+	invoiceBridge.logger = zlog.With().Str("module", "invoiceChain").Logger()
+
 	return &invoiceBridge, nil
+}
+
+func (ic *InvChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64) ([]byte, string, error) {
+	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
+	// following function.
+	encCfg := MakeEncodingConfig()
+	// Create a new TxBuilder.
+	txBuilder := encCfg.TxConfig.NewTxBuilder()
+
+	err := txBuilder.SetMsgs(sdkMsg...)
+	if err != nil {
+		return nil, "", err
+	}
+	// we use the default here
+	txBuilder.SetGasLimit(200000)
+	// txBuilder.SetFeeAmount(...)
+	// txBuilder.SetMemo(...)
+	// txBuilder.SetTimeoutHeight(...)
+
+	key, err := ic.keyring.Key("operator")
+	if err != nil {
+		ic.logger.Error().Err(err).Msg("fail to get the operator key")
+		return nil, "", err
+	}
+
+	sigV2 := signing.SignatureV2{
+		PubKey: key.GetPubKey(),
+		Data: &signing.SingleSignatureData{
+			SignMode:  encCfg.TxConfig.SignModeHandler().DefaultMode(),
+			Signature: nil,
+		},
+		Sequence: accSeq,
+	}
+
+	err = txBuilder.SetSignatures(sigV2)
+	if err != nil {
+		return nil, "", err
+	}
+
+	signerData := xauthsigning.SignerData{
+		ChainID:       chainID,
+		AccountNumber: accNum,
+		Sequence:      accSeq,
+	}
+	signatureV2, err := ic.signTx(encCfg.TxConfig, txBuilder, signerData)
+	if err != nil {
+		ic.logger.Error().Err(err).Msg("fail to generate the signature")
+		return nil, "", err
+	}
+	txBuilder.SetSignatures(signatureV2)
+
+	// Generated Protobuf-encoded bytes.
+	txBytes, err := encCfg.TxConfig.TxEncoder()(txBuilder.GetTx())
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Generate a JSON string.
+	txJSONBytes, err := encCfg.TxConfig.TxJSONEncoder()(txBuilder.GetTx())
+	if err != nil {
+		return nil, "", err
+	}
+	txJSON := string(txJSONBytes)
+	fmt.Printf(">>>>%v\n", txJSON)
+	return txBytes, "", nil
+}
+
+func (ic *InvChainBridge) signTx(txConfig client.TxConfig, txBuilder client.TxBuilder, signerData xauthsigning.SignerData) (signing.SignatureV2, error) {
+	var sigV2 signing.SignatureV2
+
+	signMode := txConfig.SignModeHandler().DefaultMode()
+	// Generate the bytes to be signed.
+	signBytes, err := txConfig.SignModeHandler().GetSignBytes(signMode, signerData, txBuilder.GetTx())
+	if err != nil {
+		return sigV2, err
+	}
+
+	// Sign those bytes
+	signature, pk, err := ic.keyring.Sign("operator", signBytes)
+	if err != nil {
+		return sigV2, err
+	}
+
+	// Construct the SignatureV2 struct
+	sigData := signing.SingleSignatureData{
+		SignMode:  signMode,
+		Signature: signature,
+	}
+
+	sigV2 = signing.SignatureV2{
+		PubKey:   pk,
+		Data:     &sigData,
+		Sequence: signerData.Sequence,
+	}
+	return sigV2, nil
+}
+
+func (ic *InvChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (bool, string, error) {
+	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
+	// service.
+	txClient := tx.NewServiceClient(ic.grpcClient)
+	// We then call the BroadcastTx method on this client.
+	grpcRes, err := txClient.BroadcastTx(
+		ctx,
+		&tx.BroadcastTxRequest{
+			Mode:    tx.BroadcastMode_BROADCAST_MODE_SYNC,
+			TxBytes: txBytes, // Proto-binary of the signed transaction, see previous step.
+		},
+	)
+	if err != nil {
+		return false, "", err
+	}
+
+	if grpcRes.GetTxResponse().Code != 0 {
+		fmt.Printf(">>>>>%v\n", grpcRes.GetTxResponse())
+		return false, "", nil
+	}
+	txHash := grpcRes.GetTxResponse().TxHash
+	return true, txHash, nil
+}
+
+func (ic *InvChainBridge) SendToken(coins sdk.Coins, from, to sdk.AccAddress) error {
+	msg := banktypes.NewMsgSend(from, to, coins)
+
+	acc, err := ic.QueryAccount(from.String())
+	if err != nil {
+		ic.logger.Error().Err(err).Msg("Fail to quer the account")
+		return err
+	}
+	txbytes, _, err := ic.SendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber())
+	if err != nil {
+		ic.logger.Error().Err(err).Msg("fail to generate the tx")
+		return err
+	}
+	ok, _, err := ic.BroadcastTx(context.Background(), txbytes)
+	if err != nil || !ok {
+		ic.logger.Error().Err(err).Msg("fail to broadcast the tx")
+		return err
+	}
+	return nil
+}
+
+func (ic *InvChainBridge) QueryAccount(addr string) (authtypes.AccountI, error) {
+	accQuery := authtypes.NewQueryClient(ic.grpcClient)
+	accResp, err := accQuery.Account(context.Background(), &authtypes.QueryAccountRequest{Address: addr})
+	if err != nil {
+		return nil, err
+	}
+
+	encCfg := MakeEncodingConfig()
+	var acc authtypes.AccountI
+	if err := encCfg.InterfaceRegistry.UnpackAny(accResp.Account, &acc); err != nil {
+		return nil, err
+	}
+	return acc, nil
 }

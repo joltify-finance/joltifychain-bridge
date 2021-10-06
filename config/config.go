@@ -1,22 +1,24 @@
 package config
 
-import "flag"
+import (
+	"flag"
+)
 
-type InvoiceChainConfig struct{
+type InvoiceChainConfig struct {
 	GrpcAddress string
 }
 
-type Config struct{
+type Config struct {
 	InvoiceChainConfig InvoiceChainConfig
-	KeyringAddress string
-	HomeDir string
+	KeyringAddress     string
+	HomeDir            string
 }
 
-func DefaultConfig()  Config{
+func DefaultConfig() Config {
 	var config Config
 	flag.StringVar(&config.InvoiceChainConfig.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for invoice chain")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
-	flag.StringVar(&config.HomeDir, "home","./","home director for bridge")
+	flag.StringVar(&config.HomeDir, "home", "./", "home director for bridge")
 	flag.Parse()
 	return config
 }
