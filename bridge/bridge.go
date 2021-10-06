@@ -2,7 +2,6 @@ package bridge
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"log"
 
@@ -108,7 +107,7 @@ func (ic *InvChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64)
 		return nil, "", err
 	}
 	txJSON := string(txJSONBytes)
-	fmt.Printf(">>>>%v\n", txJSON)
+	ic.logger.Debug().Msg(txJSON)
 	return txBytes, "", nil
 }
 
@@ -159,7 +158,7 @@ func (ic *InvChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (bool
 	}
 
 	if grpcRes.GetTxResponse().Code != 0 {
-		fmt.Printf(">>>>>%v\n", grpcRes.GetTxResponse())
+		ic.logger.Error().Msgf("fail to broadcast with err", grpcRes.TxResponse.Info)
 		return false, "", nil
 	}
 	txHash := grpcRes.GetTxResponse().TxHash
