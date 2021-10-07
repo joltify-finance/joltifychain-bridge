@@ -2,12 +2,12 @@ package bridge
 
 import (
 	"context"
+	"invoicebridge/validators"
 	"io/ioutil"
 	"log"
 
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	tmclienthttp "github.com/tendermint/tendermint/rpc/client/http"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -29,6 +29,19 @@ func NewInvoiceBridge(grpcAddr, keyringPath, passcode string) (*InvChainBridge, 
 		return nil, err
 	}
 
+	client, err := tmclienthttp.New("tcp://localhost:26657", "/websocket")
+	if err != nil {
+		panic(err)
+	}
+	err = client.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	invoiceBridge.wsClient = client
+
+	invoiceBridge.validatorSet = validators.NewValidatorSet()
+
 	invoiceBridge.keyring = keyring.NewInMemory()
 
 	dat, err := ioutil.ReadFile(keyringPath)
@@ -44,6 +57,20 @@ func NewInvoiceBridge(grpcAddr, keyringPath, passcode string) (*InvChainBridge, 
 	invoiceBridge.logger = zlog.With().Str("module", "invoiceChain").Logger()
 
 	return &invoiceBridge, nil
+}
+
+func (ic *InvChainBridge) TerminateBridge() error {
+	err := ic.wsClient.Stop()
+	if err != nil {
+		ic.logger.Error().Err(err).Msg("fail to terminate the ws")
+		return err
+	}
+	err = ic.grpcClient.Close()
+	if err != nil {
+		ic.logger.Error().Err(err).Msg("fail to terminate the grpc")
+		return err
+	}
+	return nil
 }
 
 func (ic *InvChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64) ([]byte, string, error) {
@@ -168,7 +195,7 @@ func (ic *InvChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (bool
 func (ic *InvChainBridge) SendToken(coins sdk.Coins, from, to sdk.AccAddress) error {
 	msg := banktypes.NewMsgSend(from, to, coins)
 
-	acc, err := ic.QueryAccount(from.String())
+	acc, err := QueryAccount(from.String(), ic.grpcClient)
 	if err != nil {
 		ic.logger.Error().Err(err).Msg("Fail to quer the account")
 		return err
@@ -184,19 +211,4 @@ func (ic *InvChainBridge) SendToken(coins sdk.Coins, from, to sdk.AccAddress) er
 		return err
 	}
 	return nil
-}
-
-func (ic *InvChainBridge) QueryAccount(addr string) (authtypes.AccountI, error) {
-	accQuery := authtypes.NewQueryClient(ic.grpcClient)
-	accResp, err := accQuery.Account(context.Background(), &authtypes.QueryAccountRequest{Address: addr})
-	if err != nil {
-		return nil, err
-	}
-
-	encCfg := MakeEncodingConfig()
-	var acc authtypes.AccountI
-	if err := encCfg.InterfaceRegistry.UnpackAny(accResp.Account, &acc); err != nil {
-		return nil, err
-	}
-	return acc, nil
 }

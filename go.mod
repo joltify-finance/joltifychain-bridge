@@ -6,6 +6,7 @@ require (
 	github.com/cosmos/cosmos-sdk v0.42.6
 	github.com/froyobin/invoiceChain v0.0.0-00010101000000-000000000000
 	github.com/rs/zerolog v1.21.0
+	github.com/tendermint/tendermint v0.34.11
 	google.golang.org/grpc v1.41.0
 )
 
