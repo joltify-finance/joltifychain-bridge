@@ -5,10 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
+	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/rest"
+
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	zlog "github.com/rs/zerolog/log"
 	"invoicebridge/validators"
 	"time"
+
+	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 func (ic *InvChainBridge) InitValidators(addr string) error {
@@ -52,22 +57,38 @@ func (ic *InvChainBridge) InitValidators(addr string) error {
 	}
 	ic.myValidatorInfo = info
 	ic.validatorSet = validators.NewValidator()
-	ic.validatorSet.SetupValidatorSet(vals, blockHeight)
-	return nil
-}
 
-func (ic *InvChainBridge) UpdateLatestValidator() error {
-	blockHeight, validators, err := QueryHistoricalValidator(ic.grpcClient)
-	if err != nil {
-		ic.logger.Error().Err(err).Msg("fail to initialize the validator pool")
-		return err
+	encCfg := MakeEncodingConfig()
+	var lvals []*validators.Validator
+	for _, el := range vals {
+		var pk cryptotypes.PubKey
+		if err := encCfg.InterfaceRegistry.UnpackAny(el.PubKey, &pk); err != nil {
+			return err
+		}
+		adr, err := types.ConsAddressFromBech32(el.Address)
+		if err != nil {
+			ic.logger.Error().Err(err).Msg("fail to decode the address")
+			return err
+		}
+		e := validators.Validator{
+			Address:     adr,
+			PubKey:      pk.Bytes(),
+			VotingPower: el.VotingPower,
+		}
+		lvals = append(lvals, &e)
+
 	}
-	ic.validatorSet.UpdateValidatorSet(validators, blockHeight)
+
+	ic.validatorSet.SetupValidatorSet(lvals, blockHeight)
 	return nil
 }
 
-func (ic *InvChainBridge) GetLatestValidator() ([]*tmservice.Validator, int64) {
+func (ic *InvChainBridge) UpdateLatestValidator(validators []*tmtypes.Validator) error {
+	ic.validatorSet.UpdateValidatorSet(validators, 0)
+	return nil
+}
 
+func (ic *InvChainBridge) GetLastValidator() ([]*validators.Validator, int64) {
 	validators, blockHeight := ic.validatorSet.GetActiveValidators()
 	return validators, blockHeight
 }

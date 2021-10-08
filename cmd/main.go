@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 func SetupBech32Prefix() {
@@ -75,23 +76,22 @@ func main() {
 			case <-c:
 				cancel()
 				return
-			case <-outChan:
-				err := invBridge.UpdateLatestValidator()
+			case vals := <-outChan:
+				validatorUpdates := vals.Data.(tmtypes.EventDataValidatorSetUpdates).ValidatorUpdates
+				err := invBridge.UpdateLatestValidator(validatorUpdates)
 				if err != nil {
 					zlog.Logger.Error().Msgf("fail to query the latest validator %v", err)
 				}
 
-				vals, blockHeight := invBridge.GetLatestValidator()
+				lastValidators, blockHeight := invBridge.GetLastValidator()
 
 				fmt.Printf(">>>>>>>>>>>>>>>>%v>>>>>>>>>>>>>>>\n", blockHeight)
 
-				for i, el := range vals {
-					fmt.Printf("%v>>>>>>>>>%v\n", i, el.Address)
-					//adr, err := types.ConsAddressFromHex(el.Address.String())
-					//if err != nil {
-					//	fmt.Printf("error !!!!!!!!!---%v\n", err)
-					//}
-					//fmt.Printf("%v--->%v(%v)\n", i, adr.String(), el.VotingPower)
+				for i, el := range lastValidators {
+					if err != nil {
+						fmt.Printf("error !!!!!!!!!---%v\n", err)
+					}
+					fmt.Printf("%v>>>>>>>>>%v\n", i, el.Address.String())
 				}
 			}
 		}

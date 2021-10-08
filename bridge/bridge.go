@@ -23,6 +23,8 @@ import (
 func NewInvoiceBridge(grpcAddr, keyringPath, passcode string) (*InvChainBridge, error) {
 	var invoiceBridge InvChainBridge
 	var err error
+	invoiceBridge.logger = zlog.With().Str("module", "invoiceChain").Logger()
+
 	invoiceBridge.grpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
@@ -50,8 +52,6 @@ func NewInvoiceBridge(grpcAddr, keyringPath, passcode string) (*InvChainBridge, 
 	if err != nil {
 		return nil, err
 	}
-
-	invoiceBridge.logger = zlog.With().Str("module", "invoiceChain").Logger()
 
 	return &invoiceBridge, nil
 }
