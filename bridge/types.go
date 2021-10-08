@@ -16,9 +16,23 @@ const (
 )
 
 type InvChainBridge struct {
-	grpcClient   *grpc.ClientConn
-	wsClient     *tmclienthttp.HTTP
-	keyring      keyring.Keyring
-	logger       zerolog.Logger
-	validatorSet *validators.ValidatorSet
+	grpcClient      *grpc.ClientConn
+	wsClient        *tmclienthttp.HTTP
+	keyring         keyring.Keyring
+	logger          zerolog.Logger
+	validatorSet    *validators.ValidatorSet
+	myValidatorInfo Info
+}
+
+type Info struct {
+	Result struct {
+		ValidatorInfo struct {
+			Address string `json:"address"`
+			PubKey  struct {
+				Type  string `json:"type"`
+				Value string `json:"value"`
+			} `json:"pub_key"`
+			VotingPower string `json:"voting_power"`
+		} `json:"validator_info"`
+	} `json:"result"`
 }

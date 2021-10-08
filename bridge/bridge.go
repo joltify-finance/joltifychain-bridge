@@ -2,7 +2,6 @@ package bridge
 
 import (
 	"context"
-	"invoicebridge/validators"
 	"io/ioutil"
 	"log"
 
@@ -39,8 +38,6 @@ func NewInvoiceBridge(grpcAddr, keyringPath, passcode string) (*InvChainBridge, 
 	}
 
 	invoiceBridge.wsClient = client
-
-	invoiceBridge.validatorSet = validators.NewValidatorSet()
 
 	invoiceBridge.keyring = keyring.NewInMemory()
 

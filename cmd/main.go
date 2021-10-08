@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	zlog "github.com/rs/zerolog/log"
 	"invoicebridge/bridge"
 	"invoicebridge/config"
 	"log"
@@ -13,8 +14,6 @@ import (
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/types"
-
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 func SetupBech32Prefix() {
@@ -63,8 +62,10 @@ func main() {
 		fmt.Printf("fail to start the subscription")
 		return
 	}
-	err = invBridge.InitValidators()
+
+	err = invBridge.InitValidators(config.InvoiceChainConfig.RpcAddress)
 	if err != nil {
+		fmt.Printf("error in init the validators %v", err)
 		return
 	}
 	go func() {
@@ -74,15 +75,23 @@ func main() {
 			case <-c:
 				cancel()
 				return
-			case value := <-outChan:
-				vals := value.Data.(tmtypes.EventDataValidatorSetUpdates).ValidatorUpdates
+			case <-outChan:
+				err := invBridge.UpdateLatestValidator()
+				if err != nil {
+					zlog.Logger.Error().Msgf("fail to query the latest validator %v", err)
+				}
+
+				vals, blockHeight := invBridge.GetLatestValidator()
+
+				fmt.Printf(">>>>>>>>>>>>>>>>%v>>>>>>>>>>>>>>>\n", blockHeight)
+
 				for i, el := range vals {
-					fmt.Printf(">>>>>>>>>%v\n", el.Address.String())
-					adr, err := types.ConsAddressFromHex(el.Address.String())
-					if err != nil {
-						fmt.Printf("error !!!!!!!!!---%v\n", err)
-					}
-					fmt.Printf("%v--->%v(%v)\n", i, adr.String(), el.VotingPower)
+					fmt.Printf("%v>>>>>>>>>%v\n", i, el.Address)
+					//adr, err := types.ConsAddressFromHex(el.Address.String())
+					//if err != nil {
+					//	fmt.Printf("error !!!!!!!!!---%v\n", err)
+					//}
+					//fmt.Printf("%v--->%v(%v)\n", i, adr.String(), el.VotingPower)
 				}
 			}
 		}

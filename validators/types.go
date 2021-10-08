@@ -1,15 +1,12 @@
 package validators
 
-import tmtypes "github.com/tendermint/tendermint/types"
+import (
+	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
+	"sync"
+)
 
 type ValidatorSet struct {
-	currentValidators []*tmtypes.Validator
-	blockHeight       uint64
-}
-
-func NewValidatorSet() *ValidatorSet {
-	return &ValidatorSet{
-		make([]*tmtypes.Validator, 0),
-		0,
-	}
+	locker           *sync.RWMutex
+	activeValidators []*tmservice.Validator
+	blockHeight      int64
 }
