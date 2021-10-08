@@ -40,8 +40,9 @@ func main() {
 		log.Fatalln("the passcode is too long")
 		return
 	}
+
 	keyringPath := path.Join(config.HomeDir, config.KeyringAddress)
-	invBridge, err := bridge.NewInvoiceBridge(config.InvoiceChainConfig.GrpcAddress, keyringPath, "12345678")
+	invBridge, err := bridge.NewInvoiceBridge(config.InvoiceChainConfig.GrpcAddress, keyringPath, "12345678", config)
 	if err != nil {
 		log.Fatalln("fail to create the invoice bridge", err)
 		return
@@ -65,7 +66,7 @@ func main() {
 		return
 	}
 
-	err = invBridge.InitValidators(config.InvoiceChainConfig.RpcAddress)
+	err = invBridge.InitValidators(config.InvoiceChainConfig.RPCAddress)
 	if err != nil {
 		fmt.Printf("error in init the validators %v", err)
 		return

@@ -2,6 +2,8 @@ package bridge
 
 import (
 	"context"
+	"invoicebridge/config"
+	"invoicebridge/tssclient"
 	"io/ioutil"
 	"log"
 
@@ -20,7 +22,7 @@ import (
 	xauthsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
 
-func NewInvoiceBridge(grpcAddr, keyringPath, passcode string) (*InvChainBridge, error) {
+func NewInvoiceBridge(grpcAddr, keyringPath, passcode string, config config.Config) (*InvChainBridge, error) {
 	var invoiceBridge InvChainBridge
 	var err error
 	invoiceBridge.logger = zlog.With().Str("module", "invoiceChain").Logger()
@@ -32,7 +34,7 @@ func NewInvoiceBridge(grpcAddr, keyringPath, passcode string) (*InvChainBridge, 
 
 	client, err := tmclienthttp.New("tcp://localhost:26657", "/websocket")
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	err = client.Start()
 	if err != nil {
@@ -52,7 +54,12 @@ func NewInvoiceBridge(grpcAddr, keyringPath, passcode string) (*InvChainBridge, 
 	if err != nil {
 		return nil, err
 	}
-
+	// fixme, in docker it needs to be changed to basehome
+	tssServer, err := tssclient.StartTssServer("./", config.TssConfig)
+	if err != nil {
+		return nil, err
+	}
+	invoiceBridge.tssServer = tssServer
 	return &invoiceBridge, nil
 }
 
@@ -67,6 +74,7 @@ func (ic *InvChainBridge) TerminateBridge() error {
 		ic.logger.Error().Err(err).Msg("fail to terminate the grpc")
 		return err
 	}
+	ic.tssServer.Stop()
 	return nil
 }
 

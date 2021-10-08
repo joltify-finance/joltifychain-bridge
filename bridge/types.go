@@ -4,6 +4,8 @@ import (
 	"invoicebridge/validators"
 	"time"
 
+	"github.com/joltgeorge/tss/tss"
+
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/rs/zerolog"
 	tmclienthttp "github.com/tendermint/tendermint/rpc/client/http"
@@ -22,6 +24,7 @@ type InvChainBridge struct {
 	logger          zerolog.Logger
 	validatorSet    *validators.ValidatorSet
 	myValidatorInfo Info
+	tssServer       *tss.TssServer
 }
 
 type Info struct {
