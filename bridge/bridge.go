@@ -209,3 +209,8 @@ func (ic *InvChainBridge) SendToken(coins sdk.Coins, from, to sdk.AccAddress) er
 	}
 	return nil
 }
+
+func (iv *InvChainBridge) GetLastBlockHeight() (int64, error) {
+	b, err := GetLastBlockHeight(iv.grpcClient)
+	return b, err
+}

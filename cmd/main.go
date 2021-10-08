@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	zlog "github.com/rs/zerolog/log"
 	"invoicebridge/bridge"
 	"invoicebridge/config"
 	"log"
@@ -12,6 +11,8 @@ import (
 	"path"
 	"sync"
 	"time"
+
+	zlog "github.com/rs/zerolog/log"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -77,8 +78,13 @@ func main() {
 				cancel()
 				return
 			case vals := <-outChan:
+
+				height, err := invBridge.GetLastBlockHeight()
+				if err != nil {
+					continue
+				}
 				validatorUpdates := vals.Data.(tmtypes.EventDataValidatorSetUpdates).ValidatorUpdates
-				err := invBridge.UpdateLatestValidator(validatorUpdates)
+				err = invBridge.UpdateLatestValidator(validatorUpdates, height)
 				if err != nil {
 					zlog.Logger.Error().Msgf("fail to query the latest validator %v", err)
 				}

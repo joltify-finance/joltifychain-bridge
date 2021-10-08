@@ -4,20 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"invoicebridge/validators"
+	"time"
+
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/rest"
 
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	zlog "github.com/rs/zerolog/log"
-	"invoicebridge/validators"
-	"time"
 
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 func (ic *InvChainBridge) InitValidators(addr string) error {
-
 	ts := tmservice.NewServiceClient(ic.grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
@@ -83,9 +83,8 @@ func (ic *InvChainBridge) InitValidators(addr string) error {
 	return nil
 }
 
-func (ic *InvChainBridge) UpdateLatestValidator(validators []*tmtypes.Validator) error {
-	ic.validatorSet.UpdateValidatorSet(validators, 0)
-	return nil
+func (ic *InvChainBridge) UpdateLatestValidator(validators []*tmtypes.Validator, blockHeight int64) error {
+	return ic.validatorSet.UpdateValidatorSet(validators, blockHeight)
 }
 
 func (ic *InvChainBridge) GetLastValidator() ([]*validators.Validator, int64) {

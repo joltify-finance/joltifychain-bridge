@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"google.golang.org/grpc"
@@ -16,7 +17,7 @@ func QueryAccount(addr string, grpcClient *grpc.ClientConn) (authtypes.AccountI,
 		return nil, err
 	}
 
-	//acc := accResp.Account.GetCachedValue().(authtypes.AccountI)
+	// acc := accResp.Account.GetCachedValue().(authtypes.AccountI)
 	encCfg := MakeEncodingConfig()
 	var acc authtypes.AccountI
 	if err := encCfg.InterfaceRegistry.UnpackAny(accResp.Account, &acc); err != nil {
@@ -41,8 +42,7 @@ func QueryHistoricalValidator(grpcClient *grpc.ClientConn) (int64, []*tmservice.
 	return resp.BlockHeight, resp.Validators, nil
 }
 
-func GetLastBlock(grpcClient *grpc.ClientConn){
-
+func GetLastBlockHeight(grpcClient *grpc.ClientConn) (int64, error) {
 	ts := tmservice.NewServiceClient(grpcClient)
 
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
@@ -50,9 +50,7 @@ func GetLastBlock(grpcClient *grpc.ClientConn){
 
 	resp, err := ts.GetLatestBlock(ctx, &tmservice.GetLatestBlockRequest{})
 	if err != nil {
-		return 0, nil, err
+		return 0, err
 	}
-	resp.
-
-
+	return resp.Block.Header.Height, nil
 }
