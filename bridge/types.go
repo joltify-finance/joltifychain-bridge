@@ -1,10 +1,9 @@
 package bridge
 
 import (
+	"invoicebridge/tssclient"
 	"invoicebridge/validators"
 	"time"
-
-	"github.com/joltgeorge/tss/tss"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/rs/zerolog"
@@ -24,7 +23,8 @@ type InvChainBridge struct {
 	logger          zerolog.Logger
 	validatorSet    *validators.ValidatorSet
 	myValidatorInfo Info
-	tssServer       *tss.TssServer
+	tssServer       *tssclient.BridgeTssServer
+	cosKey          tssclient.CosPrivKey
 }
 
 type Info struct {

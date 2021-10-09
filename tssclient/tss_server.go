@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/joltgeorge/tss/keygen"
 	"invoicebridge/config"
 	"os"
 	"path"
@@ -13,38 +14,42 @@ import (
 	"github.com/joltgeorge/tss/common"
 	"github.com/libp2p/go-libp2p-peerstore/addr"
 
-	"github.com/joltgeorge/tss/tss"
+	tsslib "github.com/joltgeorge/tss/tss"
 
 	"github.com/tendermint/tendermint/crypto/ed25519"
 )
 
-func StartTssServer(baseFolder string, tssConfig config.TssConfig) (*tss.TssServer, error) {
+const version = "0.14.0"
+
+type BridgeTssServer struct {
+	ts *tsslib.TssServer
+}
+
+func StartTssServer(baseFolder string, tssConfig config.TssConfig) (*BridgeTssServer, CosPrivKey, error) {
 	golog.SetAllLoggers(golog.LevelInfo)
 	_ = golog.SetLogLevel("tss-lib", "INFO")
 
 	filePath := path.Join(baseFolder, "priv_validator_key.json")
-	fmt.Printf(">>>>>%v\n", filePath)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		fmt.Printf("unable to read the file, invalid path")
-		return nil, err
+		return nil, CosPrivKey{}, err
 	}
 
 	var key CosPrivKey
 	err = json.Unmarshal(data, &key)
 	if err != nil {
 		fmt.Printf("unable to unmarshal the private key file")
-		return nil, err
+		return nil, CosPrivKey{}, err
 	}
 	priKeyBytes, err := base64.StdEncoding.DecodeString(key.PrivKey.Value)
 	if err != nil {
 		fmt.Printf("fail to decode the private key")
-		return nil, err
+		return nil, CosPrivKey{}, err
 	}
 
 	var privKey ed25519.PrivKey
 	privKey = priKeyBytes
-	fmt.Printf(">>>>%v\n", privKey.Bytes())
 
 	tssTimeConfig := common.TssConfig{
 		PartyTimeout:    tssConfig.PartyTimeout,
@@ -54,7 +59,7 @@ func StartTssServer(baseFolder string, tssConfig config.TssConfig) (*tss.TssServ
 	}
 
 	// init tss module
-	tssServer, err := tss.NewTss(
+	ts, err := tsslib.NewTss(
 		addr.AddrList(tssConfig.BootstrapPeers),
 		tssConfig.Port,
 		privKey,
@@ -64,10 +69,23 @@ func StartTssServer(baseFolder string, tssConfig config.TssConfig) (*tss.TssServ
 		nil,
 		tssConfig.ExternalIP,
 	)
-	fmt.Printf(">>>>>>>>>>%v\n", err)
-	return tssServer, err
+
+	tc := BridgeTssServer{
+		ts,
+	}
+
+	return &tc, key, err
 }
 
-func StopTssServer(ts *tss.TssServer) {
-	ts.Stop()
+func (tc *BridgeTssServer) Keygen(keys []string, blockHeight int64, version string) (keygen.Response, error) {
+	req := keygen.NewRequest(keys, blockHeight, version)
+	resp, err := tc.ts.Keygen(req)
+	if err != nil {
+		return keygen.Response{}, err
+	}
+	return resp, nil
+}
+
+func (tc *BridgeTssServer) Stop() {
+	tc.ts.Stop()
 }

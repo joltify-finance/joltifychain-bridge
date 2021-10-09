@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	zlog "github.com/rs/zerolog/log"
-
 	"github.com/cosmos/cosmos-sdk/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 )
@@ -85,21 +83,8 @@ func main() {
 					continue
 				}
 				validatorUpdates := vals.Data.(tmtypes.EventDataValidatorSetUpdates).ValidatorUpdates
-				err = invBridge.UpdateLatestValidator(validatorUpdates, height)
-				if err != nil {
-					zlog.Logger.Error().Msgf("fail to query the latest validator %v", err)
-				}
+				invBridge.HandleUpdateValidators(validatorUpdates, height)
 
-				lastValidators, blockHeight := invBridge.GetLastValidator()
-
-				fmt.Printf(">>>>>>>>>>>>>>>>%v>>>>>>>>>>>>>>>\n", blockHeight)
-
-				for i, el := range lastValidators {
-					if err != nil {
-						fmt.Printf("error !!!!!!!!!---%v\n", err)
-					}
-					fmt.Printf("%v>>>>>>>>>%v\n", i, el.Address.String())
-				}
 			}
 		}
 	}()

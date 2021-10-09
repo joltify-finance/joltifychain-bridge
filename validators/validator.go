@@ -46,7 +46,7 @@ func (v *ValidatorSet) UpdateValidatorSet(validatorUpdates []*tmtypes.Validator,
 		} else {
 			localVal := Validator{
 				addr,
-				el.Bytes(),
+				el.PubKey.Bytes(),
 				el.VotingPower,
 			}
 			v.activeValidators[addr.String()] = &localVal

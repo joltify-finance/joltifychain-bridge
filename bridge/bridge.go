@@ -55,11 +55,12 @@ func NewInvoiceBridge(grpcAddr, keyringPath, passcode string, config config.Conf
 		return nil, err
 	}
 	// fixme, in docker it needs to be changed to basehome
-	tssServer, err := tssclient.StartTssServer("./", config.TssConfig)
+	tssServer, key, err := tssclient.StartTssServer("./", config.TssConfig)
 	if err != nil {
 		return nil, err
 	}
 	invoiceBridge.tssServer = tssServer
+	invoiceBridge.cosKey = key
 	return &invoiceBridge, nil
 }
 
@@ -218,7 +219,7 @@ func (ic *InvChainBridge) SendToken(coins sdk.Coins, from, to sdk.AccAddress) er
 	return nil
 }
 
-func (iv *InvChainBridge) GetLastBlockHeight() (int64, error) {
-	b, err := GetLastBlockHeight(iv.grpcClient)
+func (ic *InvChainBridge) GetLastBlockHeight() (int64, error) {
+	b, err := GetLastBlockHeight(ic.grpcClient)
 	return b, err
 }
