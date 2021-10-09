@@ -4,10 +4,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/joltgeorge/tss/keygen"
 	"invoicebridge/config"
 	"os"
 	"path"
+
+	"github.com/joltgeorge/tss/keygen"
 
 	golog "github.com/ipfs/go-log"
 
@@ -19,7 +20,7 @@ import (
 	"github.com/tendermint/tendermint/crypto/ed25519"
 )
 
-const version = "0.14.0"
+const Version = "0.14.0"
 
 type BridgeTssServer struct {
 	ts *tsslib.TssServer

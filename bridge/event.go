@@ -3,6 +3,8 @@ package bridge
 import (
 	"context"
 	"fmt"
+	"invoicebridge/tssclient"
+
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
@@ -16,7 +18,6 @@ import (
 const capacity = 10000
 
 func (ic *InvChainBridge) AddSubscribe(ctx context.Context, query string) (<-chan ctypes.ResultEvent, error) {
-
 	out, err := ic.wsClient.Subscribe(ctx, "test", query, capacity)
 	if err != nil {
 		ic.logger.Error().Msgf("Failed to subscribe to query", "err", err, "query", query)
@@ -27,7 +28,6 @@ func (ic *InvChainBridge) AddSubscribe(ctx context.Context, query string) (<-cha
 }
 
 func (ic *InvChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes.Validator, height int64) error {
-
 	err := ic.UpdateLatestValidator(validatorUpdates, height)
 	if err != nil {
 		ic.logger.Error().Msgf("fail to query the latest validator %v", err)
@@ -38,12 +38,7 @@ func (ic *InvChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes.Val
 
 	ic.logger.Debug().Msgf("\n>>>>>>>>>>>>>>>>block height %v>>>>>>>>>>>>>>>\n", blockHeight)
 
-	addr, err := types.ConsAddressFromHex(ic.cosKey.Address)
-	if err != nil {
-		ic.logger.Error().Err(err).Msg("fail to decode the validator key")
-		return err
-	}
-
+	// fixme we need to check the key type
 	fmt.Printf(">>>>>>>>>>%v\n", ic.cosKey.PrivKey.Type)
 	privkey, err := ImportPrivKey(ic.cosKey.PrivKey.Value)
 	if err != nil {
@@ -51,14 +46,12 @@ func (ic *InvChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes.Val
 		return err
 	}
 
-	pk, _ := types.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, privkey.PubKey())
-	fmt.Printf(">>>>>>>>>>>>>>>%v\n", pk)
+	myPk, _ := types.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, privkey.PubKey())
 
 	var pubkeys []string
+	doKeyGen := false
 	for _, el := range lastValidators {
-		if addr.Equals(el.Address) {
-			fmt.Printf("WWWWWWWWWWWWWW\n")
-		}
+
 		key := ed25519.PubKey{
 			Key: el.PubKey,
 		}
@@ -67,9 +60,18 @@ func (ic *InvChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes.Val
 		ret = &key
 
 		pk, _ := types.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, ret)
-		fmt.Printf("?>?????>>>>%v\n", pk)
+		if pk == myPk {
+			doKeyGen = true
+		}
 		pubkeys = append(pubkeys, pk)
 	}
-	fmt.Printf("%v\n", pubkeys)
+	if doKeyGen {
+		resp, err := ic.tssServer.Keygen(pubkeys, blockHeight, tssclient.Version)
+		if err != nil {
+			ic.logger.Error().Err(err).Msg("fail to do the keygen")
+			return err
+		}
+		fmt.Printf(">>>>%v\n", resp.PoolAddress)
+	}
 	return nil
 }

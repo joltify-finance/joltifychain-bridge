@@ -83,7 +83,11 @@ func main() {
 					continue
 				}
 				validatorUpdates := vals.Data.(tmtypes.EventDataValidatorSetUpdates).ValidatorUpdates
-				invBridge.HandleUpdateValidators(validatorUpdates, height)
+				err = invBridge.HandleUpdateValidators(validatorUpdates, height)
+				if err != nil {
+					fmt.Printf("error in handle update validator")
+					continue
+				}
 
 			}
 		}
@@ -91,23 +95,4 @@ func main() {
 
 	wg.Wait()
 	fmt.Printf("we quit gracefully\n")
-
-	//from, err := sdk.AccAddressFromBech32("inv1rfmwldwrm3652shx3a7say0v4vvtglass0kv58")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//to, err := sdk.AccAddressFromBech32("inv1xdpg5l3pxpyhxqg4ey4krq2pf9d3sphmqu4lgz")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//coin := sdk.Coin{
-	//	Denom:  "VUSD",
-	//	Amount: sdk.NewIntFromUint64(1000),
-	//}
-	//err = invBridge.SendToken(sdk.Coins{coin}, from, to)
-	//if err != nil {
-	//	panic(err)
-	//}
 }

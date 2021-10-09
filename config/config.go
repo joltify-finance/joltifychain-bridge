@@ -70,7 +70,7 @@ func DefaultConfig() Config {
 	flag.StringVar(&config.InvoiceChainConfig.RPCAddress, "rpc-port", "http://localhost:26657", "rpc address for invoice chain")
 	flag.StringVar(&config.InvoiceChainConfig.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for invoice chain")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
-	flag.StringVar(&config.HomeDir, "home", "./", "home director for bridge")
+	flag.StringVar(&config.HomeDir, "home", "/root/.invoiceChain/config", "home director for bridge")
 
 	// we setup the Tss parameter configuration
 	flag.DurationVar(&config.TssConfig.KeyGenTimeout, "gentimeout", 30*time.Second, "keygen timeout")
