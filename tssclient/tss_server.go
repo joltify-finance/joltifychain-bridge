@@ -87,6 +87,10 @@ func (tc *BridgeTssServer) Keygen(keys []string, blockHeight int64, version stri
 	return resp, nil
 }
 
+func (tc *BridgeTssServer) GetTssNodeID() string {
+	return tc.ts.GetLocalPeerID()
+}
+
 func (tc *BridgeTssServer) Stop() {
 	tc.ts.Stop()
 }

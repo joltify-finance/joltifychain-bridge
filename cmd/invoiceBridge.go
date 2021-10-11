@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/types"
+	golog "github.com/ipfs/go-log"
+	"github.com/joltgeorge/tss/common"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"invoicebridge/bridge"
 	"invoicebridge/config"
 	"log"
@@ -11,9 +15,6 @@ import (
 	"path"
 	"sync"
 	"time"
-
-	"github.com/cosmos/cosmos-sdk/types"
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 func SetupBech32Prefix() {
@@ -27,6 +28,9 @@ func SetupBech32Prefix() {
 func main() {
 	SetupBech32Prefix()
 	config := config.DefaultConfig()
+
+	_ = golog.SetLogLevel("tss-lib", "INFO")
+	common.InitLog("info", true, "invoiceBridge_service")
 
 	passcodeLength := 32
 	passcode := make([]byte, passcodeLength)
@@ -52,32 +56,57 @@ func main() {
 		}
 	}()
 	wg := sync.WaitGroup{}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithCancel(context.Background())
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
-	wg.Add(1)
-
-	query := "tm.event = 'ValidatorSetUpdates'"
-	outChan, err := invBridge.AddSubscribe(ctx, query)
-	if err != nil {
-		fmt.Printf("fail to start the subscription")
-		return
-	}
 
 	err = invBridge.InitValidators(config.InvoiceChainConfig.RPCAddress)
 	if err != nil {
 		fmt.Printf("error in init the validators %v", err)
 		return
 	}
+	tssHttpServer := NewTssHttpServer(config.TssConfig.HttpAddr, invBridge.GetTssNodeID(), ctx)
+
+	wg.Add(1)
+	ret := tssHttpServer.Start(&wg)
+	if ret != nil {
+		cancel()
+		return
+	}
+
+	wg.Add(1)
+	addEventLoop(ctx, wg, invBridge)
+
+	select {
+	case <-c:
+		cancel()
+		return
+	case <-ctx.Done():
+		return
+	}
+	wg.Wait()
+	fmt.Printf("we quit gracefully\n")
+}
+
+func addEventLoop(ctx context.Context, wg sync.WaitGroup, invBridge *bridge.InvChainBridge) {
+
+	defer wg.Done()
+	query := "tm.event = 'ValidatorSetUpdates'"
+	ctxLocal, cancelLocal := context.WithTimeout(ctx, time.Second*5)
+	defer cancelLocal()
+	outChan, err := invBridge.AddSubscribe(ctxLocal, query)
+	if err != nil {
+		fmt.Printf("fail to start the subscription")
+		return
+	}
+
 	go func() {
-		defer wg.Done()
+
 		for {
 			select {
-			case <-c:
-				cancel()
+			case <-ctx.Done():
 				return
 			case vals := <-outChan:
-
 				height, err := invBridge.GetLastBlockHeight()
 				if err != nil {
 					continue
@@ -88,11 +117,9 @@ func main() {
 					fmt.Printf("error in handle update validator")
 					continue
 				}
-
 			}
 		}
+
 	}()
 
-	wg.Wait()
-	fmt.Printf("we quit gracefully\n")
 }

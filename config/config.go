@@ -34,6 +34,7 @@ type (
 		Port             int
 		BootstrapPeers   addrList
 		ExternalIP       string
+		HttpAddr         string
 	}
 )
 
@@ -71,6 +72,7 @@ func DefaultConfig() Config {
 	flag.StringVar(&config.InvoiceChainConfig.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for invoice chain")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
 	flag.StringVar(&config.HomeDir, "home", "/root/.invoiceChain/config", "home director for bridge")
+	flag.StringVar(&config.TssConfig.HttpAddr, "tss-http-port", "0.0.0.0:8321", "tss http port for info only")
 
 	// we setup the Tss parameter configuration
 	flag.DurationVar(&config.TssConfig.KeyGenTimeout, "gentimeout", 30*time.Second, "keygen timeout")

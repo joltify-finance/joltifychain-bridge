@@ -13,7 +13,7 @@ tools:
 	go install ./cmd/tss-benchsign
 
 install: go.sum
-	go install ./cmd/bridge.go
+	go install ./cmd/invoiceBridge.go ./cmd/http.go
 
 go.sum: go.mod
 	@echo "--> Ensure dependencies have not been modified"

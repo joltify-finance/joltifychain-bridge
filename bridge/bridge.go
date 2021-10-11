@@ -55,6 +55,7 @@ func NewInvoiceBridge(grpcAddr, keyringPath, passcode string, config config.Conf
 		return nil, err
 	}
 	// fixme, in docker it needs to be changed to basehome
+
 	tssServer, key, err := tssclient.StartTssServer(config.HomeDir, config.TssConfig)
 	if err != nil {
 		return nil, err
@@ -62,6 +63,10 @@ func NewInvoiceBridge(grpcAddr, keyringPath, passcode string, config config.Conf
 	invoiceBridge.tssServer = tssServer
 	invoiceBridge.cosKey = key
 	return &invoiceBridge, nil
+}
+
+func (ic *InvChainBridge) GetTssNodeID() string {
+	return ic.tssServer.GetTssNodeID()
 }
 
 func (ic *InvChainBridge) TerminateBridge() error {

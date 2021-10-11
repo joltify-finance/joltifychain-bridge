@@ -2,7 +2,6 @@ package bridge
 
 import (
 	"context"
-	"fmt"
 	"invoicebridge/tssclient"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -36,10 +35,9 @@ func (ic *InvChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes.Val
 
 	lastValidators, blockHeight := ic.GetLastValidator()
 
-	ic.logger.Debug().Msgf("\n>>>>>>>>>>>>>>>>block height %v>>>>>>>>>>>>>>>\n", blockHeight)
+	ic.logger.Info().Msgf(">>>>>>>>>>>>>>>>at block height %v system do keygen>>>>>>>>>>>>>>>\n", blockHeight)
 
 	// fixme we need to check the key type
-	fmt.Printf(">>>>>>>>>>%v\n", ic.cosKey.PrivKey.Type)
 	privkey, err := ImportPrivKey(ic.cosKey.PrivKey.Value)
 	if err != nil {
 		ic.logger.Error().Err(err).Msg("fail to import the cosmos private key")
@@ -71,7 +69,7 @@ func (ic *InvChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes.Val
 			ic.logger.Error().Err(err).Msg("fail to do the keygen")
 			return err
 		}
-		fmt.Printf(">>>>%v\n", resp.PoolAddress)
+		ic.logger.Info().Msgf(">>>>%v\n", resp.PoolAddress)
 	}
 	return nil
 }

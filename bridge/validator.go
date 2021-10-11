@@ -38,7 +38,7 @@ func (ic *InvChainBridge) InitValidators(addr string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf(">>>>>>>>>>>>>>>>node %v attached>>>>>>>>.\n", nodeInfo.GetDefaultNodeInfo().Moniker)
+	ic.logger.Info().Msgf(">>>>>>>>>>>>>>>>node %v attached>>>>>>>>\n", nodeInfo.GetDefaultNodeInfo().Moniker)
 
 	restRes, err := rest.GetRequest(fmt.Sprintf("%s/status", addr))
 	if err != nil {
