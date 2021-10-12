@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"github.com/froyobin/invoiceChain/x/vault/types"
 	"invoicebridge/config"
 	"invoicebridge/tssclient"
 	"io/ioutil"
@@ -140,12 +141,13 @@ func (ic *InvChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64)
 	}
 
 	// Generate a JSON string.
-	txJSONBytes, err := encCfg.TxConfig.TxJSONEncoder()(txBuilder.GetTx())
-	if err != nil {
-		return nil, "", err
-	}
-	txJSON := string(txJSONBytes)
-	ic.logger.Debug().Msg(txJSON)
+	//txJSONBytes, err := encCfg.TxConfig.TxJSONEncoder()(txBuilder.GetTx())
+	//if err != nil {
+	//	fmt.Printf(">>>>fail to see the json %v", err)
+	//	return nil, "", err
+	//}
+	//txJSON := string(txJSONBytes)
+	//ic.logger.Debug().Msg(txJSON)
 	return txBytes, "", nil
 }
 
@@ -196,7 +198,7 @@ func (ic *InvChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (bool
 	}
 
 	if grpcRes.GetTxResponse().Code != 0 {
-		ic.logger.Error().Msgf("fail to broadcast with err", grpcRes.TxResponse.Info)
+		ic.logger.Error().Err(err).Msgf("fail to broadcast with response %v", grpcRes.TxResponse)
 		return false, "", nil
 	}
 	txHash := grpcRes.GetTxResponse().TxHash
@@ -207,6 +209,27 @@ func (ic *InvChainBridge) SendToken(coins sdk.Coins, from, to sdk.AccAddress) er
 	msg := banktypes.NewMsgSend(from, to, coins)
 
 	acc, err := QueryAccount(from.String(), ic.grpcClient)
+	if err != nil {
+		ic.logger.Error().Err(err).Msg("Fail to quer the account")
+		return err
+	}
+	txbytes, _, err := ic.SendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber())
+	if err != nil {
+		ic.logger.Error().Err(err).Msg("fail to generate the tx")
+		return err
+	}
+	ok, _, err := ic.BroadcastTx(context.Background(), txbytes)
+	if err != nil || !ok {
+		ic.logger.Error().Err(err).Msg("fail to broadcast the tx")
+		return err
+	}
+	return nil
+}
+
+func (ic *InvChainBridge) BroadcastTssPool(creator sdk.AccAddress, address, pubKey, height string) error {
+	msg := types.NewMsgCreateCreatePool(creator, pubKey, address, height)
+
+	acc, err := QueryAccount(creator.String(), ic.grpcClient)
 	if err != nil {
 		ic.logger.Error().Err(err).Msg("Fail to quer the account")
 		return err

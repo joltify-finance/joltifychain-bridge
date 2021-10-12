@@ -2,7 +2,10 @@ package bridge
 
 import (
 	"context"
+	"fmt"
+	"github.com/joltgeorge/tss/common"
 	"invoicebridge/tssclient"
+	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 
@@ -69,7 +72,25 @@ func (ic *InvChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes.Val
 			ic.logger.Error().Err(err).Msg("fail to do the keygen")
 			return err
 		}
-		ic.logger.Info().Msgf(">>>>%v\n", resp.PoolAddress)
+		if resp.Status != common.Success {
+			//todo we need to put our blame on chain as well
+			ic.logger.Error().Msgf("we fail to ge the valid key")
+			return nil
+		}
+		// now we put the tss key on chain
+		creator, err := ic.keyring.Key("operator")
+		if err != nil {
+			ic.logger.Error().Msgf("fail to get the operator key :%v", err)
+			return err
+		}
+		fmt.Printf(">>>>>%v:::%v:::%v\n", resp.PoolAddress, resp.PubKey, blockHeight)
+		err = ic.BroadcastTssPool(creator.GetAddress(), resp.PoolAddress, resp.PubKey, strconv.FormatInt(blockHeight, 10))
+		if err != nil {
+			ic.logger.Error().Msgf("fail to broadcast the tss generated key on chain")
+			return err
+		}
+		ic.logger.Info().Msgf("successfully upload the tss key info on chain")
+		return nil
 	}
 	return nil
 }
