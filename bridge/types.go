@@ -16,6 +16,11 @@ const (
 	chainID     = "invoiceChain"
 )
 
+type TssPoolMsg struct {
+	data        []byte
+	blockHeight int64
+}
+
 type InvChainBridge struct {
 	grpcClient      *grpc.ClientConn
 	wsClient        *tmclienthttp.HTTP
@@ -25,6 +30,7 @@ type InvChainBridge struct {
 	myValidatorInfo Info
 	tssServer       *tssclient.BridgeTssServer
 	cosKey          tssclient.CosPrivKey
+	msgSendCache    []TssPoolMsg
 }
 
 type Info struct {

@@ -100,6 +100,13 @@ func addEventLoop(ctx context.Context, wg sync.WaitGroup, invBridge *bridge.InvC
 		return
 	}
 
+	query = "tm.event = 'NewBlock'"
+	outChanNewBlock, err := invBridge.AddSubscribe(ctxLocal, query)
+	if err != nil {
+		fmt.Printf("fail to start the subscription")
+		return
+	}
+
 	go func() {
 
 		for {
@@ -117,6 +124,8 @@ func addEventLoop(ctx context.Context, wg sync.WaitGroup, invBridge *bridge.InvC
 					fmt.Printf("error in handle update validator")
 					continue
 				}
+			case block := <-outChanNewBlock:
+				invBridge.TriggerSend(block.Data.(tmtypes.EventDataNewBlock).Block.Height)
 			}
 		}
 

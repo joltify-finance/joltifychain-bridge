@@ -2,10 +2,10 @@ package bridge
 
 import (
 	"context"
-	"fmt"
-	"github.com/joltgeorge/tss/common"
 	"invoicebridge/tssclient"
 	"strconv"
+
+	"github.com/joltgeorge/tss/common"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 
@@ -83,8 +83,8 @@ func (ic *InvChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes.Val
 			ic.logger.Error().Msgf("fail to get the operator key :%v", err)
 			return err
 		}
-		fmt.Printf(">>>>>%v:::%v:::%v\n", resp.PoolAddress, resp.PubKey, blockHeight)
-		err = ic.BroadcastTssPool(creator.GetAddress(), resp.PoolAddress, resp.PubKey, strconv.FormatInt(blockHeight, 10))
+
+		err = ic.BroadcastTssPool(creator.GetAddress(), resp.PubKey, strconv.FormatInt(blockHeight+1, 10))
 		if err != nil {
 			ic.logger.Error().Msgf("fail to broadcast the tss generated key on chain")
 			return err

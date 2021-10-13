@@ -2,11 +2,13 @@ package bridge
 
 import (
 	"context"
-	"github.com/froyobin/invoiceChain/x/vault/types"
 	"invoicebridge/config"
 	"invoicebridge/tssclient"
 	"io/ioutil"
 	"log"
+	"strconv"
+
+	"github.com/froyobin/invoiceChain/x/vault/types"
 
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	tmclienthttp "github.com/tendermint/tendermint/rpc/client/http"
@@ -63,6 +65,9 @@ func NewInvoiceBridge(grpcAddr, keyringPath, passcode string, config config.Conf
 	}
 	invoiceBridge.tssServer = tssServer
 	invoiceBridge.cosKey = key
+
+	invoiceBridge.msgSendCache = []TssPoolMsg{}
+
 	return &invoiceBridge, nil
 }
 
@@ -226,8 +231,8 @@ func (ic *InvChainBridge) SendToken(coins sdk.Coins, from, to sdk.AccAddress) er
 	return nil
 }
 
-func (ic *InvChainBridge) BroadcastTssPool(creator sdk.AccAddress, address, pubKey, height string) error {
-	msg := types.NewMsgCreateCreatePool(creator, pubKey, address, height)
+func (ic *InvChainBridge) BroadcastTssPool(creator sdk.AccAddress, pubKey, height string) error {
+	msg := types.NewMsgCreateCreatePool(creator, pubKey, height)
 
 	acc, err := QueryAccount(creator.String(), ic.grpcClient)
 	if err != nil {
@@ -239,9 +244,21 @@ func (ic *InvChainBridge) BroadcastTssPool(creator sdk.AccAddress, address, pubK
 		ic.logger.Error().Err(err).Msg("fail to generate the tx")
 		return err
 	}
-	ok, _, err := ic.BroadcastTx(context.Background(), txbytes)
+
+	dHeight, err := strconv.ParseInt(height, 10, 64)
+	if err != nil {
+		ic.logger.Error().Err(err).Msgf("fail to parse the height")
+		return err
+	}
+
+	item := TssPoolMsg{
+		txbytes,
+		dHeight,
+	}
+	ic.msgSendCache = append(ic.msgSendCache, item)
+	ok, resp, err := ic.BroadcastTx(context.Background(), txbytes)
 	if err != nil || !ok {
-		ic.logger.Error().Err(err).Msg("fail to broadcast the tx")
+		ic.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
 		return err
 	}
 	return nil
@@ -250,4 +267,25 @@ func (ic *InvChainBridge) BroadcastTssPool(creator sdk.AccAddress, address, pubK
 func (ic *InvChainBridge) GetLastBlockHeight() (int64, error) {
 	b, err := GetLastBlockHeight(ic.grpcClient)
 	return b, err
+}
+
+func (ic *InvChainBridge) TriggerSend(blockHeight int64) {
+
+	if len(ic.msgSendCache) < 1 {
+		return
+	}
+
+	el := ic.msgSendCache[0]
+	if el.blockHeight == blockHeight {
+		ic.logger.Info().Msgf("we are submit the block at height>>>>>>>>%v\n", el.blockHeight)
+		ok, resp, err := ic.BroadcastTx(context.Background(), el.data)
+		if err != nil || !ok {
+			ic.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
+			return
+		}
+		ic.msgSendCache = ic.msgSendCache[1:]
+		ic.logger.Info().Msgf("successfully broadcast the pool info")
+		return
+	}
+
 }
