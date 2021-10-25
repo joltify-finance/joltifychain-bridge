@@ -94,7 +94,7 @@ func addEventLoop(ctx context.Context, wg sync.WaitGroup, invBridge *bridge.InvC
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(ctx, time.Second*5)
 	defer cancelLocal()
-	outChan, err := invBridge.AddSubscribe(ctxLocal, query)
+	subOutChan, err := invBridge.AddSubscribe(ctxLocal, query)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return
@@ -107,13 +107,15 @@ func addEventLoop(ctx context.Context, wg sync.WaitGroup, invBridge *bridge.InvC
 		return
 	}
 
+	//now we monitor the bsc transfer event
+
 	go func() {
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case vals := <-outChan:
+			case vals := <-subOutChan:
 				height, err := invBridge.GetLastBlockHeight()
 				if err != nil {
 					continue

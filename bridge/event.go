@@ -84,7 +84,7 @@ func (ic *InvChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes.Val
 			return err
 		}
 
-		err = ic.BroadcastTssPool(creator.GetAddress(), resp.PubKey, strconv.FormatInt(blockHeight+1, 10))
+		err = ic.PrepareTssPool(creator.GetAddress(), resp.PubKey, strconv.FormatInt(blockHeight+1, 10))
 		if err != nil {
 			ic.logger.Error().Msgf("fail to broadcast the tss generated key on chain")
 			return err

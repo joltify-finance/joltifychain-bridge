@@ -3,6 +3,7 @@ package bridge
 import (
 	"invoicebridge/tssclient"
 	"invoicebridge/validators"
+	"sync"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -22,15 +23,17 @@ type TssPoolMsg struct {
 }
 
 type InvChainBridge struct {
-	grpcClient      *grpc.ClientConn
-	wsClient        *tmclienthttp.HTTP
-	keyring         keyring.Keyring
-	logger          zerolog.Logger
-	validatorSet    *validators.ValidatorSet
-	myValidatorInfo Info
-	tssServer       *tssclient.BridgeTssServer
-	cosKey          tssclient.CosPrivKey
-	msgSendCache    []TssPoolMsg
+	grpcClient        *grpc.ClientConn
+	wsClient          *tmclienthttp.HTTP
+	keyring           keyring.Keyring
+	logger            zerolog.Logger
+	validatorSet      *validators.ValidatorSet
+	myValidatorInfo   Info
+	tssServer         *tssclient.BridgeTssServer
+	cosKey            tssclient.CosPrivKey
+	poolUpdateLocker  *sync.Mutex
+	msgSendCache      []TssPoolMsg
+	LastTwoTssPoolMsg []*TssPoolMsg
 }
 
 type Info struct {

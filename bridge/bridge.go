@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"strconv"
+	"sync"
 
 	"github.com/froyobin/invoiceChain/x/vault/types"
 
@@ -67,6 +68,8 @@ func NewInvoiceBridge(grpcAddr, keyringPath, passcode string, config config.Conf
 	invoiceBridge.cosKey = key
 
 	invoiceBridge.msgSendCache = []TssPoolMsg{}
+	invoiceBridge.LastTwoTssPoolMsg = []*TssPoolMsg{nil, nil}
+	invoiceBridge.poolUpdateLocker = &sync.Mutex{}
 
 	return &invoiceBridge, nil
 }
@@ -231,12 +234,12 @@ func (ic *InvChainBridge) SendToken(coins sdk.Coins, from, to sdk.AccAddress) er
 	return nil
 }
 
-func (ic *InvChainBridge) BroadcastTssPool(creator sdk.AccAddress, pubKey, height string) error {
+func (ic *InvChainBridge) PrepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
 	msg := types.NewMsgCreateCreatePool(creator, pubKey, height)
 
 	acc, err := QueryAccount(creator.String(), ic.grpcClient)
 	if err != nil {
-		ic.logger.Error().Err(err).Msg("Fail to quer the account")
+		ic.logger.Error().Err(err).Msg("Fail to query the account")
 		return err
 	}
 	txbytes, _, err := ic.SendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber())
@@ -255,12 +258,12 @@ func (ic *InvChainBridge) BroadcastTssPool(creator sdk.AccAddress, pubKey, heigh
 		txbytes,
 		dHeight,
 	}
+	ic.poolUpdateLocker.Lock()
+	// we store the latest two tss pool address
+	ic.LastTwoTssPoolMsg[0] = ic.LastTwoTssPoolMsg[1]
+	ic.LastTwoTssPoolMsg[1] = &item
 	ic.msgSendCache = append(ic.msgSendCache, item)
-	ok, resp, err := ic.BroadcastTx(context.Background(), txbytes)
-	if err != nil || !ok {
-		ic.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
-		return err
-	}
+	ic.poolUpdateLocker.Unlock()
 	return nil
 }
 
@@ -271,11 +274,12 @@ func (ic *InvChainBridge) GetLastBlockHeight() (int64, error) {
 
 func (ic *InvChainBridge) TriggerSend(blockHeight int64) {
 
+	ic.poolUpdateLocker.Lock()
 	if len(ic.msgSendCache) < 1 {
 		return
 	}
-
 	el := ic.msgSendCache[0]
+	ic.poolUpdateLocker.Unlock()
 	if el.blockHeight == blockHeight {
 		ic.logger.Info().Msgf("we are submit the block at height>>>>>>>>%v\n", el.blockHeight)
 		ok, resp, err := ic.BroadcastTx(context.Background(), el.data)
