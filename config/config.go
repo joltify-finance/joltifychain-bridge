@@ -71,7 +71,7 @@ func DefaultConfig() Config {
 	flag.StringVar(&config.InvoiceChainConfig.RPCAddress, "rpc-port", "http://localhost:26657", "rpc address for invoice chain")
 	flag.StringVar(&config.InvoiceChainConfig.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for invoice chain")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
-	flag.StringVar(&config.HomeDir, "home", "/root/.invoiceChain/config", "home director for bridge")
+	flag.StringVar(&config.HomeDir, "home", "/root/.joltifyChain/config", "home director for bridge")
 	flag.StringVar(&config.TssConfig.HttpAddr, "tss-http-port", "0.0.0.0:8321", "tss http port for info only")
 
 	// we setup the Tss parameter configuration
@@ -81,7 +81,7 @@ func DefaultConfig() Config {
 	flag.BoolVar(&config.TssConfig.EnableMonitor, "enablemonitor", true, "enable the tss monitor")
 
 	// we setup the p2p network configuration
-	flag.StringVar(&config.TssConfig.RendezvousString, "rendezvous", "invoiceChainTss",
+	flag.StringVar(&config.TssConfig.RendezvousString, "rendezvous", "joltifyChainTss",
 		"Unique string to identify group of nodes. Share this with your friends to let them connect with you")
 	flag.IntVar(&config.TssConfig.Port, "p2p-port", 6668, "listening port local")
 	flag.StringVar(&config.TssConfig.ExternalIP, "external-ip", "", "external IP of this node")

@@ -7,8 +7,8 @@ import (
 	golog "github.com/ipfs/go-log"
 	"github.com/joltgeorge/tss/common"
 	tmtypes "github.com/tendermint/tendermint/types"
-	"invoicebridge/bridge"
-	"invoicebridge/config"
+	"joltifybridge/bridge"
+	"joltifybridge/config"
 	"log"
 	"os"
 	"os/signal"
@@ -20,9 +20,9 @@ import (
 func SetupBech32Prefix() {
 	config := types.GetConfig()
 	// thorchain will import go-tss as a library , thus this is not needed, we copy the prefix here to avoid go-tss to import thorchain
-	config.SetBech32PrefixForAccount("inv", "invpub")
-	config.SetBech32PrefixForValidator("invval", "invvpub")
-	config.SetBech32PrefixForConsensusNode("invvalcons", "invcpub")
+	config.SetBech32PrefixForAccount("jolt", "joltpub")
+	config.SetBech32PrefixForValidator("joltval", "joltvpub")
+	config.SetBech32PrefixForConsensusNode("joltvalcons", "joltcpub")
 }
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 	config := config.DefaultConfig()
 
 	_ = golog.SetLogLevel("tss-lib", "INFO")
-	common.InitLog("info", true, "invoiceBridge_service")
+	common.InitLog("info", true, "joltifyBridge_service")
 
 	passcodeLength := 32
 	passcode := make([]byte, passcodeLength)

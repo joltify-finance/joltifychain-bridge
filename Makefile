@@ -1,4 +1,4 @@
-module = gitlab.com/thorchain/tss/go-tss
+module = gitlab.com/joltify/joltifyBridge
 
 .PHONY: clear tools install test test-watch lint-pre lint lint-verbose protob build docker-gitlab-login docker-gitlab-push docker-gitlab-build
 
@@ -7,13 +7,9 @@ all: lint build
 clear:
 	clear
 
-tools:
-	go install ./cmd/tss-recovery
-	go install ./cmd/tss-benchgen
-	go install ./cmd/tss-benchsign
 
 install: go.sum
-	go install ./cmd/invoiceBridge.go ./cmd/http.go
+	go install ./cmd/joltifyBridge.go ./cmd/http.go
 
 go.sum: go.mod
 	@echo "--> Ensure dependencies have not been modified"
@@ -47,8 +43,8 @@ docker-gitlab-login:
 	docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
 
 docker-gitlab-push:
-	docker push registry.gitlab.com/thorchain/tss/go-tss
+	docker push registry.gitlab.com/joltify/tss/go-tss
 
 docker-gitlab-build:
-	docker build -t registry.gitlab.com/thorchain/tss/go-tss .
-	docker tag registry.gitlab.com/thorchain/tss/go-tss $$(git rev-parse --short HEAD)
+	docker build -t registry.gitlab.com/joltify/tss/go-tss .
+	docker tag registry.gitlab.com/joltify/tss/go-tss $$(git rev-parse --short HEAD)

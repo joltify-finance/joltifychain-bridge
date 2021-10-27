@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"invoicebridge/validators"
+	"joltifybridge/validators"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"

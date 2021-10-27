@@ -2,7 +2,7 @@ package bridge
 
 import (
 	"context"
-	"invoicebridge/tssclient"
+	"joltifybridge/tssclient"
 	"strconv"
 
 	"github.com/joltgeorge/tss/common"
@@ -20,7 +20,7 @@ import (
 const capacity = 10000
 
 func (ic *InvChainBridge) AddSubscribe(ctx context.Context, query string) (<-chan ctypes.ResultEvent, error) {
-	out, err := ic.wsClient.Subscribe(ctx, "test", query, capacity)
+	out, err := ic.wsClient.Subscribe(ctx, "joltifyBridge", query, capacity)
 	if err != nil {
 		ic.logger.Error().Msgf("Failed to subscribe to query", "err", err, "query", query)
 		return nil, err

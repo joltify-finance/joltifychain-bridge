@@ -2,14 +2,14 @@ package bridge
 
 import (
 	"context"
-	"invoicebridge/config"
-	"invoicebridge/tssclient"
 	"io/ioutil"
+	"joltifybridge/config"
+	"joltifybridge/tssclient"
 	"log"
 	"strconv"
 	"sync"
 
-	"github.com/froyobin/invoiceChain/x/vault/types"
+	"github.com/joltify/joltifyChain/x/vault/types"
 
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	tmclienthttp "github.com/tendermint/tendermint/rpc/client/http"
@@ -29,7 +29,7 @@ import (
 func NewInvoiceBridge(grpcAddr, keyringPath, passcode string, config config.Config) (*InvChainBridge, error) {
 	var invoiceBridge InvChainBridge
 	var err error
-	invoiceBridge.logger = zlog.With().Str("module", "invoiceChain").Logger()
+	invoiceBridge.logger = zlog.With().Str("module", "joltifyChain").Logger()
 
 	invoiceBridge.grpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
 	if err != nil {
@@ -276,6 +276,7 @@ func (ic *InvChainBridge) TriggerSend(blockHeight int64) {
 
 	ic.poolUpdateLocker.Lock()
 	if len(ic.msgSendCache) < 1 {
+		ic.poolUpdateLocker.Unlock()
 		return
 	}
 	el := ic.msgSendCache[0]

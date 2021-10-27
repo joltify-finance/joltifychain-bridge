@@ -1,8 +1,8 @@
 package bridge
 
 import (
-	"invoicebridge/tssclient"
-	"invoicebridge/validators"
+	"joltifybridge/tssclient"
+	"joltifybridge/validators"
 	"sync"
 	"time"
 
@@ -14,7 +14,7 @@ import (
 
 const (
 	grpcTimeout = time.Second * 10
-	chainID     = "invoiceChain"
+	chainID     = "joltifyChain"
 )
 
 type TssPoolMsg struct {
