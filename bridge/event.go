@@ -22,7 +22,7 @@ const capacity = 10000
 func (ic *InvChainBridge) AddSubscribe(ctx context.Context, query string) (<-chan ctypes.ResultEvent, error) {
 	out, err := ic.wsClient.Subscribe(ctx, "joltifyBridge", query, capacity)
 	if err != nil {
-		ic.logger.Error().Msgf("Failed to subscribe to query", "err", err, "query", query)
+		ic.logger.Error().Err(err).Msgf("Failed to subscribe to query", "err", err, "query", query)
 		return nil, err
 	}
 
@@ -67,13 +67,13 @@ func (ic *InvChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes.Val
 		pubkeys = append(pubkeys, pk)
 	}
 	if doKeyGen {
-		resp, err := ic.tssServer.Keygen(pubkeys, blockHeight, tssclient.Version)
+		resp, err := ic.tssServer.Keygen(pubkeys, blockHeight, tssclient.TssVersion)
 		if err != nil {
 			ic.logger.Error().Err(err).Msg("fail to do the keygen")
 			return err
 		}
 		if resp.Status != common.Success {
-			//todo we need to put our blame on chain as well
+			// todo we need to put our blame on chain as well
 			ic.logger.Error().Msgf("we fail to ge the valid key")
 			return nil
 		}

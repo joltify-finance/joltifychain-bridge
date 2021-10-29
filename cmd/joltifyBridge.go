@@ -3,11 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cosmos/cosmos-sdk/types"
-	golog "github.com/ipfs/go-log"
-	"github.com/joltgeorge/tss/common"
-	tmtypes "github.com/tendermint/tendermint/types"
 	"joltifybridge/bridge"
+	"joltifybridge/chain"
 	"joltifybridge/config"
 	"log"
 	"os"
@@ -15,9 +12,19 @@ import (
 	"path"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
+
+	zlog "github.com/rs/zerolog/log"
+
+	"github.com/cosmos/cosmos-sdk/types"
+
+	golog "github.com/ipfs/go-log"
+	"github.com/joltgeorge/tss/common"
+	tmtypes "github.com/tendermint/tendermint/types"
 )
 
-func SetupBech32Prefix() {
+func setupBech32Prefix() {
 	config := types.GetConfig()
 	// thorchain will import go-tss as a library , thus this is not needed, we copy the prefix here to avoid go-tss to import thorchain
 	config.SetBech32PrefixForAccount("jolt", "joltpub")
@@ -26,11 +33,17 @@ func SetupBech32Prefix() {
 }
 
 func main() {
-	SetupBech32Prefix()
+	setupBech32Prefix()
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	config := config.DefaultConfig()
 
 	_ = golog.SetLogLevel("tss-lib", "INFO")
 	common.InitLog("info", true, "joltifyBridge_service")
+
+	wg := sync.WaitGroup{}
+	ctx, cancel := context.WithCancel(context.Background())
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
 
 	passcodeLength := 32
 	passcode := make([]byte, passcodeLength)
@@ -55,41 +68,47 @@ func main() {
 			return
 		}
 	}()
-	wg := sync.WaitGroup{}
-	ctx, cancel := context.WithCancel(context.Background())
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
 
 	err = invBridge.InitValidators(config.InvoiceChainConfig.RPCAddress)
 	if err != nil {
 		fmt.Printf("error in init the validators %v", err)
 		return
 	}
-	tssHttpServer := NewTssHttpServer(config.TssConfig.HttpAddr, invBridge.GetTssNodeID(), ctx)
+	tssHTTPServer := NewTssHttpServer(config.TssConfig.HttpAddr, invBridge.GetTssNodeID(), ctx)
 
 	wg.Add(1)
-	ret := tssHttpServer.Start(&wg)
+	ret := tssHTTPServer.Start(&wg)
 	if ret != nil {
 		cancel()
 		return
 	}
 
+	// now we monitor the bsc transfer event
+	ci, err := chain.NewChainInstance(config.PubChainConfig.WsAddress, config.PubChainConfig.TokenAddress)
+	if err != nil {
+		fmt.Printf("fail to connect the public chain with address %v\n", config.PubChainConfig.WsAddress)
+		return
+	}
+	//fixme for current testing purpose,we set the pool address to be the local wallet
+	err = ci.UpdatePool("bDf7Fb0Ad9b0D722ea54D808b79751608E7AE991")
+	if err != nil {
+		fmt.Printf("invalid pool address!!!")
+		return
+	}
+
 	wg.Add(1)
-	addEventLoop(ctx, wg, invBridge)
+	addEventLoop(ctx, &wg, invBridge, ci)
 
 	select {
 	case <-c:
+		ctx.Done()
 		cancel()
-		return
-	case <-ctx.Done():
-		return
 	}
 	wg.Wait()
 	fmt.Printf("we quit gracefully\n")
 }
 
-func addEventLoop(ctx context.Context, wg sync.WaitGroup, invBridge *bridge.InvChainBridge) {
-
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, invBridge *bridge.InvChainBridge, ci *chain.PubChainInstance) {
 	defer wg.Done()
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(ctx, time.Second*5)
@@ -107,10 +126,15 @@ func addEventLoop(ctx context.Context, wg sync.WaitGroup, invBridge *bridge.InvC
 		return
 	}
 
-	//now we monitor the bsc transfer event
+	wg.Add(1)
+
+	blockHeadChan, err := ci.StartSubscription(ctx, wg)
+	if err != nil {
+		fmt.Printf("fail to subscribe the token transfer with err %v\n", err)
+		return
+	}
 
 	go func() {
-
 		for {
 			select {
 			case <-ctx.Done():
@@ -128,9 +152,17 @@ func addEventLoop(ctx context.Context, wg sync.WaitGroup, invBridge *bridge.InvC
 				}
 			case block := <-outChanNewBlock:
 				invBridge.TriggerSend(block.Data.(tmtypes.EventDataNewBlock).Block.Height)
+			case tokenTransfer := <-ci.GetSubChannel():
+				err := ci.ProcessInBound(tokenTransfer)
+				if err != nil {
+					zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
+				}
+			case head := <-blockHeadChan:
+				err := ci.ProcessNewBlock(head.Number)
+				if err != nil {
+					zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
+				}
 			}
 		}
-
 	}()
-
 }

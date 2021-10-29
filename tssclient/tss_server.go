@@ -20,12 +20,15 @@ import (
 	"github.com/tendermint/tendermint/crypto/ed25519"
 )
 
-const Version = "0.14.0"
+//TssVersion that we apply to
+const TssVersion = "0.14.0"
 
+//BridgeTssServer the entity of tss server
 type BridgeTssServer struct {
 	ts *tsslib.TssServer
 }
 
+//StartTssServer start the tss server
 func StartTssServer(baseFolder string, tssConfig config.TssConfig) (*BridgeTssServer, CosPrivKey, error) {
 	golog.SetAllLoggers(golog.LevelInfo)
 	_ = golog.SetLogLevel("tss-lib", "INFO")
@@ -78,6 +81,7 @@ func StartTssServer(baseFolder string, tssConfig config.TssConfig) (*BridgeTssSe
 	return &tc, key, err
 }
 
+//Keygen generate the tss key
 func (tc *BridgeTssServer) Keygen(keys []string, blockHeight int64, version string) (keygen.Response, error) {
 	req := keygen.NewRequest(keys, blockHeight, version)
 	resp, err := tc.ts.Keygen(req)
@@ -87,10 +91,12 @@ func (tc *BridgeTssServer) Keygen(keys []string, blockHeight int64, version stri
 	return resp, nil
 }
 
+//GetTssNodeID get the tss node ID
 func (tc *BridgeTssServer) GetTssNodeID() string {
 	return tc.ts.GetLocalPeerID()
 }
 
+//Stop stop the tss server
 func (tc *BridgeTssServer) Stop() {
 	tc.ts.Stop()
 }

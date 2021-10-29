@@ -4,16 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"sync"
+
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"net/http"
-	"sync"
 )
 
-// TssHttpServer provide http endpoint for tss server
-type TssHttpServer struct {
+// TssHTTPServer provide http endpoint for tss server
+type TssHTTPServer struct {
 	logger zerolog.Logger
 	s      *http.Server
 	peerID string
@@ -21,8 +22,8 @@ type TssHttpServer struct {
 }
 
 // NewTssHttpServer should only listen to the loopback
-func NewTssHttpServer(tssAddr string, peerID string, ctx context.Context) *TssHttpServer {
-	hs := &TssHttpServer{
+func NewTssHttpServer(tssAddr string, peerID string, ctx context.Context) *TssHTTPServer {
+	hs := &TssHTTPServer{
 		logger: log.With().Str("module", "http").Logger(),
 		peerID: peerID,
 		ctx:    ctx,
@@ -49,7 +50,7 @@ func logMiddleware() mux.MiddlewareFunc {
 	}
 }
 
-func (t *TssHttpServer) getP2pIDHandler(w http.ResponseWriter, _ *http.Request) {
+func (t *TssHTTPServer) getP2pIDHandler(w http.ResponseWriter, _ *http.Request) {
 	_, err := w.Write([]byte(t.peerID))
 	if err != nil {
 		t.logger.Error().Err(err).Msg("fail to write to response")
@@ -57,7 +58,7 @@ func (t *TssHttpServer) getP2pIDHandler(w http.ResponseWriter, _ *http.Request) 
 }
 
 // NewHandler registers the API routes and returns a new HTTP handler
-func (t *TssHttpServer) tssNewHandler() http.Handler {
+func (t *TssHTTPServer) tssNewHandler() http.Handler {
 	router := mux.NewRouter()
 	router.Handle("/p2pid", http.HandlerFunc(t.getP2pIDHandler)).Methods(http.MethodGet)
 	router.Handle("/metrics", promhttp.Handler())
@@ -65,7 +66,7 @@ func (t *TssHttpServer) tssNewHandler() http.Handler {
 	return router
 }
 
-func (t *TssHttpServer) Start(wg *sync.WaitGroup) error {
+func (t *TssHTTPServer) Start(wg *sync.WaitGroup) error {
 	if t.s == nil {
 		return errors.New("invalid http server instance")
 	}
@@ -76,12 +77,14 @@ func (t *TssHttpServer) Start(wg *sync.WaitGroup) error {
 				globalErr = err
 			}
 		}
-
 	}()
 
 	go func() {
 		<-t.ctx.Done()
-		t.s.Shutdown(t.ctx)
+		err := t.s.Shutdown(t.ctx)
+		if err != nil {
+			t.logger.Error().Err(err).Msg("fail to shut down the http server gracefully")
+		}
 		fmt.Printf("we quit the http service")
 		wg.Done()
 	}()

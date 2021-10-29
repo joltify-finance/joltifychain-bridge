@@ -1,13 +1,14 @@
 package validators
 
 import (
+	"sync"
+
 	"github.com/cosmos/cosmos-sdk/types"
 	tmtypes "github.com/tendermint/tendermint/types"
-	"sync"
 )
 
+//NewValidator initialize a validator set
 func NewValidator() *ValidatorSet {
-
 	return &ValidatorSet{
 		&sync.RWMutex{},
 		make(map[string]*Validator),
@@ -15,6 +16,7 @@ func NewValidator() *ValidatorSet {
 	}
 }
 
+//SetupValidatorSet set up the validator set
 func (v *ValidatorSet) SetupValidatorSet(validators []*Validator, blockHeight int64) {
 	v.locker = &sync.RWMutex{}
 	v.locker.Lock()
@@ -32,6 +34,7 @@ func (v *ValidatorSet) SetupValidatorSet(validators []*Validator, blockHeight in
 	}
 }
 
+//UpdateValidatorSet updates the validator set
 func (v *ValidatorSet) UpdateValidatorSet(validatorUpdates []*tmtypes.Validator, blockHeight int64) error {
 	v.locker.Lock()
 	defer v.locker.Unlock()
@@ -55,6 +58,7 @@ func (v *ValidatorSet) UpdateValidatorSet(validatorUpdates []*tmtypes.Validator,
 	return nil
 }
 
+//GetActiveValidators get the active validators
 func (v *ValidatorSet) GetActiveValidators() ([]*Validator, int64) {
 	v.locker.RLock()
 	defer v.locker.RUnlock()
@@ -62,7 +66,7 @@ func (v *ValidatorSet) GetActiveValidators() ([]*Validator, int64) {
 	i := 0
 	for _, el := range v.activeValidators {
 		activeValidators[i] = el
-		i += 1
+		i++
 	}
 	return activeValidators, v.blockHeight
 }
