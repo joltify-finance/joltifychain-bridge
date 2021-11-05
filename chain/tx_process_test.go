@@ -124,7 +124,7 @@ func TestProcessInBound(t *testing.T) {
 	tToken.Raw.Address = common.HexToAddress(iNBoundToken)
 	err = ci.ProcessInBound(&tToken)
 	require.Nil(t, err)
-	a, _ := ci.pendingAccounts[testTxHash.Hex()[2:]]
+	a := ci.pendingAccounts[testTxHash.Hex()[2:]]
 	require.True(t, a.token.Equal(testCoin))
 
 	// same tx hash should be rejected
@@ -272,7 +272,7 @@ func TestProcessEachBlock(t *testing.T) {
 	err = ci.UpdatePool(account2)
 	require.Nil(t, err)
 	ci.processEachBlock(&tBlock)
-	ret, _ := ci.pendingAccounts[encodeStr]
+	ret := ci.pendingAccounts[encodeStr]
 	// indicate nothing happens
 	require.True(t, ret.fee.Amount.Equal(sdk.NewIntFromUint64(1)))
 

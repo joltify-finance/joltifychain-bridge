@@ -2,14 +2,13 @@ package bridge
 
 import (
 	"context"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/tssclient"
+	"gitlab.com/joltify/joltifychain/joltifychain/x/vault/types"
 	"io/ioutil"
-	"joltifybridge/config"
-	"joltifybridge/tssclient"
 	"log"
 	"strconv"
 	"sync"
-
-	"github.com/joltify/joltifyChain/x/vault/types"
 
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	tmclienthttp "github.com/tendermint/tendermint/rpc/client/http"
@@ -140,7 +139,11 @@ func (ic *InvChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64)
 		ic.logger.Error().Err(err).Msg("fail to generate the signature")
 		return nil, "", err
 	}
-	txBuilder.SetSignatures(signatureV2)
+	err = txBuilder.SetSignatures(signatureV2)
+	if err != nil {
+		ic.logger.Error().Err(err).Msgf("fail to set the signature")
+		return nil, "", err
+	}
 
 	// Generated Protobuf-encoded bytes.
 	txBytes, err := encCfg.TxConfig.TxEncoder()(txBuilder.GetTx())

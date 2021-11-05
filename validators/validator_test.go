@@ -57,7 +57,8 @@ func TestNewValidator(t *testing.T) {
 	uv1 := tmtypes.NewValidator(sk4.PubKey(), 10)
 	uv2 := tmtypes.NewValidator(sk2.PubKey(), 0)
 
-	validatorSet.UpdateValidatorSet([]*tmtypes.Validator{uv1, uv2}, 20)
+	err = validatorSet.UpdateValidatorSet([]*tmtypes.Validator{uv1, uv2}, 20)
+	require.Nil(t, err)
 
 	validators, height := validatorSet.GetActiveValidators()
 	for k := range validators {

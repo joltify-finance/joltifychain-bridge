@@ -1,8 +1,8 @@
 package bridge
 
 import (
-	"joltifybridge/tssclient"
-	"joltifybridge/validators"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/tssclient"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/validators"
 	"sync"
 	"time"
 

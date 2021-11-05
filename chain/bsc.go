@@ -45,13 +45,10 @@ func (ci *PubChainInstance) StartSubscription(ctx context.Context, wg *sync.Wait
 	}
 
 	go func() {
-		select {
-		case <-ctx.Done():
-			blockSub.Unsubscribe()
-			ci.logger.Info().Msgf("shutdown the public chain subscription channel")
-			wg.Done()
-			return
-		}
+		<-ctx.Done()
+		blockSub.Unsubscribe()
+		ci.logger.Info().Msgf("shutdown the public chain subscription channel")
+		wg.Done()
 	}()
 	return blockEvent, nil
 }

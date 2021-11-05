@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"joltifybridge/config"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/config"
 	"os"
 	"path"
 
@@ -52,8 +52,7 @@ func StartTssServer(baseFolder string, tssConfig config.TssConfig) (*BridgeTssSe
 		return nil, CosPrivKey{}, err
 	}
 
-	var privKey ed25519.PrivKey
-	privKey = priKeyBytes
+	var privKey ed25519.PrivKey = priKeyBytes
 
 	tssTimeConfig := common.TssConfig{
 		PartyTimeout:    tssConfig.PartyTimeout,

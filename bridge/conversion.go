@@ -12,8 +12,8 @@ func ImportPrivKey(privkey string) (cryptotypes.PrivKey, error) {
 		return nil, err
 	}
 
-	var ret cryptotypes.PrivKey
-	ret = &ed25519.PrivKey{
+	//var ret cryptotypes.PrivKey
+	ret := &ed25519.PrivKey{
 		Key: privkeyBytes,
 	}
 	return ret, nil

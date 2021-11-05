@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"joltifybridge/validators"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/validators"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
@@ -17,6 +17,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
+//InitValidators initialize the validators
 func (ic *InvChainBridge) InitValidators(addr string) error {
 	ts := tmservice.NewServiceClient(ic.grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
@@ -83,10 +84,12 @@ func (ic *InvChainBridge) InitValidators(addr string) error {
 	return nil
 }
 
+//UpdateLatestValidator update the validator set
 func (ic *InvChainBridge) UpdateLatestValidator(validators []*tmtypes.Validator, blockHeight int64) error {
 	return ic.validatorSet.UpdateValidatorSet(validators, blockHeight)
 }
 
+//GetLastValidator get the last validator set
 func (ic *InvChainBridge) GetLastValidator() ([]*validators.Validator, int64) {
 	validators, blockHeight := ic.validatorSet.GetActiveValidators()
 	return validators, blockHeight

@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"joltifybridge/bridge"
-	"joltifybridge/chain"
-	"joltifybridge/config"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/bridge"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/chain"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/config"
 	"log"
 	"os"
 	"os/signal"
@@ -99,11 +99,9 @@ func main() {
 	wg.Add(1)
 	addEventLoop(ctx, &wg, invBridge, ci)
 
-	select {
-	case <-c:
-		ctx.Done()
-		cancel()
-	}
+	<-c
+	ctx.Done()
+	cancel()
 	wg.Wait()
 	fmt.Printf("we quit gracefully\n")
 }
@@ -113,14 +111,15 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, invBridge *bridge.Inv
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(ctx, time.Second*5)
 	defer cancelLocal()
-	subOutChan, err := invBridge.AddSubscribe(ctxLocal, query)
+
+	validatorUpdateChan, err := invBridge.AddSubscribe(ctxLocal, query)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return
 	}
 
 	query = "tm.event = 'NewBlock'"
-	outChanNewBlock, err := invBridge.AddSubscribe(ctxLocal, query)
+	newBlockChan, err := invBridge.AddSubscribe(ctxLocal, query)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return
@@ -139,7 +138,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, invBridge *bridge.Inv
 			select {
 			case <-ctx.Done():
 				return
-			case vals := <-subOutChan:
+			case vals := <-validatorUpdateChan:
 				height, err := invBridge.GetLastBlockHeight()
 				if err != nil {
 					continue
@@ -150,8 +149,10 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, invBridge *bridge.Inv
 					fmt.Printf("error in handle update validator")
 					continue
 				}
-			case block := <-outChanNewBlock:
+
+			case block := <-newBlockChan:
 				invBridge.TriggerSend(block.Data.(tmtypes.EventDataNewBlock).Block.Height)
+
 			case tokenTransfer := <-ci.GetSubChannel():
 				err := ci.ProcessInBound(tokenTransfer)
 				if err != nil {
