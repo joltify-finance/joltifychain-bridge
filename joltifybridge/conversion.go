@@ -1,4 +1,4 @@
-package bridge
+package joltifybridge
 
 import (
 	"encoding/base64"

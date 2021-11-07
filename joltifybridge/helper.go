@@ -1,14 +1,16 @@
-package bridge
+package joltifybridge
 
 import (
 	"context"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	vaulttypes "gitlab.com/joltify/joltifychain/joltifychain/x/vault/types"
 	"google.golang.org/grpc"
 )
 
-func QueryAccount(addr string, grpcClient *grpc.ClientConn) (authtypes.AccountI, error) {
+//queryAccount get the current sender account info
+func queryAccount(addr string, grpcClient *grpc.ClientConn) (authtypes.AccountI, error) {
 	accQuery := authtypes.NewQueryClient(grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
@@ -26,7 +28,23 @@ func QueryAccount(addr string, grpcClient *grpc.ClientConn) (authtypes.AccountI,
 	return acc, nil
 }
 
-func QueryHistoricalValidator(grpcClient *grpc.ClientConn) (int64, []*tmservice.Validator, error) {
+//queryLastValidatorSet get the last two validator sets
+func queryLastValidatorSet(grpcClient *grpc.ClientConn) ([]*vaulttypes.PoolInfo, error) {
+	ts := vaulttypes.NewQueryClient(grpcClient)
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
+
+	req := vaulttypes.QueryLatestPoolRequest{}
+	resp, err := ts.GetLastPool(ctx, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Pools, nil
+}
+
+//QueryTipValidator get the validator set of the tip of the current pub_chain
+func QueryTipValidator(grpcClient *grpc.ClientConn) (int64, []*tmservice.Validator, error) {
 	ts := tmservice.NewServiceClient(grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
@@ -36,9 +54,6 @@ func QueryHistoricalValidator(grpcClient *grpc.ClientConn) (int64, []*tmservice.
 		return 0, nil, err
 	}
 
-	//for i, el := range resp.Validators {
-	//	fmt.Printf("%v========%v\n", i, el.GetAddress())
-	//}
 	return resp.BlockHeight, resp.Validators, nil
 }
 

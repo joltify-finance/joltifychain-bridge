@@ -1,6 +1,7 @@
-package chain
+package pubchain
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/types"
@@ -18,7 +19,7 @@ func SetupBech32Prefix() {
 func TestAccount_Verify(t *testing.T) {
 	SetupBech32Prefix()
 	type fields struct {
-		address   types.AccAddress
+		address   common.Address
 		direction direction
 		token     types.Coin
 		fee       types.Coin
@@ -26,6 +27,7 @@ func TestAccount_Verify(t *testing.T) {
 
 	addr, err := types.AccAddressFromBech32("jolt1ljh48799pqcnezpsjr69ukpfq4mgapvpr7kzhm")
 	assert.Nil(t, err)
+	hexAddr := common.BytesToAddress(addr.Bytes())
 
 	minFee, err := types.NewDecFromStr(inBoundFeeMin)
 	assert.Nil(t, err)
@@ -42,7 +44,7 @@ func TestAccount_Verify(t *testing.T) {
 		{
 			name: "test ok",
 			fields: fields{
-				address:   addr,
+				address:   hexAddr,
 				direction: inBound,
 				fee:       types.Coin{Denom: inBoundDenom, Amount: types.NewIntFromBigInt(larger.BigInt())},
 			},
@@ -51,7 +53,7 @@ func TestAccount_Verify(t *testing.T) {
 		{
 			name: "not enough fee",
 			fields: fields{
-				address:   addr,
+				address:   hexAddr,
 				direction: inBound,
 				fee:       types.Coin{Denom: inBoundDenom, Amount: types.NewIntFromBigInt(small.BigInt())},
 			},
@@ -60,7 +62,7 @@ func TestAccount_Verify(t *testing.T) {
 		{
 			name: "wrong demon",
 			fields: fields{
-				address:   addr,
+				address:   hexAddr,
 				direction: inBound,
 				fee:       types.Coin{Denom: "wrong", Amount: types.NewIntFromBigInt(small.BigInt())},
 			},
@@ -70,19 +72,17 @@ func TestAccount_Verify(t *testing.T) {
 		{
 			name: "exact fee",
 			fields: fields{
-				address:   addr,
+				address:   hexAddr,
 				direction: inBound,
 				fee:       types.Coin{Denom: "wrong", Amount: types.NewIntFromBigInt(minFee.BigInt())},
 			},
 			wantErr: true,
 		},
-
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &bridgeTx{
-				address:   tt.fields.address.String(),
+				address:   tt.fields.address,
 				direction: tt.fields.direction,
 				token:     tt.fields.token,
 				fee:       tt.fields.fee,

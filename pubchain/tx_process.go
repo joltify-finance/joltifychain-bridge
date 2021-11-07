@@ -1,10 +1,9 @@
-package chain
+package pubchain
 
 import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -25,7 +24,7 @@ func (ci *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
 	return err
 }
 
-// ProcessNewBlock process the blocks received from the public chain
+// ProcessNewBlock process the blocks received from the public pub_chain
 func (ci *PubChainInstance) ProcessNewBlock(number *big.Int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
@@ -55,7 +54,7 @@ func (ci *PubChainInstance) updateBridgeTx(txID string, amount *big.Int, directi
 	err := thisAccount.Verify()
 	if err != nil {
 		ci.pendingAccounts[txID] = thisAccount
-		ci.logger.Warn().Msgf("the account cannot be processed on joltify chain this round")
+		ci.logger.Warn().Msgf("the account cannot be processed on joltify pub_chain this round")
 		return nil
 	}
 	// since this tx is processed,we do not need to store it any longer
@@ -78,7 +77,7 @@ func (ci *PubChainInstance) addBridgeTx(txID string, from common.Address, value 
 	}
 
 	token := types.Coin{
-		Denom:  iNBoundToken,
+		Denom:  iNBoundTokenSymbol,
 		Amount: types.NewIntFromBigInt(value),
 	}
 	fee := types.Coin{
@@ -87,7 +86,7 @@ func (ci *PubChainInstance) addBridgeTx(txID string, from common.Address, value 
 	}
 
 	acc := bridgeTx{
-		from.String(),
+		from,
 		direction,
 		time.Now(),
 		token,
@@ -98,12 +97,13 @@ func (ci *PubChainInstance) addBridgeTx(txID string, from common.Address, value 
 	return nil
 }
 
+//fixme we need to check timeout to remove the pending transactions
 func (ci *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil || tx.Value() == nil {
 			continue
 		}
-		if ci.checkToBridge(tx.To().String()) {
+		if ci.checkToBridge(*tx.To()) {
 			if tx.Data() == nil {
 				ci.logger.Warn().Msgf("we have received unknown fund")
 				continue
@@ -111,41 +111,39 @@ func (ci *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 			payTxID := tx.Data()
 			account := ci.updateBridgeTx(hex.EncodeToString(payTxID), tx.Value(), inBound)
 			if account != nil {
-				fmt.Printf("BridgeTx %s is ready to send %v\n tokens to joltify Chain!!!", account.address, account.token.String())
+				item := newAccountInboundReq(account.address, *tx.To(), account.token)
+				ci.AccountInboundReqChan <- &item
+				//fmt.Printf("BridgeTx %s is ready to send %v\n tokens to joltify Chain!!!", account.address, account.token.String())
 			}
 		}
 	}
 }
 
 // UpdatePool update the tss pool address
-func (ci *PubChainInstance) UpdatePool(poolAddr string) error {
-	_, err := types.AccAddressFromHex(poolAddr)
-	if err != nil {
-		return err
-	}
+func (ci *PubChainInstance) UpdatePool(poolAddr common.Address) {
 	ci.poolLocker.Lock()
 	defer ci.poolLocker.Unlock()
-	if ci.lastTwoPools[1] != "" {
+	if len(ci.lastTwoPools[1]) != 0 {
 		ci.lastTwoPools[0] = ci.lastTwoPools[1]
 	}
-	ci.lastTwoPools[1] = "0x" + poolAddr
-	return nil
+	ci.lastTwoPools[1] = poolAddr
+	return
 }
 
 // GetPool get the latest two pool address
-func (ci *PubChainInstance) getPool() []string {
+func (ci *PubChainInstance) GetPool() []common.Address {
 	ci.poolLocker.RLock()
 	defer ci.poolLocker.RUnlock()
-	var ret []string
+	var ret []common.Address
 	ret = append(ret, ci.lastTwoPools...)
 	return ret
 }
 
 // GetPool get the latest two pool address
-func (ci *PubChainInstance) checkToBridge(dest string) bool {
-	pools := ci.getPool()
+func (ci *PubChainInstance) checkToBridge(dest common.Address) bool {
+	pools := ci.GetPool()
 	for _, el := range pools {
-		if dest == el {
+		if dest.String() == el.String() {
 			return true
 		}
 	}

@@ -1,4 +1,4 @@
-package chain
+package pubchain
 
 import (
 	"encoding/hex"
@@ -32,19 +32,19 @@ func TestUpdatePoolAndGetPool(t *testing.T) {
 
 	err = ci.UpdatePool(account1)
 	require.Nil(t, err)
-	pools := ci.getPool()
+	pools := ci.GetPool()
 	require.Equal(t, pools[0], "")
 	require.Equal(t, pools[1], "0x"+account1)
 
 	err = ci.UpdatePool(account2)
 	require.Nil(t, err)
-	pools = ci.getPool()
+	pools = ci.GetPool()
 	require.Equal(t, pools[0], "0x"+account1)
 	require.Equal(t, pools[1], "0x"+account2)
 
 	err = ci.UpdatePool(account3)
 	require.Nil(t, err)
-	pools = ci.getPool()
+	pools = ci.GetPool()
 	require.Equal(t, pools[0], "0x"+account2)
 	require.Equal(t, pools[1], "0x"+account3)
 }
@@ -245,10 +245,11 @@ func TestProcessEachBlock(t *testing.T) {
 	tBlock := ethTypes.Block{}
 
 	ci := PubChainInstance{
-		lastTwoPools:         make([]string, 2),
-		poolLocker:           sync.RWMutex{},
-		pendingAccounts:      make(map[string]*bridgeTx),
-		pendingAccountLocker: sync.RWMutex{},
+		lastTwoPools:          make([]common.Address, 2),
+		poolLocker:            sync.RWMutex{},
+		pendingAccounts:       make(map[string]*bridgeTx),
+		pendingAccountLocker:  sync.RWMutex{},
+		AccountInboundReqChan: make(chan *AccountInboundReq, 1),
 	}
 	fromStr := "90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"
 	coin := sdk.Coin{
@@ -282,7 +283,7 @@ func TestProcessEachBlock(t *testing.T) {
 		GasLimit:   12345678,
 		GasUsed:    1476322,
 		Time:       9876543,
-		Extra:      []byte("coolest block on chain"),
+		Extra:      []byte("coolest block on pub_chain"),
 	}
 
 	tBlock1 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718Tx}, nil, nil, newHasher())

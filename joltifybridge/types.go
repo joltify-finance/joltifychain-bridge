@@ -1,4 +1,4 @@
-package bridge
+package joltifybridge
 
 import (
 	"gitlab.com/joltify/joltifychain/joltifychain-bridge/tssclient"
@@ -17,26 +17,30 @@ const (
 	chainID     = "joltifyChain"
 )
 
-type TssPoolMsg struct {
+//tssPoolMsg this is the pool pre-submit message for the given height
+type tssPoolMsg struct {
 	data        []byte
+	poolPubKey  string
 	blockHeight int64
 }
 
-type InvChainBridge struct {
+//JoltifyChainBridge defines the types for joltify pub_chain side
+type JoltifyChainBridge struct {
 	grpcClient        *grpc.ClientConn
 	wsClient          *tmclienthttp.HTTP
 	keyring           keyring.Keyring
 	logger            zerolog.Logger
 	validatorSet      *validators.ValidatorSet
-	myValidatorInfo   Info
+	myValidatorInfo   info
 	tssServer         *tssclient.BridgeTssServer
 	cosKey            tssclient.CosPrivKey
 	poolUpdateLocker  *sync.Mutex
-	msgSendCache      []TssPoolMsg
-	LastTwoTssPoolMsg []*TssPoolMsg
+	msgSendCache      []tssPoolMsg
+	LastTwoTssPoolMsg []*tssPoolMsg
 }
 
-type Info struct {
+//info the import structure of the cosmos validator info
+type info struct {
 	Result struct {
 		ValidatorInfo struct {
 			Address string `json:"address"`

@@ -9,7 +9,7 @@ clear:
 
 
 install: go.sum
-	go install ./cmd/joltifyBridge.go ./cmd/http.go
+	go install ./cmd/joltifyBridge.go
 
 go.sum: go.mod
 	@echo "--> Ensure dependencies have not been modified"

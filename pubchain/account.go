@@ -1,4 +1,4 @@
-package chain
+package pubchain
 
 import (
 	"errors"
@@ -6,7 +6,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-// Verify is the function  to verify the correctness of the account on bridge
+// Verify is the function  to verify the correctness of the account on joltify_bridge
 func (a *bridgeTx) Verify() error {
 	if a.direction == inBound {
 		if a.fee.Denom != inBoundDenom {

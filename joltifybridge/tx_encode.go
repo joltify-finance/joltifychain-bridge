@@ -1,4 +1,4 @@
-package bridge
+package joltifybridge
 
 import (
 	"github.com/cosmos/cosmos-sdk/codec"

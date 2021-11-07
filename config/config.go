@@ -72,14 +72,14 @@ type Config struct {
 
 func DefaultConfig() Config {
 	var config Config
-	flag.StringVar(&config.InvoiceChainConfig.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for invoice chain")
-	flag.StringVar(&config.InvoiceChainConfig.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for invoice chain")
-	flag.StringVar(&config.InvoiceChainConfig.RPCAddress, "rpc-port", "http://localhost:26657", "rpc address for invoice chain")
-	flag.StringVar(&config.InvoiceChainConfig.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for invoice chain")
-	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://10.1.194.26:8456/", "endpoint for public chain listener")
+	flag.StringVar(&config.InvoiceChainConfig.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for invoice pub_chain")
+	flag.StringVar(&config.InvoiceChainConfig.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for invoice pub_chain")
+	flag.StringVar(&config.InvoiceChainConfig.RPCAddress, "rpc-port", "http://localhost:26657", "rpc address for invoice pub_chain")
+	flag.StringVar(&config.InvoiceChainConfig.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for invoice pub_chain")
+	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://10.1.194.26:8456/", "endpoint for public pub_chain listener")
 	flag.StringVar(&config.PubChainConfig.TokenAddress, "pub-token-addr", "0x6ca715403f18259e971cbfe74aee60bea3781ba6", "monitored token address")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
-	flag.StringVar(&config.HomeDir, "home", "/root/.joltifyChain/config", "home director for bridge")
+	flag.StringVar(&config.HomeDir, "home", "/root/.joltifyChain/config", "home director for joltify_bridge")
 	flag.StringVar(&config.TssConfig.HttpAddr, "tss-http-port", "0.0.0.0:8321", "tss http port for info only")
 
 	// we setup the Tss parameter configuration

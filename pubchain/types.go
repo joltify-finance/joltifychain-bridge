@@ -1,0 +1,133 @@
+package pubchain
+
+import (
+	"errors"
+	"github.com/ethereum/go-ethereum/common"
+	"sync"
+	"time"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
+	"github.com/ethereum/go-ethereum/event"
+)
+
+const (
+	inBoundDenom       = "BNB"
+	OutBoundDenom      = "jolt"
+	inBoundFeeMin      = "0.000000000000001"
+	OUTBoundFeeOut     = "0.000000000000001"
+	PendingAccountsize = 1024
+	iNBoundToken       = "0x6CA715403f18259e971cbfe74aEe60beA3781bA6"
+	iNBoundTokenSymbol = "jusd"
+)
+
+const (
+	inBound = iota
+	outBound
+	QueryTimeOut = time.Second * 3
+)
+
+// direction is the direction of the joltify_bridge
+type direction int
+
+type tokenSb struct {
+	tokenInstance *Token
+	sb            chan *TokenTransfer
+	sbEvent       event.Subscription
+	lock          *sync.RWMutex
+}
+
+//UpdateSbEvent at the start of the subscription
+func (tk *tokenSb) UpdateSbEvent(sbEvent event.Subscription) {
+	tk.lock.Lock()
+	defer tk.lock.Unlock()
+	// we unsubscribe the previous event
+	if tk.sbEvent != nil {
+		tk.sbEvent.Unsubscribe()
+	}
+	tk.sbEvent = sbEvent
+}
+
+// AccountInboundReq is the account that top up account info to joltify pub_chain
+type AccountInboundReq struct {
+	address    common.Address
+	toPoolAddr common.Address
+	coin       sdk.Coin
+}
+
+func newAccountInboundReq(address, toPoolAddr common.Address, coin sdk.Coin) AccountInboundReq {
+	return AccountInboundReq{
+		address,
+		toPoolAddr,
+		coin,
+	}
+}
+
+// GetInboundReqInfo returns the info of the inbound transaction
+func (acq *AccountInboundReq) GetInboundReqInfo() (common.Address, common.Address, sdk.Coin) {
+	return acq.address, acq.toPoolAddr, acq.coin
+}
+
+// PubChainInstance hold the joltify_bridge entity
+type PubChainInstance struct {
+	EthClient             *ethclient.Client
+	tokenAddr             string
+	logger                zerolog.Logger
+	pendingAccounts       map[string]*bridgeTx
+	lastTwoPools          []common.Address
+	poolLocker            sync.RWMutex
+	pendingAccountLocker  sync.RWMutex
+	tokenSb               *tokenSb
+	AccountInboundReqChan chan *AccountInboundReq
+}
+
+type bridgeTx struct {
+	address   common.Address
+	direction direction
+	timeStamp time.Time
+	token     sdk.Coin
+	fee       sdk.Coin
+}
+
+// NewChainInstance initialize the joltify_bridge entity
+func NewChainInstance(ws, tokenAddr string) (*PubChainInstance, error) {
+	logger := log.With().Str("module", "pubchain").Logger()
+
+	wsClient, err := ethclient.Dial(ws)
+	if err != nil {
+		logger.Error().Err(err).Msg("fail to dial the websocket")
+		return nil, errors.New("fail to dial the network")
+	}
+
+	sink := make(chan *TokenTransfer)
+
+	tokenIns, err := NewToken(common.HexToAddress(tokenAddr), wsClient)
+	if err != nil {
+		return nil, errors.New("fail to get the new token")
+	}
+
+	return &PubChainInstance{
+		logger:                logger,
+		EthClient:             wsClient,
+		tokenAddr:             tokenAddr,
+		pendingAccounts:       make(map[string]*bridgeTx),
+		poolLocker:            sync.RWMutex{},
+		pendingAccountLocker:  sync.RWMutex{},
+		lastTwoPools:          make([]common.Address, 2),
+		tokenSb:               newTokenSb(tokenIns, sink, nil),
+		AccountInboundReqChan: make(chan *AccountInboundReq, 1),
+	}, nil
+}
+
+// newTokenSb create the token instance
+func newTokenSb(instance *Token, sb chan *TokenTransfer, sbEvent event.Subscription) *tokenSb {
+	return &tokenSb{
+		instance,
+		sb,
+		sbEvent,
+		&sync.RWMutex{},
+	}
+}

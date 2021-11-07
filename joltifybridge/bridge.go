@@ -1,4 +1,4 @@
-package bridge
+package joltifybridge
 
 import (
 	"context"
@@ -25,12 +25,13 @@ import (
 	xauthsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
 
-func NewInvoiceBridge(grpcAddr, keyringPath, passcode string, config config.Config) (*InvChainBridge, error) {
-	var invoiceBridge InvChainBridge
+//NewJoltifyBridge new the instance for the joltify pub_chain
+func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, config config.Config) (*JoltifyChainBridge, error) {
+	var joltifyBridge JoltifyChainBridge
 	var err error
-	invoiceBridge.logger = zlog.With().Str("module", "joltifyChain").Logger()
+	joltifyBridge.logger = zlog.With().Str("module", "joltifyChain").Logger()
 
-	invoiceBridge.grpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
+	joltifyBridge.grpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
@@ -44,55 +45,54 @@ func NewInvoiceBridge(grpcAddr, keyringPath, passcode string, config config.Conf
 		return nil, err
 	}
 
-	invoiceBridge.wsClient = client
+	joltifyBridge.wsClient = client
 
-	invoiceBridge.keyring = keyring.NewInMemory()
+	joltifyBridge.keyring = keyring.NewInMemory()
 
 	dat, err := ioutil.ReadFile(keyringPath)
 	if err != nil {
 		log.Fatalln("error in read keyring file")
 		return nil, err
 	}
-	err = invoiceBridge.keyring.ImportPrivKey("operator", string(dat), passcode)
+	err = joltifyBridge.keyring.ImportPrivKey("operator", string(dat), passcode)
 	if err != nil {
 		return nil, err
 	}
 	// fixme, in docker it needs to be changed to basehome
-
 	tssServer, key, err := tssclient.StartTssServer(config.HomeDir, config.TssConfig)
 	if err != nil {
 		return nil, err
 	}
-	invoiceBridge.tssServer = tssServer
-	invoiceBridge.cosKey = key
+	joltifyBridge.tssServer = tssServer
+	joltifyBridge.cosKey = key
 
-	invoiceBridge.msgSendCache = []TssPoolMsg{}
-	invoiceBridge.LastTwoTssPoolMsg = []*TssPoolMsg{nil, nil}
-	invoiceBridge.poolUpdateLocker = &sync.Mutex{}
+	joltifyBridge.msgSendCache = []tssPoolMsg{}
+	joltifyBridge.LastTwoTssPoolMsg = []*tssPoolMsg{nil, nil}
+	joltifyBridge.poolUpdateLocker = &sync.Mutex{}
 
-	return &invoiceBridge, nil
+	return &joltifyBridge, nil
 }
 
-func (ic *InvChainBridge) GetTssNodeID() string {
-	return ic.tssServer.GetTssNodeID()
+func (jc *JoltifyChainBridge) GetTssNodeID() string {
+	return jc.tssServer.GetTssNodeID()
 }
 
-func (ic *InvChainBridge) TerminateBridge() error {
-	err := ic.wsClient.Stop()
+func (jc *JoltifyChainBridge) TerminateBridge() error {
+	err := jc.wsClient.Stop()
 	if err != nil {
-		ic.logger.Error().Err(err).Msg("fail to terminate the ws")
+		jc.logger.Error().Err(err).Msg("fail to terminate the ws")
 		return err
 	}
-	err = ic.grpcClient.Close()
+	err = jc.grpcClient.Close()
 	if err != nil {
-		ic.logger.Error().Err(err).Msg("fail to terminate the grpc")
+		jc.logger.Error().Err(err).Msg("fail to terminate the grpc")
 		return err
 	}
-	ic.tssServer.Stop()
+	jc.tssServer.Stop()
 	return nil
 }
 
-func (ic *InvChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64) ([]byte, string, error) {
+func (jc *JoltifyChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64) ([]byte, string, error) {
 	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
 	// following function.
 	encCfg := MakeEncodingConfig()
@@ -109,9 +109,9 @@ func (ic *InvChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64)
 	// txBuilder.SetMemo(...)
 	// txBuilder.SetTimeoutHeight(...)
 
-	key, err := ic.keyring.Key("operator")
+	key, err := jc.keyring.Key("operator")
 	if err != nil {
-		ic.logger.Error().Err(err).Msg("fail to get the operator key")
+		jc.logger.Error().Err(err).Msg("fail to get the operator key")
 		return nil, "", err
 	}
 
@@ -134,14 +134,14 @@ func (ic *InvChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64)
 		AccountNumber: accNum,
 		Sequence:      accSeq,
 	}
-	signatureV2, err := ic.signTx(encCfg.TxConfig, txBuilder, signerData)
+	signatureV2, err := jc.signTx(encCfg.TxConfig, txBuilder, signerData)
 	if err != nil {
-		ic.logger.Error().Err(err).Msg("fail to generate the signature")
+		jc.logger.Error().Err(err).Msg("fail to generate the signature")
 		return nil, "", err
 	}
 	err = txBuilder.SetSignatures(signatureV2)
 	if err != nil {
-		ic.logger.Error().Err(err).Msgf("fail to set the signature")
+		jc.logger.Error().Err(err).Msgf("fail to set the signature")
 		return nil, "", err
 	}
 
@@ -158,11 +158,11 @@ func (ic *InvChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64)
 	//	return nil, "", err
 	//}
 	//txJSON := string(txJSONBytes)
-	//ic.logger.Debug().Msg(txJSON)
+	//jc.logger.Debug().Msg(txJSON)
 	return txBytes, "", nil
 }
 
-func (ic *InvChainBridge) signTx(txConfig client.TxConfig, txBuilder client.TxBuilder, signerData xauthsigning.SignerData) (signing.SignatureV2, error) {
+func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.TxBuilder, signerData xauthsigning.SignerData) (signing.SignatureV2, error) {
 	var sigV2 signing.SignatureV2
 
 	signMode := txConfig.SignModeHandler().DefaultMode()
@@ -173,7 +173,7 @@ func (ic *InvChainBridge) signTx(txConfig client.TxConfig, txBuilder client.TxBu
 	}
 
 	// Sign those bytes
-	signature, pk, err := ic.keyring.Sign("operator", signBytes)
+	signature, pk, err := jc.keyring.Sign("operator", signBytes)
 	if err != nil {
 		return sigV2, err
 	}
@@ -192,10 +192,11 @@ func (ic *InvChainBridge) signTx(txConfig client.TxConfig, txBuilder client.TxBu
 	return sigV2, nil
 }
 
-func (ic *InvChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (bool, string, error) {
+//BroadcastTx broadcast the tx to the joltifyChain
+func (jc *JoltifyChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (bool, string, error) {
 	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
 	// service.
-	txClient := tx.NewServiceClient(ic.grpcClient)
+	txClient := tx.NewServiceClient(jc.grpcClient)
 	// We then call the BroadcastTx method on this client.
 	grpcRes, err := txClient.BroadcastTx(
 		ctx,
@@ -209,91 +210,95 @@ func (ic *InvChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (bool
 	}
 
 	if grpcRes.GetTxResponse().Code != 0 {
-		ic.logger.Error().Err(err).Msgf("fail to broadcast with response %v", grpcRes.TxResponse)
+		jc.logger.Error().Err(err).Msgf("fail to broadcast with response %v", grpcRes.TxResponse)
 		return false, "", nil
 	}
 	txHash := grpcRes.GetTxResponse().TxHash
 	return true, txHash, nil
 }
 
-func (ic *InvChainBridge) SendToken(coins sdk.Coins, from, to sdk.AccAddress) error {
+//todo this functions current is not used
+func (jc *JoltifyChainBridge) sendToken(coins sdk.Coins, from, to sdk.AccAddress) error {
 	msg := banktypes.NewMsgSend(from, to, coins)
 
-	acc, err := QueryAccount(from.String(), ic.grpcClient)
+	acc, err := queryAccount(from.String(), jc.grpcClient)
 	if err != nil {
-		ic.logger.Error().Err(err).Msg("Fail to quer the account")
+		jc.logger.Error().Err(err).Msg("Fail to quer the account")
 		return err
 	}
-	txbytes, _, err := ic.SendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber())
+	txbytes, _, err := jc.SendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber())
 	if err != nil {
-		ic.logger.Error().Err(err).Msg("fail to generate the tx")
+		jc.logger.Error().Err(err).Msg("fail to generate the tx")
 		return err
 	}
-	ok, _, err := ic.BroadcastTx(context.Background(), txbytes)
+	ok, _, err := jc.BroadcastTx(context.Background(), txbytes)
 	if err != nil || !ok {
-		ic.logger.Error().Err(err).Msg("fail to broadcast the tx")
+		jc.logger.Error().Err(err).Msg("fail to broadcast the tx")
 		return err
 	}
 	return nil
 }
 
-func (ic *InvChainBridge) PrepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
+func (jc *JoltifyChainBridge) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
 	msg := types.NewMsgCreateCreatePool(creator, pubKey, height)
 
-	acc, err := QueryAccount(creator.String(), ic.grpcClient)
+	acc, err := queryAccount(creator.String(), jc.grpcClient)
 	if err != nil {
-		ic.logger.Error().Err(err).Msg("Fail to query the account")
+		jc.logger.Error().Err(err).Msg("Fail to query the account")
 		return err
 	}
-	txbytes, _, err := ic.SendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber())
+	txbytes, _, err := jc.SendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber())
 	if err != nil {
-		ic.logger.Error().Err(err).Msg("fail to generate the tx")
+		jc.logger.Error().Err(err).Msg("fail to generate the tx")
 		return err
 	}
 
 	dHeight, err := strconv.ParseInt(height, 10, 64)
 	if err != nil {
-		ic.logger.Error().Err(err).Msgf("fail to parse the height")
+		jc.logger.Error().Err(err).Msgf("fail to parse the height")
 		return err
 	}
 
-	item := TssPoolMsg{
+	item := tssPoolMsg{
 		txbytes,
+		pubKey,
 		dHeight,
 	}
-	ic.poolUpdateLocker.Lock()
+	jc.poolUpdateLocker.Lock()
 	// we store the latest two tss pool address
-	ic.LastTwoTssPoolMsg[0] = ic.LastTwoTssPoolMsg[1]
-	ic.LastTwoTssPoolMsg[1] = &item
-	ic.msgSendCache = append(ic.msgSendCache, item)
-	ic.poolUpdateLocker.Unlock()
+	jc.LastTwoTssPoolMsg[0] = jc.LastTwoTssPoolMsg[1]
+	jc.LastTwoTssPoolMsg[1] = &item
+	jc.msgSendCache = append(jc.msgSendCache, item)
+	jc.poolUpdateLocker.Unlock()
 	return nil
 }
 
-func (ic *InvChainBridge) GetLastBlockHeight() (int64, error) {
-	b, err := GetLastBlockHeight(ic.grpcClient)
+//GetLastBlockHeight gets the current block height
+func (jc *JoltifyChainBridge) GetLastBlockHeight() (int64, error) {
+	b, err := GetLastBlockHeight(jc.grpcClient)
 	return b, err
 }
 
-func (ic *InvChainBridge) TriggerSend(blockHeight int64) {
+//TriggerSend send the tx to the joltify pub_chain, if the pool address is updated, it returns true
+func (jc *JoltifyChainBridge) TriggerSend(blockHeight int64) (bool, string) {
 
-	ic.poolUpdateLocker.Lock()
-	if len(ic.msgSendCache) < 1 {
-		ic.poolUpdateLocker.Unlock()
-		return
+	jc.poolUpdateLocker.Lock()
+	if len(jc.msgSendCache) < 1 {
+		jc.poolUpdateLocker.Unlock()
+		return false, ""
 	}
-	el := ic.msgSendCache[0]
-	ic.poolUpdateLocker.Unlock()
+	el := jc.msgSendCache[0]
+	jc.poolUpdateLocker.Unlock()
 	if el.blockHeight == blockHeight {
-		ic.logger.Info().Msgf("we are submit the block at height>>>>>>>>%v\n", el.blockHeight)
-		ok, resp, err := ic.BroadcastTx(context.Background(), el.data)
+		jc.logger.Info().Msgf("we are submit the block at height>>>>>>>>%v\n", el.blockHeight)
+		ok, resp, err := jc.BroadcastTx(context.Background(), el.data)
 		if err != nil || !ok {
-			ic.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
-			return
+			jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
+			return false, ""
 		}
-		ic.msgSendCache = ic.msgSendCache[1:]
-		ic.logger.Info().Msgf("successfully broadcast the pool info")
-		return
+		jc.msgSendCache = jc.msgSendCache[1:]
+		jc.logger.Info().Msgf("successfully broadcast the pool info")
+		return true, el.poolPubKey
 	}
-
+	return false, ""
 }
