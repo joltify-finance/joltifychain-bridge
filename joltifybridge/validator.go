@@ -4,13 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/pubchain"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/validators"
-	types2 "gitlab.com/joltify/joltifychain/joltifychain/x/vault/types"
 	"time"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/pubchain"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/validators"
+	vaulttypes "gitlab.com/joltify/joltifychain/joltifychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/types"
@@ -22,7 +20,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
-//InitValidators initialize the validators
+// InitValidators initialize the validators
 func (jc *JoltifyChainBridge) InitValidators(addr string) error {
 	ts := tmservice.NewServiceClient(jc.grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
@@ -61,24 +59,22 @@ func (jc *JoltifyChainBridge) InitValidators(addr string) error {
 		jc.logger.Error().Err(err).Msg("fail to initialize the validator pool")
 		return err
 	}
-	jc.doInitValidator(info, blockHeight, values)
-
-	return nil
+	return jc.doInitValidator(info, blockHeight, values)
 }
 
-//UpdateLatestValidator update the validator set
+// UpdateLatestValidator update the validator set
 func (jc *JoltifyChainBridge) UpdateLatestValidator(validators []*tmtypes.Validator, blockHeight int64) error {
 	return jc.validatorSet.UpdateValidatorSet(validators, blockHeight)
 }
 
-//GetLastValidator get the last validator set
+// GetLastValidator get the last validator set
 func (jc *JoltifyChainBridge) GetLastValidator() ([]*validators.Validator, int64) {
 	validators, blockHeight := jc.validatorSet.GetActiveValidators()
 	return validators, blockHeight
 }
 
-//QueryLastPoolAddress returns the latest two pool address
-func (jc *JoltifyChainBridge) QueryLastPoolAddress() ([]*types2.PoolInfo, error) {
+// QueryLastPoolAddress returns the latest two pool address
+func (jc *JoltifyChainBridge) QueryLastPoolAddress() ([]*vaulttypes.PoolInfo, error) {
 	poolInfo, err := queryLastValidatorSet(jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to get the pool info")
@@ -87,34 +83,24 @@ func (jc *JoltifyChainBridge) QueryLastPoolAddress() ([]*types2.PoolInfo, error)
 	return poolInfo, nil
 }
 
-//CheckWhetherSigner check whether the current signer is the
+// CheckWhetherSigner check whether the current signer is the
 func (jc *JoltifyChainBridge) CheckWhetherSigner(item *pubchain.AccountInboundReq) (bool, error) {
 	found := false
 	poolInfo, err := jc.QueryLastPoolAddress()
-	if err != nil {
+	if err != nil || len(poolInfo) == 0 {
 		return found, err
 	}
+	lastPoolInfo := poolInfo[len(poolInfo)-1]
 	creator, err := jc.keyring.Key("operator")
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to get the validator address")
 		return found, err
 	}
 
-	_, toPoolAddr, _ := item.GetInboundReqInfo()
-	for _, el := range poolInfo {
-		pubkey, err := types.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeAccPub, el.GetCreatePool().PoolPubKey)
-		if err != nil {
-			jc.logger.Error().Err(err).Msg("fail to decode the pool pub key")
-			return found, err
-		}
-		hexPoolPubKey := common.BytesToAddress(pubkey.Address().Bytes())
-		if hexPoolPubKey.String() == toPoolAddr.String() {
-			for _, eachValidator := range el.CreatePool.Nodes {
-				if eachValidator.Equals(creator.GetAddress()) {
-					found = true
-					break
-				}
-			}
+	for _, eachValidator := range lastPoolInfo.CreatePool.Nodes {
+		if eachValidator.Equals(creator.GetAddress()) {
+			found = true
+			break
 		}
 	}
 

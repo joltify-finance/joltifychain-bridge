@@ -3,8 +3,9 @@ package joltifybridge
 import (
 	"context"
 	"encoding/base64"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/tssclient"
 	"strconv"
+
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/tssclient"
 
 	"github.com/joltgeorge/tss/common"
 
@@ -28,7 +29,7 @@ func (jc *JoltifyChainBridge) AddSubscribe(ctx context.Context, query string) (<
 	return out, nil
 }
 
-//HandleUpdateValidators check whether we need to generate the new tss pool message
+// HandleUpdateValidators check whether we need to generate the new tss pool message
 func (jc *JoltifyChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes.Validator, height int64) error {
 	err := jc.UpdateLatestValidator(validatorUpdates, height)
 	if err != nil {
@@ -48,9 +49,15 @@ func (jc *JoltifyChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes
 		}
 		ret := &key
 
-		pk, _ := types.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, ret)
+		pk, err := types.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, ret)
+		if err != nil {
+			return err
+		}
 
-		pkValidator, _ := base64.StdEncoding.DecodeString(jc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value)
+		pkValidator, err := base64.StdEncoding.DecodeString(jc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value)
+		if err != nil {
+			return err
+		}
 
 		myValidatorPubKey := ed25519.PubKey{
 			Key: pkValidator,
@@ -62,7 +69,7 @@ func (jc *JoltifyChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes
 		pubkeys = append(pubkeys, pk)
 	}
 	if doKeyGen {
-		resp, err := jc.tssServer.Keygen(pubkeys, blockHeight, tssclient.TssVersion)
+		resp, err := jc.tssServer.KeyGen(pubkeys, blockHeight, tssclient.TssVersion)
 		if err != nil {
 			jc.logger.Error().Err(err).Msg("fail to do the keygen")
 			return err

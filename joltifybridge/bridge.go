@@ -2,16 +2,24 @@ package joltifybridge
 
 import (
 	"context"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/tssclient"
-	"gitlab.com/joltify/joltifychain/joltifychain/x/vault/types"
+	"encoding/base64"
+	"errors"
 	"io/ioutil"
 	"log"
 	"strconv"
 	"sync"
 
+	coscrypto "github.com/cosmos/cosmos-sdk/crypto/types"
+	sdktypes "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/joltgeorge/tss/common"
+	"github.com/joltgeorge/tss/keysign"
+	"github.com/tendermint/tendermint/crypto"
 	tmclienthttp "github.com/tendermint/tendermint/rpc/client/http"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/misc"
+	"gitlab.com/joltify/joltifychain/joltifychain-bridge/tssclient"
+	"gitlab.com/joltify/joltifychain/joltifychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -25,7 +33,7 @@ import (
 	xauthsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
 
-//NewJoltifyBridge new the instance for the joltify pub_chain
+// NewJoltifyBridge new the instance for the joltify pub_chain
 func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, config config.Config) (*JoltifyChainBridge, error) {
 	var joltifyBridge JoltifyChainBridge
 	var err error
@@ -92,7 +100,7 @@ func (jc *JoltifyChainBridge) TerminateBridge() error {
 	return nil
 }
 
-func (jc *JoltifyChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64) ([]byte, string, error) {
+func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64, tssSignMsg *tssclient.TssSignigMsg) ([]byte, string, error) {
 	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
 	// following function.
 	encCfg := MakeEncodingConfig()
@@ -115,13 +123,32 @@ func (jc *JoltifyChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uin
 		return nil, "", err
 	}
 
-	sigV2 := signing.SignatureV2{
-		PubKey: key.GetPubKey(),
-		Data: &signing.SingleSignatureData{
-			SignMode:  encCfg.TxConfig.SignModeHandler().DefaultMode(),
-			Signature: nil,
-		},
-		Sequence: accSeq,
+	var sigV2 signing.SignatureV2
+	if tssSignMsg == nil {
+		sigV2 = signing.SignatureV2{
+			PubKey: key.GetPubKey(),
+			Data: &signing.SingleSignatureData{
+				SignMode:  encCfg.TxConfig.SignModeHandler().DefaultMode(),
+				Signature: nil,
+			},
+			Sequence: accSeq,
+		}
+	} else {
+		pk := tssSignMsg.Pk
+		cPk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeAccPub, pk)
+		if err != nil {
+			jc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
+			return nil, "", err
+		}
+		sigV2 = signing.SignatureV2{
+			PubKey: cPk,
+			Data: &signing.SingleSignatureData{
+				SignMode:  encCfg.TxConfig.SignModeHandler().DefaultMode(),
+				Signature: nil,
+			},
+			Sequence: accSeq,
+		}
+
 	}
 
 	err = txBuilder.SetSignatures(sigV2)
@@ -134,7 +161,7 @@ func (jc *JoltifyChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uin
 		AccountNumber: accNum,
 		Sequence:      accSeq,
 	}
-	signatureV2, err := jc.signTx(encCfg.TxConfig, txBuilder, signerData)
+	signatureV2, err := jc.signTx(encCfg.TxConfig, txBuilder, signerData, tssSignMsg)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the signature")
 		return nil, "", err
@@ -151,7 +178,7 @@ func (jc *JoltifyChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uin
 		return nil, "", err
 	}
 
-	// Generate a JSON string.
+	// the following code is for debug only
 	//txJSONBytes, err := encCfg.TxConfig.TxJSONEncoder()(txBuilder.GetTx())
 	//if err != nil {
 	//	fmt.Printf(">>>>fail to see the json %v", err)
@@ -162,7 +189,7 @@ func (jc *JoltifyChainBridge) SendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uin
 	return txBytes, "", nil
 }
 
-func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.TxBuilder, signerData xauthsigning.SignerData) (signing.SignatureV2, error) {
+func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.TxBuilder, signerData xauthsigning.SignerData, signMsg *tssclient.TssSignigMsg) (signing.SignatureV2, error) {
 	var sigV2 signing.SignatureV2
 
 	signMode := txConfig.SignModeHandler().DefaultMode()
@@ -172,10 +199,43 @@ func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.
 		return sigV2, err
 	}
 
-	// Sign those bytes
-	signature, pk, err := jc.keyring.Sign("operator", signBytes)
-	if err != nil {
-		return sigV2, err
+	var signature []byte
+	var pk coscrypto.PubKey
+	if signMsg == nil {
+		// Sign those bytes by the node itself
+		signature, pk, err = jc.keyring.Sign("operator", signBytes)
+		if err != nil {
+			return sigV2, err
+		}
+	} else {
+
+		hashedMsg := crypto.Sha256(signBytes)
+		encodedMsg := base64.StdEncoding.EncodeToString(hashedMsg)
+		signMsg.Msgs = []string{encodedMsg}
+		resp, err := jc.doTssSign(signMsg)
+		if err != nil {
+			return signing.SignatureV2{}, err
+		}
+		if resp.Status != common.Success {
+			jc.logger.Error().Err(err).Msg("fail to generate the signature")
+			// todo we need to handle the blame
+			return signing.SignatureV2{}, err
+		}
+		if len(resp.Signatures) != 1 {
+			jc.logger.Error().Msgf("we should only have 1 signature")
+			return signing.SignatureV2{}, errors.New("more than 1 signature received")
+		}
+		signature, err = misc.SerializeSig(&resp.Signatures[0])
+		if err != nil {
+			jc.logger.Error().Msgf("fail to encode the signature")
+			return signing.SignatureV2{}, err
+		}
+		pubkey, err := sdktypes.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeAccPub, signMsg.Pk)
+		if err != nil {
+			jc.logger.Error().Err(err).Msgf("fail to get the pubkey")
+			return signing.SignatureV2{}, err
+		}
+		pk = pubkey
 	}
 
 	// Construct the SignatureV2 struct
@@ -192,7 +252,16 @@ func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.
 	return sigV2, nil
 }
 
-//BroadcastTx broadcast the tx to the joltifyChain
+func (jc *JoltifyChainBridge) doTssSign(msg *tssclient.TssSignigMsg) (keysign.Response, error) {
+	resp, err := jc.tssServer.KeySign(msg.Pk, msg.Msgs, msg.BlockHeight, msg.Signers, tssclient.TssVersion)
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to generate the tss signature")
+		return keysign.Response{}, err
+	}
+	return resp, nil
+}
+
+// BroadcastTx broadcast the tx to the joltifyChain
 func (jc *JoltifyChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (bool, string, error) {
 	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
 	// service.
@@ -217,8 +286,8 @@ func (jc *JoltifyChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (
 	return true, txHash, nil
 }
 
-//todo this functions current is not used
-func (jc *JoltifyChainBridge) sendToken(coins sdk.Coins, from, to sdk.AccAddress) error {
+// todo this functions current is not used
+func (jc *JoltifyChainBridge) sendToken(coins sdk.Coins, from, to sdk.AccAddress, tssSignMsg *tssclient.TssSignigMsg) error {
 	msg := banktypes.NewMsgSend(from, to, coins)
 
 	acc, err := queryAccount(from.String(), jc.grpcClient)
@@ -226,7 +295,7 @@ func (jc *JoltifyChainBridge) sendToken(coins sdk.Coins, from, to sdk.AccAddress
 		jc.logger.Error().Err(err).Msg("Fail to quer the account")
 		return err
 	}
-	txbytes, _, err := jc.SendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber())
+	txbytes, _, err := jc.genSendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber(), tssSignMsg)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the tx")
 		return err
@@ -247,7 +316,8 @@ func (jc *JoltifyChainBridge) prepareTssPool(creator sdk.AccAddress, pubKey, hei
 		jc.logger.Error().Err(err).Msg("Fail to query the account")
 		return err
 	}
-	txbytes, _, err := jc.SendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber())
+
+	txbytes, _, err := jc.genSendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber(), nil)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the tx")
 		return err
@@ -273,15 +343,14 @@ func (jc *JoltifyChainBridge) prepareTssPool(creator sdk.AccAddress, pubKey, hei
 	return nil
 }
 
-//GetLastBlockHeight gets the current block height
+// GetLastBlockHeight gets the current block height
 func (jc *JoltifyChainBridge) GetLastBlockHeight() (int64, error) {
 	b, err := GetLastBlockHeight(jc.grpcClient)
 	return b, err
 }
 
-//TriggerSend send the tx to the joltify pub_chain, if the pool address is updated, it returns true
+// TriggerSend send the tx to the joltify pub_chain, if the pool address is updated, it returns true
 func (jc *JoltifyChainBridge) TriggerSend(blockHeight int64) (bool, string) {
-
 	jc.poolUpdateLocker.Lock()
 	if len(jc.msgSendCache) < 1 {
 		jc.poolUpdateLocker.Unlock()
@@ -291,14 +360,40 @@ func (jc *JoltifyChainBridge) TriggerSend(blockHeight int64) (bool, string) {
 	jc.poolUpdateLocker.Unlock()
 	if el.blockHeight == blockHeight {
 		jc.logger.Info().Msgf("we are submit the block at height>>>>>>>>%v\n", el.blockHeight)
-		ok, resp, err := jc.BroadcastTx(context.Background(), el.data)
+		ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+		ok, resp, err := jc.BroadcastTx(ctx, el.data)
 		if err != nil || !ok {
 			jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
+			cancel()
 			return false, ""
 		}
 		jc.msgSendCache = jc.msgSendCache[1:]
 		jc.logger.Info().Msgf("successfully broadcast the pool info")
+		cancel()
 		return true, el.poolPubKey
 	}
 	return false, ""
+}
+
+// DoTssSign test for keysign
+func (jc *JoltifyChainBridge) DoTssSign() (keysign.Response, error) {
+	poolInfo, err := jc.QueryLastPoolAddress()
+	if err != nil {
+		jc.logger.Error().Err(err).Msgf("error in get pool with error %v", err)
+		return keysign.Response{}, nil
+
+	}
+	if len(poolInfo) != 2 {
+		jc.logger.Info().Msgf("fail to query the pool with length %v", len(poolInfo))
+		return keysign.Response{}, nil
+	}
+	msgtosign := base64.StdEncoding.EncodeToString([]byte("hello"))
+	msg := tssclient.TssSignigMsg{
+		Pk:          poolInfo[1].GetCreatePool().PoolPubKey,
+		Msgs:        []string{msgtosign},
+		BlockHeight: int64(100),
+		Version:     tssclient.TssVersion,
+	}
+	resp, err := jc.doTssSign(&msg)
+	return resp, err
 }

@@ -11,3 +11,12 @@ type CosPrivKey struct {
 		Value string `json:"value"`
 	} `json:"priv_key"`
 }
+
+// TssSignigMsg is the packed message for tss signing
+type TssSignigMsg struct {
+	Pk          string
+	Msgs        []string
+	Signers     []string
+	BlockHeight int64
+	Version     string
+}

@@ -2,9 +2,10 @@ package pubchain
 
 import (
 	"errors"
-	"github.com/ethereum/go-ethereum/common"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -40,7 +41,7 @@ type tokenSb struct {
 	lock          *sync.RWMutex
 }
 
-//UpdateSbEvent at the start of the subscription
+// UpdateSbEvent at the start of the subscription
 func (tk *tokenSb) UpdateSbEvent(sbEvent event.Subscription) {
 	tk.lock.Lock()
 	defer tk.lock.Unlock()
@@ -53,22 +54,24 @@ func (tk *tokenSb) UpdateSbEvent(sbEvent event.Subscription) {
 
 // AccountInboundReq is the account that top up account info to joltify pub_chain
 type AccountInboundReq struct {
-	address    common.Address
-	toPoolAddr common.Address
-	coin       sdk.Coin
+	address     common.Address
+	toPoolAddr  common.Address
+	coin        sdk.Coin
+	blockHeight int64
 }
 
-func newAccountInboundReq(address, toPoolAddr common.Address, coin sdk.Coin) AccountInboundReq {
+func newAccountInboundReq(address, toPoolAddr common.Address, coin sdk.Coin, blockHeight int64) AccountInboundReq {
 	return AccountInboundReq{
 		address,
 		toPoolAddr,
 		coin,
+		blockHeight,
 	}
 }
 
 // GetInboundReqInfo returns the info of the inbound transaction
-func (acq *AccountInboundReq) GetInboundReqInfo() (common.Address, common.Address, sdk.Coin) {
-	return acq.address, acq.toPoolAddr, acq.coin
+func (acq *AccountInboundReq) GetInboundReqInfo() (common.Address, common.Address, sdk.Coin, int64) {
+	return acq.address, acq.toPoolAddr, acq.coin, acq.blockHeight
 }
 
 // PubChainInstance hold the joltify_bridge entity

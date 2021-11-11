@@ -97,7 +97,7 @@ func (ci *PubChainInstance) addBridgeTx(txID string, from common.Address, value 
 	return nil
 }
 
-//fixme we need to check timeout to remove the pending transactions
+// fixme we need to check timeout to remove the pending transactions
 func (ci *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil || tx.Value() == nil {
@@ -111,9 +111,9 @@ func (ci *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 			payTxID := tx.Data()
 			account := ci.updateBridgeTx(hex.EncodeToString(payTxID), tx.Value(), inBound)
 			if account != nil {
-				item := newAccountInboundReq(account.address, *tx.To(), account.token)
+				item := newAccountInboundReq(account.address, *tx.To(), account.token, block.Number().Int64())
 				ci.AccountInboundReqChan <- &item
-				//fmt.Printf("BridgeTx %s is ready to send %v\n tokens to joltify Chain!!!", account.address, account.token.String())
+				// fmt.Printf("BridgeTx %s is ready to send %v\n tokens to joltify Chain!!!", account.address, account.token.String())
 			}
 		}
 	}

@@ -72,6 +72,7 @@ func NewBridgeService(config config.Config) {
 	ci, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, config.PubChainConfig.TokenAddress)
 	if err != nil {
 		fmt.Printf("fail to connect the public pub_chain with address %v\n", config.PubChainConfig.WsAddress)
+		cancel()
 		return
 	}
 
@@ -118,6 +119,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 			select {
 			case <-ctx.Done():
 				return
+				// process the update of the validators
 			case vals := <-validatorUpdateChan:
 				height, err := joltBridge.GetLastBlockHeight()
 				if err != nil {
@@ -130,6 +132,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					continue
 				}
 
+				// process the new joltify block, validator may need to submit the pool address
 			case block := <-newBlockChan:
 				updated, poolPubKey := joltBridge.TriggerSend(block.Data.(tmtypes.EventDataNewBlock).Block.Height)
 				if updated {
@@ -148,26 +151,32 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					}
 				}
 
-				// process the inbound message to the channel
+				// process the public chain inbound message to the channel
 			case tokenTransfer := <-ci.GetSubChannel():
 				err := ci.ProcessInBound(tokenTransfer)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
 				}
 
+				// process the public chain new block event
 			case head := <-pubNewBlockChan:
 				err := ci.ProcessNewBlock(head.Number)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
 				}
 
+			// process the in-bound top up event which will mint coin for users
 			case item := <-ci.AccountInboundReqChan:
 				found, err := joltBridge.CheckWhetherSigner(item)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
 				}
 				if found {
-					joltBridge.MintCoin(item)
+					// todo  do we need to think about refund the user or we can only delete the top-up request here
+					err := joltBridge.MintCoin(item)
+					if err != nil {
+						zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
+					}
 				}
 
 			}

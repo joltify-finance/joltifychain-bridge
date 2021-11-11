@@ -1,6 +1,7 @@
 package misc
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -14,7 +15,7 @@ func TestPoolPubkeyToEthAddress(t *testing.T) {
 	addr := sk.PubKey().Address()
 	joltAddr, err := types.AccAddressFromHex(addr.String())
 	require.Nil(t, err)
-
+	fmt.Printf(">>%v\n", joltAddr.String())
 	pk, err := types.Bech32ifyPubKey(types.Bech32PubKeyTypeAccPub, sk.PubKey())
 	require.Nil(t, err)
 

@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-//queryAccount get the current sender account info
+// queryAccount get the current sender account info
 func queryAccount(addr string, grpcClient *grpc.ClientConn) (authtypes.AccountI, error) {
 	accQuery := authtypes.NewQueryClient(grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
@@ -19,7 +19,6 @@ func queryAccount(addr string, grpcClient *grpc.ClientConn) (authtypes.AccountI,
 		return nil, err
 	}
 
-	// acc := accResp.Account.GetCachedValue().(authtypes.AccountI)
 	encCfg := MakeEncodingConfig()
 	var acc authtypes.AccountI
 	if err := encCfg.InterfaceRegistry.UnpackAny(accResp.Account, &acc); err != nil {
@@ -28,7 +27,7 @@ func queryAccount(addr string, grpcClient *grpc.ClientConn) (authtypes.AccountI,
 	return acc, nil
 }
 
-//queryLastValidatorSet get the last two validator sets
+// queryLastValidatorSet get the last two validator sets
 func queryLastValidatorSet(grpcClient *grpc.ClientConn) ([]*vaulttypes.PoolInfo, error) {
 	ts := vaulttypes.NewQueryClient(grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
@@ -43,7 +42,7 @@ func queryLastValidatorSet(grpcClient *grpc.ClientConn) ([]*vaulttypes.PoolInfo,
 	return resp.Pools, nil
 }
 
-//QueryTipValidator get the validator set of the tip of the current pub_chain
+// QueryTipValidator get the validator set of the tip of the current pub_chain
 func QueryTipValidator(grpcClient *grpc.ClientConn) (int64, []*tmservice.Validator, error) {
 	ts := tmservice.NewServiceClient(grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
