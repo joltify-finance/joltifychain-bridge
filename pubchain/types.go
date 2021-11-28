@@ -21,7 +21,7 @@ const (
 	inBoundFeeMin      = "0.000000000000001"
 	OUTBoundFeeOut     = "0.000000000000001"
 	PendingAccountsize = 1024
-	iNBoundToken       = "0x6CA715403f18259e971cbfe74aEe60beA3781bA6"
+	iNBoundToken       = "0x0cD80A18df1C5eAd4B5Fb549391d58B06EFfDBC4"
 	iNBoundTokenSymbol = "jusd"
 )
 
@@ -85,6 +85,7 @@ type PubChainInstance struct {
 	pendingAccountLocker  sync.RWMutex
 	tokenSb               *tokenSb
 	AccountInboundReqChan chan *AccountInboundReq
+	RetryInboundReq       chan *AccountInboundReq // if a tx fail to process, we need to put in this channel and wait for retry
 }
 
 type bridgeTx struct {
@@ -121,7 +122,8 @@ func NewChainInstance(ws, tokenAddr string) (*PubChainInstance, error) {
 		pendingAccountLocker:  sync.RWMutex{},
 		lastTwoPools:          make([]common.Address, 2),
 		tokenSb:               newTokenSb(tokenIns, sink, nil),
-		AccountInboundReqChan: make(chan *AccountInboundReq, 1),
+		AccountInboundReqChan: make(chan *AccountInboundReq, 512),
+		RetryInboundReq:       make(chan *AccountInboundReq, 128),
 	}, nil
 }
 

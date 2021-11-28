@@ -349,8 +349,8 @@ func (jc *JoltifyChainBridge) GetLastBlockHeight() (int64, error) {
 	return b, err
 }
 
-// TriggerSend send the tx to the joltify pub_chain, if the pool address is updated, it returns true
-func (jc *JoltifyChainBridge) TriggerSend(blockHeight int64) (bool, string) {
+// CheckAndUpdatePool send the tx to the joltify pub_chain, if the pool address is updated, it returns true
+func (jc *JoltifyChainBridge) CheckAndUpdatePool(blockHeight int64) (bool, string) {
 	jc.poolUpdateLocker.Lock()
 	if len(jc.msgSendCache) < 1 {
 		jc.poolUpdateLocker.Unlock()

@@ -93,12 +93,11 @@ func (jc *JoltifyChainBridge) MintCoin(item *pubchain.AccountInboundReq) error {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
 	ok, resp, err := jc.BroadcastTx(ctx, txbytes)
 	if err != nil || !ok {
-		cancel()
 		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
 		return err
 	}
-	cancel()
 	return nil
 }

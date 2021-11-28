@@ -25,6 +25,7 @@ import (
 func NewBridgeService(config config.Config) {
 	wg := sync.WaitGroup{}
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
@@ -32,7 +33,6 @@ func NewBridgeService(config config.Config) {
 	passcode := make([]byte, passcodeLength)
 	n, err := os.Stdin.Read(passcode)
 	if err != nil {
-		cancel()
 		return
 	}
 	if n > passcodeLength {
@@ -134,7 +134,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 
 				// process the new joltify block, validator may need to submit the pool address
 			case block := <-newBlockChan:
-				updated, poolPubKey := joltBridge.TriggerSend(block.Data.(tmtypes.EventDataNewBlock).Block.Height)
+				updated, poolPubKey := joltBridge.CheckAndUpdatePool(block.Data.(tmtypes.EventDataNewBlock).Block.Height)
 				if updated {
 					// var poolPubkey []
 					addr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
@@ -149,6 +149,15 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
 					}
+				}
+				// now we need to put the failed inbound request to the process channel, for each new joltify block
+				// we process one failure
+				select {
+				case item := <-ci.RetryInboundReq:
+					ci.AccountInboundReqChan <- item
+					continue
+				default:
+					continue
 				}
 
 				// process the public chain inbound message to the channel
@@ -172,9 +181,10 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
 				}
 				if found {
-					// todo  do we need to think about refund the user or we can only delete the top-up request here
+					// todo do we need to think about refund the user or we can only delete the top-up request here
 					err := joltBridge.MintCoin(item)
 					if err != nil {
+						ci.RetryInboundReq <- item
 						zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
 					}
 				}
