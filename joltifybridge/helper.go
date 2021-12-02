@@ -42,6 +42,23 @@ func queryLastValidatorSet(grpcClient *grpc.ClientConn) ([]*vaulttypes.PoolInfo,
 	return resp.Pools, nil
 }
 
+// queryLastValidatorSet get the last two validator sets
+func queryGivenToeknIssueTx(grpcClient *grpc.ClientConn, index string) (*vaulttypes.IssueToken, error) {
+	ts := vaulttypes.NewQueryClient(grpcClient)
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
+
+	req := vaulttypes.QueryGetIssueTokenRequest{
+		Index: index,
+	}
+	resp, err := ts.IssueToken(ctx, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.IssueToken, nil
+}
+
 // QueryTipValidator get the validator set of the tip of the current pub_chain
 func QueryTipValidator(grpcClient *grpc.ClientConn) (int64, []*tmservice.Validator, error) {
 	ts := tmservice.NewServiceClient(grpcClient)

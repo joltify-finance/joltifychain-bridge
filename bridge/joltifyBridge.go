@@ -177,6 +177,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 
 			// process the in-bound top up event which will mint coin for users
 			case item := <-ci.AccountInboundReqChan:
+				// first we check whether this tx has already been submitted by others
 				found, err := joltBridge.CheckWhetherSigner()
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")

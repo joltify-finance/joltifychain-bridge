@@ -3,7 +3,6 @@ package joltifybridge
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -41,7 +40,6 @@ func (jc *JoltifyChainBridge) MintCoin(item *pubchain.AccountInboundReq) error {
 		return errors.New("not enough signer")
 	}
 	creatorAddr := poolInfo[1].CreatePool.PoolAddr
-	fmt.Printf("------------we sign with %v\n", poolInfo[1].CreatePool.PoolPubKey)
 
 	acc, err := queryAccount(creatorAddr.String(), jc.grpcClient)
 	if err != nil {
@@ -49,26 +47,25 @@ func (jc *JoltifyChainBridge) MintCoin(item *pubchain.AccountInboundReq) error {
 		return err
 	}
 
-	index := strconv.FormatUint(acc.GetSequence(), 10)
+	index := strconv.FormatUint(acc.GetSequence(), 10) + creatorAddr.String()
+	if jc.CheckWhetherAlreadyExist(index) {
+		jc.logger.Warn().Msg("already submitted by others")
+		return nil
+	}
+
 	issueReq, err := prepareIssueTokenRequest(item, creatorAddr.String(), index)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to prepare the issuing of the token")
 	}
 
 	_, _, _, height := item.GetInboundReqInfo()
+	jc.logger.Info().Msgf("we do the top up for %v at height %v", issueReq.Receiver.String(), height)
 	signMsg := tssclient.TssSignigMsg{
 		Pk:          poolInfo[1].CreatePool.PoolPubKey,
 		Signers:     nil,
 		BlockHeight: height,
 		Version:     tssclient.TssVersion,
 	}
-
-	jc.logger.Info().Msgf("we do the broadcast top-up token message!!\n")
-	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
-	fmt.Printf("%v\n", issueReq.Coin)
-	fmt.Printf("The Vault address: %v\n", issueReq.Creator.String())
-	fmt.Printf("The User Wallet Address: %v\n", issueReq.Receiver.String())
-	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
 
 	txbytes, _, err := jc.genSendTx([]sdk.Msg{issueReq}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg)
 	if err != nil {
@@ -83,7 +80,7 @@ func (jc *JoltifyChainBridge) MintCoin(item *pubchain.AccountInboundReq) error {
 		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
 		return err
 	}
-	fmt.Printf("we have successfully broadcast the signature")
+	jc.logger.Info().Msgf("we have successfully top up %s with %v", issueReq.Receiver.String(), issueReq.Coin.String())
 
 	return nil
 }

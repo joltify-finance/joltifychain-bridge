@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -113,9 +112,7 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 			}
 			payTxID := tx.Data()
 			account := pi.updateBridgeTx(hex.EncodeToString(payTxID), tx.Value(), inBound)
-			fmt.Printf("5555555555566666666666====%v\n", account.address)
 			if account != nil {
-				fmt.Printf("444444444444444444\n")
 				item := newAccountInboundReq(account.address, *tx.To(), account.token, block.Number().Int64())
 				pi.AccountInboundReqChan <- &item
 			}

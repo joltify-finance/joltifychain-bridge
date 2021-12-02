@@ -107,6 +107,19 @@ func (jc *JoltifyChainBridge) CheckWhetherSigner() (bool, error) {
 	return found, nil
 }
 
+//CheckWhetherAlreadyExist check whether it is already existed
+func (jc *JoltifyChainBridge) CheckWhetherAlreadyExist(index string) bool {
+	ret, err := queryGivenToeknIssueTx(jc.grpcClient, index)
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to query the token with given index")
+		return false
+	}
+	if ret != nil {
+		return true
+	}
+	return false
+}
+
 func (jc *JoltifyChainBridge) doInitValidator(i info, blockHeight int64, values []*tmservice.Validator) error {
 	jc.myValidatorInfo = i
 	jc.validatorSet = validators.NewValidator()
