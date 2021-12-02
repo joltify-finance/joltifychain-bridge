@@ -5,7 +5,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	vaulttypes "gitlab.com/joltify/joltifychain/joltifychain/x/vault/types"
+	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 	"google.golang.org/grpc"
 )
 

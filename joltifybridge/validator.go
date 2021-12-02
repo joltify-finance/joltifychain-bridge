@@ -3,12 +3,12 @@ package joltifybridge
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/pubchain"
 	"gitlab.com/joltify/joltifychain/joltifychain-bridge/validators"
-	vaulttypes "gitlab.com/joltify/joltifychain/joltifychain/x/vault/types"
+	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/types"
@@ -84,11 +84,11 @@ func (jc *JoltifyChainBridge) QueryLastPoolAddress() ([]*vaulttypes.PoolInfo, er
 }
 
 // CheckWhetherSigner check whether the current signer is the
-func (jc *JoltifyChainBridge) CheckWhetherSigner(item *pubchain.AccountInboundReq) (bool, error) {
+func (jc *JoltifyChainBridge) CheckWhetherSigner() (bool, error) {
 	found := false
 	poolInfo, err := jc.QueryLastPoolAddress()
 	if err != nil || len(poolInfo) == 0 {
-		return found, err
+		return found, errors.New("fail to query the signer")
 	}
 	lastPoolInfo := poolInfo[len(poolInfo)-1]
 	creator, err := jc.keyring.Key("operator")
@@ -96,8 +96,8 @@ func (jc *JoltifyChainBridge) CheckWhetherSigner(item *pubchain.AccountInboundRe
 		jc.logger.Error().Err(err).Msg("fail to get the validator address")
 		return found, err
 	}
-
 	for _, eachValidator := range lastPoolInfo.CreatePool.Nodes {
+		fmt.Printf(">>>>%v\n", eachValidator.String())
 		if eachValidator.Equals(creator.GetAddress()) {
 			found = true
 			break

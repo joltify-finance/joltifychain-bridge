@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -15,69 +16,70 @@ import (
 const chainQueryTimeout = time.Second * 5
 
 // ProcessInBound process the inbound contract token top-up
-func (ci *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
+func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
 	if transfer.Raw.Removed {
 		return errors.New("the tx is the revert tx")
 	}
 	tokenAddr := transfer.Raw.Address
-	err := ci.addBridgeTx(transfer.Raw.TxHash.Hex()[2:], transfer.From, transfer.Value, tokenAddr, inBound)
+	err := pi.addBridgeTx(transfer.Raw.TxHash.Hex()[2:], transfer.From, transfer.Value, tokenAddr, inBound)
 	return err
 }
 
 // ProcessNewBlock process the blocks received from the public pub_chain
-func (ci *PubChainInstance) ProcessNewBlock(number *big.Int) error {
+func (pi *PubChainInstance) ProcessNewBlock(number *big.Int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
-	block, err := ci.EthClient.BlockByNumber(ctx, number)
+	block, err := pi.EthClient.BlockByNumber(ctx, number)
 	if err != nil {
-		ci.logger.Error().Err(err).Msg("fail to retrieve the block")
+		pi.logger.Error().Err(err).Msg("fail to retrieve the block")
 		return err
 	}
-	ci.processEachBlock(block)
+	pi.processEachBlock(block)
 	return nil
 }
 
 // updateBridgeTx update the top-up token with fee
-func (ci *PubChainInstance) updateBridgeTx(txID string, amount *big.Int, direction direction) *bridgeTx {
-	ci.pendingAccountLocker.Lock()
-	defer ci.pendingAccountLocker.Unlock()
-	thisAccount, ok := ci.pendingAccounts[txID]
+func (pi *PubChainInstance) updateBridgeTx(txID string, amount *big.Int, direction direction) *bridgeTx {
+	pi.pendingAccountLocker.Lock()
+	defer pi.pendingAccountLocker.Unlock()
+	thisAccount, ok := pi.pendingAccounts[txID]
 	if !ok {
-		ci.logger.Warn().Msg("fail to get the stored tx from pool")
+		pi.logger.Warn().Msgf("fail to get the stored tx from pool with %v\n", pi.pendingAccounts)
 		return nil
 	}
 	if thisAccount.direction != direction {
-		ci.logger.Warn().Msg("the tx direction is not consistent")
+		pi.logger.Warn().Msg("the tx direction is not consistent")
 		return nil
 	}
 	thisAccount.fee.Amount = thisAccount.fee.Amount.Add(types.NewIntFromBigInt(amount))
 	err := thisAccount.Verify()
+
 	if err != nil {
-		ci.pendingAccounts[txID] = thisAccount
-		ci.logger.Warn().Msgf("the account cannot be processed on joltify pub_chain this round")
+		pi.pendingAccounts[txID] = thisAccount
+		pi.logger.Warn().Msgf("the account cannot be processed on joltify pub_chain this round")
 		return nil
 	}
 	// since this tx is processed,we do not need to store it any longer
-	delete(ci.pendingAccounts, txID)
+	delete(pi.pendingAccounts, txID)
 	return thisAccount
 }
 
-func (ci *PubChainInstance) addBridgeTx(txID string, from common.Address, value *big.Int, addr common.Address, direction direction) error {
-	ci.pendingAccountLocker.Lock()
-	defer ci.pendingAccountLocker.Unlock()
-	_, ok := ci.pendingAccounts[txID]
+func (pi *PubChainInstance) addBridgeTx(txID string, from common.Address, value *big.Int, addr common.Address, direction direction) error {
+	pi.pendingAccountLocker.Lock()
+	defer pi.pendingAccountLocker.Unlock()
+	_, ok := pi.pendingAccounts[txID]
 	if ok {
-		ci.logger.Error().Msgf("the tx already exist!!")
+		pi.logger.Error().Msgf("the tx already exist!!")
 		return errors.New("tx existed")
 	}
 
-	if addr.String() != iNBoundToken {
-		ci.logger.Error().Msgf("incorrect top up token")
+	if addr.String() != pi.tokenAddr {
+		pi.logger.Error().Msgf("incorrect top up token")
 		return errors.New("incorrect top up token")
 	}
 
 	token := types.Coin{
-		Denom:  iNBoundTokenSymbol,
+		Denom:  iNBoundDenom,
 		Amount: types.NewIntFromBigInt(value),
 	}
 	fee := types.Coin{
@@ -92,56 +94,58 @@ func (ci *PubChainInstance) addBridgeTx(txID string, from common.Address, value 
 		token,
 		fee,
 	}
-	ci.logger.Info().Msgf("we add the tokens %v", acc.token.String())
-	ci.pendingAccounts[txID] = &acc
+	pi.logger.Info().Msgf("we add the tokens tx(%v):%v", txID, acc.token.String())
+	pi.pendingAccounts[txID] = &acc
+	pi.logger.Info().Msgf("after add the tokens %v", pi.pendingAccounts)
 	return nil
 }
 
 // fixme we need to check timeout to remove the pending transactions
-func (ci *PubChainInstance) processEachBlock(block *ethTypes.Block) {
+func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil || tx.Value() == nil {
 			continue
 		}
-		if ci.checkToBridge(*tx.To()) {
+		if pi.checkToBridge(*tx.To()) {
 			if tx.Data() == nil {
-				ci.logger.Warn().Msgf("we have received unknown fund")
+				pi.logger.Warn().Msgf("we have received unknown fund")
 				continue
 			}
 			payTxID := tx.Data()
-			account := ci.updateBridgeTx(hex.EncodeToString(payTxID), tx.Value(), inBound)
+			account := pi.updateBridgeTx(hex.EncodeToString(payTxID), tx.Value(), inBound)
+			fmt.Printf("5555555555566666666666====%v\n", account.address)
 			if account != nil {
+				fmt.Printf("444444444444444444\n")
 				item := newAccountInboundReq(account.address, *tx.To(), account.token, block.Number().Int64())
-				ci.AccountInboundReqChan <- &item
-				// fmt.Printf("BridgeTx %s is ready to send %v\n tokens to joltify Chain!!!", account.address, account.token.String())
+				pi.AccountInboundReqChan <- &item
 			}
 		}
 	}
 }
 
 // UpdatePool update the tss pool address
-func (ci *PubChainInstance) UpdatePool(poolAddr common.Address) {
-	ci.poolLocker.Lock()
-	defer ci.poolLocker.Unlock()
-	if len(ci.lastTwoPools[1]) != 0 {
-		ci.lastTwoPools[0] = ci.lastTwoPools[1]
+func (pi *PubChainInstance) UpdatePool(poolAddr common.Address) {
+	pi.poolLocker.Lock()
+	defer pi.poolLocker.Unlock()
+	if len(pi.lastTwoPools[1]) != 0 {
+		pi.lastTwoPools[0] = pi.lastTwoPools[1]
 	}
-	ci.lastTwoPools[1] = poolAddr
+	pi.lastTwoPools[1] = poolAddr
 	return
 }
 
 // GetPool get the latest two pool address
-func (ci *PubChainInstance) GetPool() []common.Address {
-	ci.poolLocker.RLock()
-	defer ci.poolLocker.RUnlock()
+func (pi *PubChainInstance) GetPool() []common.Address {
+	pi.poolLocker.RLock()
+	defer pi.poolLocker.RUnlock()
 	var ret []common.Address
-	ret = append(ret, ci.lastTwoPools...)
+	ret = append(ret, pi.lastTwoPools...)
 	return ret
 }
 
 // GetPool get the latest two pool address
-func (ci *PubChainInstance) checkToBridge(dest common.Address) bool {
-	pools := ci.GetPool()
+func (pi *PubChainInstance) checkToBridge(dest common.Address) bool {
+	pools := pi.GetPool()
 	for _, el := range pools {
 		if dest.String() == el.String() {
 			return true

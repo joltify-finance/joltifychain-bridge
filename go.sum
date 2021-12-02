@@ -1195,8 +1195,10 @@ github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1
 github.com/zondax/hid v0.9.0 h1:eiT3P6vNxAEVxXMw66eZUAAnU2zD33JBkfG/EnfAKl8=
 github.com/zondax/hid v0.9.0/go.mod h1:l5wttcP0jwtdLjqjMMWFVEE7d1zO0jvSPA9OPZxWpEM=
 github.com/zondax/ledger-go v0.12.1/go.mod h1:KatxXrVDzgWwbssUWsF5+cOJHXPvzQ09YSlzGNuhOEo=
-gitlab.com/joltify/joltifychain/joltifychain v0.0.0-20211105031913-4f1cc70220f4 h1:DU/qhn7k4swB5MegElqFdlwk/+tZ0c6EKWIBjNLxLZI=
-gitlab.com/joltify/joltifychain/joltifychain v0.0.0-20211105031913-4f1cc70220f4/go.mod h1:zOS4Q5/VQdLWdRt3PkxFmmdwWNvJEr70NWvZOROI24Q=
+gitlab.com/joltify/joltifychain v0.0.0-20211201232207-2a06cc4c9941 h1:2yhXQz/5VVC9gRGTc5CPvma8aYp34hyXr7YIr+oZlWM=
+gitlab.com/joltify/joltifychain v0.0.0-20211201232207-2a06cc4c9941/go.mod h1:D3nD4cG+xjZvc+d2ntmYILH3H8WTwkgN8OdPtNFc+qU=
+gitlab.com/joltify/joltifychain/joltifychain v0.0.0-20211108055740-299f09af8b17 h1:LAxTpXxolJxveXr1cNM0xC6ly9p2At+/hrASJ7wj8lo=
+gitlab.com/joltify/joltifychain/joltifychain v0.0.0-20211108055740-299f09af8b17/go.mod h1:zOS4Q5/VQdLWdRt3PkxFmmdwWNvJEr70NWvZOROI24Q=
 gitlab.com/thorchain/binance-sdk v1.2.3-0.20210117202539-d569b6b9ba5d/go.mod h1:SW01IZMpqlPNPdhHnn99qnJNvg8ll/agyyW7p85npwY=
 gitlab.com/thorchain/tss/tss-lib v0.0.0-20201118045712-70b2cb4bf916 h1:rM3TjCVZzn3cYQV1L8KuvwXOZ5yvMdB2C5YyExI/m9Y=
 gitlab.com/thorchain/tss/tss-lib v0.0.0-20201118045712-70b2cb4bf916/go.mod h1:i7bv+PuILDZmCiU3mtZXgOfgQkWLdLngByT2KDfyzpE=
@@ -1527,8 +1529,9 @@ google.golang.org/genproto v0.0.0-20200825200019-8632dd797987/go.mod h1:FWY/as6D
 google.golang.org/genproto v0.0.0-20201111145450-ac7456db90a6/go.mod h1:FWY/as6DDZQgahTzZj3fqbO1CbirC29ZNUFHwi0/+no=
 google.golang.org/genproto v0.0.0-20201119123407-9b1e624d6bc4/go.mod h1:FWY/as6DDZQgahTzZj3fqbO1CbirC29ZNUFHwi0/+no=
 google.golang.org/genproto v0.0.0-20210114201628-6edceaf6022f/go.mod h1:FWY/as6DDZQgahTzZj3fqbO1CbirC29ZNUFHwi0/+no=
-google.golang.org/genproto v0.0.0-20210903162649-d08c68adba83 h1:3V2dxSZpz4zozWWUq36vUxXEKnSYitEH2LdsAx+RUmg=
 google.golang.org/genproto v0.0.0-20210903162649-d08c68adba83/go.mod h1:eFjDcFEctNawg4eG61bRv87N7iHBWyVhJu7u1kqDUXY=
+google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1 h1:b9mVrqYfq3P4bCdaLg1qtBnPzUYgglsIdjZkL/fQVOE=
+google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1/go.mod h1:5CzLGKJ67TSI2B9POpiiyGha0AjJvZIUgRMt1dSmuhc=
 google.golang.org/grpc v1.33.2 h1:EQyQC3sa8M+p6Ulc8yy9SWSS2GVwyRc83gAbG8lrl4o=
 google.golang.org/grpc v1.33.2/go.mod h1:JMHMWHQWaTccqQQlmk3MJZS+GWXOdAesneDmEnv2fbc=
 google.golang.org/protobuf v0.0.0-20200109180630-ec00e32a8dfd/go.mod h1:DFci5gLYBciE7Vtevhsrf46CRTquxDuWsQurQQe4oz8=

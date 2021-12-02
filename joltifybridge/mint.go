@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"gitlab.com/joltify/joltifychain/joltifychain-bridge/misc"
 	"gitlab.com/joltify/joltifychain/joltifychain-bridge/pubchain"
 	"gitlab.com/joltify/joltifychain/joltifychain-bridge/tssclient"
-	vaulttypes "gitlab.com/joltify/joltifychain/joltifychain/x/vault/types"
+	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 )
 
-func prepareIssueTokenRequest(item *pubchain.AccountInboundReq, creatorPub string) (*vaulttypes.MsgCreateIssueToken, error) {
+func prepareIssueTokenRequest(item *pubchain.AccountInboundReq, creatorAddr, index string) (*vaulttypes.MsgCreateIssueToken, error) {
 	userAcc, _, coin, _ := item.GetInboundReqInfo()
 
 	receiver, err := misc.EthAddressToJoltAddr(userAcc)
@@ -20,20 +21,7 @@ func prepareIssueTokenRequest(item *pubchain.AccountInboundReq, creatorPub strin
 		return nil, err
 	}
 
-	pk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeAccPub, creatorPub)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("pubkey is %v\n", creatorPub)
-
-	creator, err := sdk.AccAddressFromHex(pk.Address().String())
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Printf("address is %v\n", creator.String())
-
-	a, err := vaulttypes.NewMsgCreateIssueToken(creator.String(), userAcc.String(), coin.String(), receiver.String())
+	a, err := vaulttypes.NewMsgCreateIssueToken(creatorAddr, index, coin.String(), receiver.String())
 	if err != nil {
 		return nil, err
 	}
@@ -52,23 +40,19 @@ func (jc *JoltifyChainBridge) MintCoin(item *pubchain.AccountInboundReq) error {
 		jc.logger.Info().Msgf("fail to query the pool with length %v", len(poolInfo))
 		return errors.New("not enough signer")
 	}
-	creatorPub := poolInfo[1].CreatePool.PoolPubKey
+	creatorAddr := poolInfo[1].CreatePool.PoolAddr
 	fmt.Printf("------------we sign with %v\n", poolInfo[1].CreatePool.PoolPubKey)
 
-	issueReq, err := prepareIssueTokenRequest(item, creatorPub)
+	acc, err := queryAccount(creatorAddr.String(), jc.grpcClient)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to prepare the issuing of the token")
+		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
+		return err
 	}
 
-	var accSeq, accNum uint64
-	acc, err := queryAccount(issueReq.Creator.String(), jc.grpcClient)
+	index := strconv.FormatUint(acc.GetSequence(), 10)
+	issueReq, err := prepareIssueTokenRequest(item, creatorAddr.String(), index)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("Fail to query the account")
-		accSeq = 1
-		accNum = 1
-	} else {
-		accSeq = acc.GetSequence()
-		accNum = acc.GetAccountNumber()
+		jc.logger.Error().Err(err).Msg("fail to prepare the issuing of the token")
 	}
 
 	_, _, _, height := item.GetInboundReqInfo()
@@ -86,7 +70,7 @@ func (jc *JoltifyChainBridge) MintCoin(item *pubchain.AccountInboundReq) error {
 	fmt.Printf("The User Wallet Address: %v\n", issueReq.Receiver.String())
 	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
 
-	txbytes, _, err := jc.genSendTx([]sdk.Msg{issueReq}, accSeq, accNum, &signMsg)
+	txbytes, _, err := jc.genSendTx([]sdk.Msg{issueReq}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the tx")
 		return err
@@ -99,5 +83,7 @@ func (jc *JoltifyChainBridge) MintCoin(item *pubchain.AccountInboundReq) error {
 		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
 		return err
 	}
+	fmt.Printf("we have successfully broadcast the signature")
+
 	return nil
 }

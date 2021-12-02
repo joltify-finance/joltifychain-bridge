@@ -12,28 +12,28 @@ import (
 )
 
 //StartSubscription start the subscription of the token
-func (ci *PubChainInstance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) (chan *etypes.Header, error) {
+func (pi *PubChainInstance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) (chan *etypes.Header, error) {
 
 	ctxWatch, _ := context.WithTimeout(context.Background(), chainQueryTimeout)
 	watchOpt := bind.WatchOpts{
 		Context: ctxWatch,
 	}
-	pools := ci.GetPool()
+	pools := pi.GetPool()
 	var watchList []common.Address
 	for _, el := range pools {
 		if len(el) != 0 {
 			watchList = append(watchList, el)
 		}
 	}
-	sbEvent, err := ci.tokenSb.tokenInstance.WatchTransfer(&watchOpt, ci.tokenSb.sb, nil, watchList)
+	sbEvent, err := pi.tokenSb.tokenInstance.WatchTransfer(&watchOpt, pi.tokenSb.sb, nil, watchList)
 	if err != nil {
-		ci.logger.Error().Err(err).Msgf("fail to setup watcher")
+		pi.logger.Error().Err(err).Msgf("fail to setup watcher")
 		return nil, errors.New("fail to setup the watcher")
 	}
-	ci.tokenSb.UpdateSbEvent(sbEvent)
+	pi.tokenSb.UpdateSbEvent(sbEvent)
 
 	blockEvent := make(chan *etypes.Header)
-	blockSub, err := ci.EthClient.SubscribeNewHead(ctx, blockEvent)
+	blockSub, err := pi.EthClient.SubscribeNewHead(ctx, blockEvent)
 	if err != nil {
 		fmt.Printf("fail to subscribe the block event with err %v\n", err)
 		return nil, err
@@ -42,20 +42,20 @@ func (ci *PubChainInstance) StartSubscription(ctx context.Context, wg *sync.Wait
 	go func() {
 		<-ctx.Done()
 		blockSub.Unsubscribe()
-		ci.logger.Info().Msgf("shutdown the public pub_chain subscription channel")
+		pi.logger.Info().Msgf("shutdown the public pub_chain subscription channel")
 		wg.Done()
 	}()
 	return blockEvent, nil
 }
 
 //UpdateSubscribe update the subscribed pool address
-func (ci *PubChainInstance) UpdateSubscribe() error {
+func (pi *PubChainInstance) UpdateSubscribe() error {
 	//fixme ctx should be global parameter
 	ctx, _ := context.WithTimeout(context.Background(), chainQueryTimeout)
 	watchOpt := bind.WatchOpts{
 		Context: ctx,
 	}
-	pools := ci.GetPool()
+	pools := pi.GetPool()
 	var watchList []common.Address
 	for _, el := range pools {
 		if len(el) != 0 {
@@ -63,17 +63,17 @@ func (ci *PubChainInstance) UpdateSubscribe() error {
 		}
 	}
 	//cancel the previous subscription
-	sbEvent, err := ci.tokenSb.tokenInstance.WatchTransfer(&watchOpt, ci.tokenSb.sb, nil, watchList)
+	sbEvent, err := pi.tokenSb.tokenInstance.WatchTransfer(&watchOpt, pi.tokenSb.sb, nil, watchList)
 	if err != nil {
-		ci.logger.Error().Err(err).Msg("fail to subscribe the event")
+		pi.logger.Error().Err(err).Msg("fail to subscribe the event")
 		return err
 	}
-	ci.tokenSb.UpdateSbEvent(sbEvent)
-	ci.logger.Info().Msgf("we update the event to address %v\n", watchList)
+	pi.tokenSb.UpdateSbEvent(sbEvent)
+	pi.logger.Info().Msgf("we update the event to address %v\n", watchList)
 	return nil
 }
 
 //GetSubChannel gets the subscription channel
-func (ci *PubChainInstance) GetSubChannel() chan *TokenTransfer {
-	return ci.tokenSb.sb
+func (pi *PubChainInstance) GetSubChannel() chan *TokenTransfer {
+	return pi.tokenSb.sb
 }

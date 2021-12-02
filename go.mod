@@ -13,11 +13,12 @@ require (
 	github.com/prometheus/client_golang v1.10.0
 	github.com/rs/zerolog v1.21.0
 	github.com/stretchr/testify v1.7.0
-	github.com/tendermint/btcd v0.1.1 // indirect
+	github.com/tendermint/btcd v0.1.1
 	github.com/tendermint/tendermint v0.34.11
-	gitlab.com/joltify/joltifychain/joltifychain v0.0.0-20211105031913-4f1cc70220f4
+	gitlab.com/joltify/joltifychain v0.0.0-20211201232207-2a06cc4c9941
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
-	google.golang.org/grpc v1.41.0
+	google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1 // indirect
+	google.golang.org/grpc v1.42.0
 )
 
 replace (

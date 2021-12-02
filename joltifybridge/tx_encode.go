@@ -7,7 +7,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	"github.com/cosmos/cosmos-sdk/std"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
-	"gitlab.com/joltify/joltifychain/joltifychain/app"
+	"gitlab.com/joltify/joltifychain/app"
 )
 
 func genEncodingConfig() params.EncodingConfig {

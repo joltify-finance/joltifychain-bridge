@@ -22,7 +22,7 @@ const (
 	OUTBoundFeeOut     = "0.000000000000001"
 	PendingAccountsize = 1024
 	iNBoundToken       = "0x0cD80A18df1C5eAd4B5Fb549391d58B06EFfDBC4"
-	iNBoundTokenSymbol = "jusd"
+	iNBoundDenom       = "jusd"
 )
 
 const (
@@ -72,6 +72,11 @@ func newAccountInboundReq(address, toPoolAddr common.Address, coin sdk.Coin, blo
 // GetInboundReqInfo returns the info of the inbound transaction
 func (acq *AccountInboundReq) GetInboundReqInfo() (common.Address, common.Address, sdk.Coin, int64) {
 	return acq.address, acq.toPoolAddr, acq.coin, acq.blockHeight
+}
+
+//SetItemHeight sets the block height of the tx
+func (acq *AccountInboundReq) SetItemHeight(blockHeight int64) {
+	acq.blockHeight = blockHeight
 }
 
 // PubChainInstance hold the joltify_bridge entity

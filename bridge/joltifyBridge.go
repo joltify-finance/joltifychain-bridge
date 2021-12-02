@@ -150,15 +150,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 						zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
 					}
 				}
-				// now we need to put the failed inbound request to the process channel, for each new joltify block
-				// we process one failure
-				select {
-				case item := <-ci.RetryInboundReq:
-					ci.AccountInboundReqChan <- item
-					continue
-				default:
-					continue
-				}
 
 				// process the public chain inbound message to the channel
 			case tokenTransfer := <-ci.GetSubChannel():
@@ -173,22 +164,32 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
 				}
+				// now we need to put the failed inbound request to the process channel, for each new joltify block
+				// we process one failure
+				select {
+				case item := <-ci.RetryInboundReq:
+					item.SetItemHeight(head.Number.Int64())
+					ci.AccountInboundReqChan <- item
+					continue
+				default:
+					continue
+				}
 
 			// process the in-bound top up event which will mint coin for users
 			case item := <-ci.AccountInboundReqChan:
-				found, err := joltBridge.CheckWhetherSigner(item)
+				found, err := joltBridge.CheckWhetherSigner()
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
+					continue
 				}
+
 				if found {
-					// todo do we need to think about refund the user or we can only delete the top-up request here
 					err := joltBridge.MintCoin(item)
 					if err != nil {
 						ci.RetryInboundReq <- item
 						zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
 					}
 				}
-
 			}
 		}
 	}()

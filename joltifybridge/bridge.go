@@ -19,7 +19,7 @@ import (
 	"gitlab.com/joltify/joltifychain/joltifychain-bridge/config"
 	"gitlab.com/joltify/joltifychain/joltifychain-bridge/misc"
 	"gitlab.com/joltify/joltifychain/joltifychain-bridge/tssclient"
-	"gitlab.com/joltify/joltifychain/joltifychain/x/vault/types"
+	"gitlab.com/joltify/joltifychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -100,7 +100,7 @@ func (jc *JoltifyChainBridge) TerminateBridge() error {
 	return nil
 }
 
-func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq uint64, accNum uint64, tssSignMsg *tssclient.TssSignigMsg) ([]byte, string, error) {
+func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64, tssSignMsg *tssclient.TssSignigMsg) ([]byte, string, error) {
 	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
 	// following function.
 	encCfg := MakeEncodingConfig()
@@ -208,7 +208,6 @@ func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.
 			return sigV2, err
 		}
 	} else {
-
 		hashedMsg := crypto.Sha256(signBytes)
 		encodedMsg := base64.StdEncoding.EncodeToString(hashedMsg)
 		signMsg.Msgs = []string{encodedMsg}

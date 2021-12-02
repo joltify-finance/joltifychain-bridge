@@ -270,7 +270,8 @@ func TestProcessEachBlock(t *testing.T) {
 		feeCoin,
 	}
 	ci.pendingAccounts[encodeStr] = &btx
-	err = ci.UpdatePool(account2)
+	acc2 := common.HexToAddress(account2)
+	err = ci.UpdatePool(acc2)
 	require.Nil(t, err)
 	ci.processEachBlock(&tBlock)
 	ret := ci.pendingAccounts[encodeStr]
