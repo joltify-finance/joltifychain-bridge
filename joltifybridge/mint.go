@@ -39,7 +39,7 @@ func (jc *JoltifyChainBridge) MintCoin(item *pubchain.AccountInboundReq) error {
 		jc.logger.Info().Msgf("fail to query the pool with length %v", len(poolInfo))
 		return errors.New("not enough signer")
 	}
-	creatorAddr := poolInfo[1].CreatePool.PoolAddr
+	creatorAddr := poolInfo[0].CreatePool.PoolAddr
 
 	acc, err := queryAccount(creatorAddr.String(), jc.grpcClient)
 	if err != nil {
@@ -61,7 +61,7 @@ func (jc *JoltifyChainBridge) MintCoin(item *pubchain.AccountInboundReq) error {
 	_, _, _, height := item.GetInboundReqInfo()
 	jc.logger.Info().Msgf("we do the top up for %v at height %v", issueReq.Receiver.String(), height)
 	signMsg := tssclient.TssSignigMsg{
-		Pk:          poolInfo[1].CreatePool.PoolPubKey,
+		Pk:          poolInfo[0].CreatePool.PoolPubKey,
 		Signers:     nil,
 		BlockHeight: height,
 		Version:     tssclient.TssVersion,

@@ -90,14 +90,13 @@ func (jc *JoltifyChainBridge) CheckWhetherSigner() (bool, error) {
 	if err != nil || len(poolInfo) == 0 {
 		return found, errors.New("fail to query the signer")
 	}
-	lastPoolInfo := poolInfo[len(poolInfo)-1]
+	lastPoolInfo := poolInfo[0]
 	creator, err := jc.keyring.Key("operator")
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to get the validator address")
 		return found, err
 	}
 	for _, eachValidator := range lastPoolInfo.CreatePool.Nodes {
-		fmt.Printf(">>>>%v\n", eachValidator.String())
 		if eachValidator.Equals(creator.GetAddress()) {
 			found = true
 			break
