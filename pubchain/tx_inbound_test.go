@@ -88,7 +88,7 @@ func TestProcessInBound(t *testing.T) {
 	ci := PubChainInstance{
 		lastTwoPools:    make([]string, 2),
 		poolLocker:      sync.RWMutex{},
-		pendingAccounts: make(map[string]*bridgeTx),
+		pendingInbounds: make(map[string]*inboundTx),
 	}
 
 	log := ethTypes.Log{Removed: true}
@@ -124,7 +124,7 @@ func TestProcessInBound(t *testing.T) {
 	tToken.Raw.Address = common.HexToAddress(iNBoundToken)
 	err = ci.ProcessInBound(&tToken)
 	require.Nil(t, err)
-	a := ci.pendingAccounts[testTxHash.Hex()[2:]]
+	a := ci.pendingInbounds[testTxHash.Hex()[2:]]
 	require.True(t, a.token.Equal(testCoin))
 
 	// same tx hash should be rejected
@@ -134,10 +134,10 @@ func TestProcessInBound(t *testing.T) {
 
 func TestUpdateBridgeTx(t *testing.T) {
 	ci := PubChainInstance{
-		lastTwoPools:         make([]string, 2),
-		poolLocker:           sync.RWMutex{},
-		pendingAccounts:      make(map[string]*bridgeTx),
-		pendingAccountLocker: sync.RWMutex{},
+		lastTwoPools:           make([]string, 2),
+		poolLocker:             sync.RWMutex{},
+		pendingInbounds:        make(map[string]*inboundTx),
+		pendingInboundTxLocker: sync.RWMutex{},
 	}
 
 	fromStr := "90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"
@@ -150,37 +150,37 @@ func TestUpdateBridgeTx(t *testing.T) {
 		Denom:  inBoundDenom,
 		Amount: sdk.NewIntFromUint64(0),
 	}
-	btx := bridgeTx{
+	btx := inboundTx{
 		fromStr,
 		inBound,
 		time.Now(),
 		coin,
 		feeCoin,
 	}
-	ci.pendingAccounts["tester"] = &btx
+	ci.pendingInbounds["tester"] = &btx
 
-	ret := ci.updateBridgeTx("false", big.NewInt(1), inBound)
+	ret := ci.updateInboundTx("false", big.NewInt(1), inBound)
 	require.Nil(t, ret)
 
-	ret = ci.updateBridgeTx("tester", big.NewInt(1), outBound)
+	ret = ci.updateInboundTx("tester", big.NewInt(1), outBound)
 	require.Nil(t, ret)
 
 	// if we do not have enough fee paid
-	ret = ci.updateBridgeTx("tester", big.NewInt(123), inBound)
+	ret = ci.updateInboundTx("tester", big.NewInt(123), inBound)
 	require.Nil(t, ret)
-	require.True(t, ci.pendingAccounts["tester"].fee.Amount.Equal(sdk.NewInt(123)))
+	require.True(t, ci.pendingInbounds["tester"].fee.Amount.Equal(sdk.NewInt(123)))
 
 	// now we top up the money
 	topUp, err := sdk.NewDecFromStr(inBoundFeeMin)
 	require.Nil(t, err)
 
-	ret = ci.updateBridgeTx("tester", topUp.BigInt(), inBound)
+	ret = ci.updateInboundTx("tester", topUp.BigInt(), inBound)
 	require.NotNil(t, ret)
 
 	target := sdk.NewInt(123).Add(sdk.NewIntFromBigInt(topUp.BigInt()))
 	require.True(t, ret.fee.Amount.Equal(target))
 
-	_, ok := ci.pendingAccounts["tester"]
+	_, ok := ci.pendingInbounds["tester"]
 	require.False(t, ok)
 }
 
@@ -245,11 +245,11 @@ func TestProcessEachBlock(t *testing.T) {
 	tBlock := ethTypes.Block{}
 
 	ci := PubChainInstance{
-		lastTwoPools:          make([]common.Address, 2),
-		poolLocker:            sync.RWMutex{},
-		pendingAccounts:       make(map[string]*bridgeTx),
-		pendingAccountLocker:  sync.RWMutex{},
-		AccountInboundReqChan: make(chan *AccountInboundReq, 1),
+		lastTwoPools:           make([]common.Address, 2),
+		poolLocker:             sync.RWMutex{},
+		pendingInbounds:        make(map[string]*inboundTx),
+		pendingInboundTxLocker: sync.RWMutex{},
+		InboundReqChan:         make(chan *InboundReq, 1),
 	}
 	fromStr := "90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"
 	coin := sdk.Coin{
@@ -262,19 +262,19 @@ func TestProcessEachBlock(t *testing.T) {
 		Amount: sdk.NewIntFromUint64(1),
 	}
 
-	btx := bridgeTx{
+	btx := inboundTx{
 		fromStr,
 		inBound,
 		time.Now(),
 		coin,
 		feeCoin,
 	}
-	ci.pendingAccounts[encodeStr] = &btx
+	ci.pendingInbounds[encodeStr] = &btx
 	acc2 := common.HexToAddress(account2)
 	err = ci.UpdatePool(acc2)
 	require.Nil(t, err)
 	ci.processEachBlock(&tBlock)
-	ret := ci.pendingAccounts[encodeStr]
+	ret := ci.pendingInbounds[encodeStr]
 	// indicate nothing happens
 	require.True(t, ret.fee.Amount.Equal(sdk.NewIntFromUint64(1)))
 
@@ -302,7 +302,7 @@ func TestProcessEachBlock(t *testing.T) {
 	// now we top up the fee
 	tBlock3 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGood}, nil, nil, newHasher())
 	ci.processEachBlock(tBlock3)
-	_, ok := ci.pendingAccounts[encodeStr]
+	_, ok := ci.pendingInbounds[encodeStr]
 	// the tx should still be in map
 	require.True(t, ok)
 	require.True(t, ret.fee.Amount.Equal(sdk.NewIntFromUint64(11)))
@@ -310,7 +310,7 @@ func TestProcessEachBlock(t *testing.T) {
 	// now we top up the fee
 	tBlock4 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFee}, nil, nil, newHasher())
 	ci.processEachBlock(tBlock4)
-	_, ok = ci.pendingAccounts[encodeStr]
+	_, ok = ci.pendingInbounds[encodeStr]
 	// the tx should still be in map
 	require.False(t, ok)
 	totalFee := sdk.NewIntFromUint64(11).Add(sdk.NewIntFromBigInt(fee.BigInt()))

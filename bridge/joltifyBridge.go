@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"fmt"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	"log"
 	"os"
 	"os/signal"
@@ -40,8 +41,15 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
+	// fixme, in docker it needs to be changed to basehome
+	tssServer, _, err := tssclient.StartTssServer(config.HomeDir, config.TssConfig)
+	if err != nil {
+		log.Fatalln("fail to start the tss")
+		return
+	}
+
 	keyringPath := path.Join(config.HomeDir, config.KeyringAddress)
-	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.InvoiceChainConfig.GrpcAddress, keyringPath, "12345678", config)
+	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.InvoiceChainConfig.GrpcAddress, keyringPath, "12345678", tssServer)
 	if err != nil {
 		log.Fatalln("fail to create the invoice joltify_bridge", err)
 		return
@@ -69,7 +77,7 @@ func NewBridgeService(config config.Config) {
 	}
 
 	// now we monitor the bsc transfer event
-	ci, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, config.PubChainConfig.TokenAddress)
+	ci, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, config.PubChainConfig.TokenAddress, tssServer)
 	if err != nil {
 		fmt.Printf("fail to connect the public pub_chain with address %v\n", config.PubChainConfig.WsAddress)
 		cancel()
@@ -134,7 +142,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 
 				// process the new joltify block, validator may need to submit the pool address
 			case block := <-newBlockChan:
-				updated, poolPubKey := joltBridge.CheckAndUpdatePool(block.Data.(tmtypes.EventDataNewBlock).Block.Height)
+				blockHeight := block.Data.(tmtypes.EventDataNewBlock).Block.Height
+				updated, poolPubKey := joltBridge.CheckAndUpdatePool(blockHeight)
 				if updated {
 					addr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
 					if err != nil {
@@ -149,8 +158,10 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 						zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
 					}
 				}
+				// we now check whether we have the outbound tx
+				joltBridge.CheckOutBoundTx(blockHeight, block.Data.(tmtypes.EventDataNewBlock).Block.Data.Txs, pi.GetPool())
 
-				// process the public chain inbound message to the channel
+			// process the public chain inbound message to the channel
 			case tokenTransfer := <-pi.GetSubChannel():
 				err := pi.ProcessInBound(tokenTransfer)
 				if err != nil {
@@ -170,14 +181,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				select {
 				case item := <-pi.RetryInboundReq:
 					item.SetItemHeight(head.Number.Int64())
-					pi.AccountInboundReqChan <- item
+					pi.InboundReqChan <- item
 					continue
 				default:
 					continue
 				}
 
 			// process the in-bound top up event which will mint coin for users
-			case item := <-pi.AccountInboundReqChan:
+			case item := <-pi.InboundReqChan:
 				// first we check whether this tx has already been submitted by others
 				found, err := joltBridge.CheckWhetherSigner()
 				if err != nil {
@@ -186,12 +197,23 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				}
 
 				if found {
-					err := joltBridge.MintCoin(item)
+					err := joltBridge.ProcessInBound(item)
 					if err != nil {
 						pi.RetryInboundReq <- item
 						zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
 					}
 				}
+			case item := <-joltBridge.OutboundReqChan:
+				found, err := joltBridge.CheckWhetherSigner()
+				if err != nil {
+					zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
+					continue
+				}
+				if found {
+					_ = item
+					pi.ProcessOutBound(item)
+				}
+
 			}
 		}
 	}()

@@ -12,7 +12,7 @@ import (
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 )
 
-func prepareIssueTokenRequest(item *pubchain.AccountInboundReq, creatorAddr, index string) (*vaulttypes.MsgCreateIssueToken, error) {
+func prepareIssueTokenRequest(item *pubchain.InboundReq, creatorAddr, index string) (*vaulttypes.MsgCreateIssueToken, error) {
 	userAcc, _, coin, _ := item.GetInboundReqInfo()
 
 	receiver, err := misc.EthAddressToJoltAddr(userAcc)
@@ -27,8 +27,8 @@ func prepareIssueTokenRequest(item *pubchain.AccountInboundReq, creatorAddr, ind
 	return a, nil
 }
 
-// MintCoin mint the token in joltify chain
-func (jc *JoltifyChainBridge) MintCoin(item *pubchain.AccountInboundReq) error {
+// ProcessInBound mint the token in joltify chain
+func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
 	poolInfo, err := jc.QueryLastPoolAddress()
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("error in get pool with error %v", err)

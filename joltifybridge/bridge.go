@@ -9,6 +9,9 @@ import (
 	"strconv"
 	"sync"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	tendertypes "github.com/tendermint/tendermint/types"
+
 	coscrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdktypes "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -16,7 +19,6 @@ import (
 	"github.com/joltgeorge/tss/keysign"
 	"github.com/tendermint/tendermint/crypto"
 	tmclienthttp "github.com/tendermint/tendermint/rpc/client/http"
-	"gitlab.com/joltify/joltifychain-bridge/config"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	"gitlab.com/joltify/joltifychain/x/vault/types"
@@ -34,7 +36,7 @@ import (
 )
 
 // NewJoltifyBridge new the instance for the joltify pub_chain
-func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, config config.Config) (*JoltifyChainBridge, error) {
+func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer *tssclient.BridgeTssServer) (*JoltifyChainBridge, error) {
 	var joltifyBridge JoltifyChainBridge
 	var err error
 	joltifyBridge.logger = zlog.With().Str("module", "joltifyChain").Logger()
@@ -66,17 +68,17 @@ func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, config config.Conf
 	if err != nil {
 		return nil, err
 	}
-	// fixme, in docker it needs to be changed to basehome
-	tssServer, key, err := tssclient.StartTssServer(config.HomeDir, config.TssConfig)
-	if err != nil {
-		return nil, err
-	}
+
 	joltifyBridge.tssServer = tssServer
-	joltifyBridge.cosKey = key
 
 	joltifyBridge.msgSendCache = []tssPoolMsg{}
 	joltifyBridge.LastTwoTssPoolMsg = []*tssPoolMsg{nil, nil}
 	joltifyBridge.poolUpdateLocker = &sync.Mutex{}
+	encode := MakeEncodingConfig()
+	joltifyBridge.encoding = &encode
+	joltifyBridge.pendingOutbounds = make(map[string]*outboundTx)
+	joltifyBridge.pendingOutboundLocker = &sync.RWMutex{}
+	joltifyBridge.OutboundReqChan = make(chan *OutBoundReq, reqCacheSize)
 
 	return &joltifyBridge, nil
 }
@@ -103,7 +105,7 @@ func (jc *JoltifyChainBridge) TerminateBridge() error {
 func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64, tssSignMsg *tssclient.TssSignigMsg) ([]byte, string, error) {
 	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
 	// following function.
-	encCfg := MakeEncodingConfig()
+	encCfg := *jc.encoding
 	// Create a new TxBuilder.
 	txBuilder := encCfg.TxConfig.NewTxBuilder()
 
@@ -334,7 +336,7 @@ func (jc *JoltifyChainBridge) prepareTssPool(creator sdk.AccAddress, pubKey, hei
 		dHeight,
 	}
 	jc.poolUpdateLocker.Lock()
-	// we store the latest two tss pool address
+	// we store the latest two tss pool outReceiverAddress
 	jc.LastTwoTssPoolMsg[0] = jc.LastTwoTssPoolMsg[1]
 	jc.LastTwoTssPoolMsg[1] = &item
 	jc.msgSendCache = append(jc.msgSendCache, item)
@@ -348,7 +350,7 @@ func (jc *JoltifyChainBridge) GetLastBlockHeight() (int64, error) {
 	return b, err
 }
 
-// CheckAndUpdatePool send the tx to the joltify pub_chain, if the pool address is updated, it returns true
+// CheckAndUpdatePool send the tx to the joltify pub_chain, if the pool outReceiverAddress is updated, it returns true
 func (jc *JoltifyChainBridge) CheckAndUpdatePool(blockHeight int64) (bool, string) {
 	jc.poolUpdateLocker.Lock()
 	if len(jc.msgSendCache) < 1 {
@@ -374,6 +376,32 @@ func (jc *JoltifyChainBridge) CheckAndUpdatePool(blockHeight int64) (bool, strin
 	return false, ""
 }
 
+// CheckOutBoundTx checks
+func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, txs tendertypes.Txs, poolAddress []ethcommon.Address) {
+	config := jc.encoding
+
+	for _, el := range txs {
+		tx, err := config.TxConfig.TxDecoder()(el)
+		if err != nil {
+			jc.logger.Info().Msgf("fail to decode the data and skip this tx")
+			continue
+		}
+		txWithMemo := tx.(sdk.TxWithMemo)
+		memo := txWithMemo.GetMemo()
+		for _, msg := range txWithMemo.GetMsgs() {
+			switch eachMsg := msg.(type) {
+			case *banktypes.MsgSend:
+				err := jc.processMsg(blockHeight, poolAddress, eachMsg, el.Hash(), memo)
+				if err != nil {
+					jc.logger.Error().Err(err).Msgf("fail to process the send message")
+				}
+			default:
+				continue
+			}
+		}
+	}
+}
+
 // DoTssSign test for keysign
 func (jc *JoltifyChainBridge) DoTssSign() (keysign.Response, error) {
 	poolInfo, err := jc.QueryLastPoolAddress()
@@ -388,7 +416,8 @@ func (jc *JoltifyChainBridge) DoTssSign() (keysign.Response, error) {
 	}
 	msgtosign := base64.StdEncoding.EncodeToString([]byte("hello"))
 	msg := tssclient.TssSignigMsg{
-		Pk:          poolInfo[1].GetCreatePool().PoolPubKey,
+		// fixme of the pool pubkey
+		Pk:          poolInfo[0].GetCreatePool().PoolPubKey,
 		Msgs:        []string{msgtosign},
 		BlockHeight: int64(100),
 		Version:     tssclient.TssVersion,

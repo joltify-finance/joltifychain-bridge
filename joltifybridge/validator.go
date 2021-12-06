@@ -73,7 +73,7 @@ func (jc *JoltifyChainBridge) GetLastValidator() ([]*validators.Validator, int64
 	return validators, blockHeight
 }
 
-// QueryLastPoolAddress returns the latest two pool address
+// QueryLastPoolAddress returns the latest two pool outReceiverAddress
 func (jc *JoltifyChainBridge) QueryLastPoolAddress() ([]*vaulttypes.PoolInfo, error) {
 	poolInfo, err := queryLastValidatorSet(jc.grpcClient)
 	if err != nil {
@@ -93,7 +93,7 @@ func (jc *JoltifyChainBridge) CheckWhetherSigner() (bool, error) {
 	lastPoolInfo := poolInfo[0]
 	creator, err := jc.keyring.Key("operator")
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to get the validator address")
+		jc.logger.Error().Err(err).Msg("fail to get the validator outReceiverAddress")
 		return found, err
 	}
 	for _, eachValidator := range lastPoolInfo.CreatePool.Nodes {
@@ -132,7 +132,7 @@ func (jc *JoltifyChainBridge) doInitValidator(i info, blockHeight int64, values 
 		}
 		adr, err := types.ConsAddressFromBech32(el.Address)
 		if err != nil {
-			jc.logger.Error().Err(err).Msg("fail to decode the address")
+			jc.logger.Error().Err(err).Msg("fail to decode the outReceiverAddress")
 			return err
 		}
 		e := validators.Validator{

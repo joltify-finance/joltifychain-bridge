@@ -4,15 +4,12 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"math/big"
-	"time"
-
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	"gitlab.com/joltify/joltifychain-bridge/config"
+	"math/big"
 )
-
-const chainQueryTimeout = time.Second * 5
 
 // ProcessInBound process the inbound contract token top-up
 func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
@@ -20,7 +17,7 @@ func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
 		return errors.New("the tx is the revert tx")
 	}
 	tokenAddr := transfer.Raw.Address
-	err := pi.addBridgeTx(transfer.Raw.TxHash.Hex()[2:], transfer.Raw.BlockNumber, transfer.From, transfer.Value, tokenAddr, inBound)
+	err := pi.processInboundTx(transfer.Raw.TxHash.Hex()[2:], transfer.Raw.BlockNumber, transfer.From, transfer.Value, tokenAddr)
 	return err
 }
 
@@ -37,36 +34,33 @@ func (pi *PubChainInstance) ProcessNewBlock(number *big.Int) error {
 	return nil
 }
 
-// updateBridgeTx update the top-up token with fee
-func (pi *PubChainInstance) updateBridgeTx(txID string, amount *big.Int, direction direction) *bridgeTx {
-	pi.pendingAccountLocker.Lock()
-	defer pi.pendingAccountLocker.Unlock()
-	thisAccount, ok := pi.pendingAccounts[txID]
+// updateInboundTx update the top-up token with fee
+func (pi *PubChainInstance) updateInboundTx(txID string, amount *big.Int, direction config.Direction) *inboundTx {
+	pi.pendingInboundTxLocker.Lock()
+	defer pi.pendingInboundTxLocker.Unlock()
+	thisAccount, ok := pi.pendingInbounds[txID]
 	if !ok {
-		pi.logger.Warn().Msgf("fail to get the stored tx from pool with %v\n", pi.pendingAccounts)
+		pi.logger.Warn().Msgf("fail to get the stored tx from pool with %v\n", pi.pendingInbounds)
 		return nil
 	}
-	if thisAccount.direction != direction {
-		pi.logger.Warn().Msg("the tx direction is not consistent")
-		return nil
-	}
+
 	thisAccount.fee.Amount = thisAccount.fee.Amount.Add(types.NewIntFromBigInt(amount))
 	err := thisAccount.Verify()
 
 	if err != nil {
-		pi.pendingAccounts[txID] = thisAccount
+		pi.pendingInbounds[txID] = thisAccount
 		pi.logger.Warn().Msgf("the account cannot be processed on joltify pub_chain this round")
 		return nil
 	}
 	// since this tx is processed,we do not need to store it any longer
-	delete(pi.pendingAccounts, txID)
+	delete(pi.pendingInbounds, txID)
 	return thisAccount
 }
 
-func (pi *PubChainInstance) addBridgeTx(txID string, blockHeight uint64, from common.Address, value *big.Int, addr common.Address, direction direction) error {
-	pi.pendingAccountLocker.Lock()
-	defer pi.pendingAccountLocker.Unlock()
-	_, ok := pi.pendingAccounts[txID]
+func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, from common.Address, value *big.Int, addr common.Address) error {
+	pi.pendingInboundTxLocker.Lock()
+	defer pi.pendingInboundTxLocker.Unlock()
+	_, ok := pi.pendingInbounds[txID]
 	if ok {
 		pi.logger.Error().Msgf("the tx already exist!!")
 		return errors.New("tx existed")
@@ -78,24 +72,22 @@ func (pi *PubChainInstance) addBridgeTx(txID string, blockHeight uint64, from co
 	}
 
 	token := types.Coin{
-		Denom:  iNBoundDenom,
+		Denom:  config.InBoundDenom,
 		Amount: types.NewIntFromBigInt(value),
 	}
 	fee := types.Coin{
-		Denom:  inBoundDenom,
+		Denom:  config.InBoundDenomFee,
 		Amount: types.NewInt(0),
 	}
 
-	acc := bridgeTx{
+	tx := inboundTx{
 		from,
-		direction,
 		blockHeight,
 		token,
 		fee,
 	}
-	pi.logger.Info().Msgf("we add the tokens tx(%v):%v", txID, acc.token.String())
-	pi.pendingAccounts[txID] = &acc
-	pi.logger.Info().Msgf("after add the tokens %v", pi.pendingAccounts)
+	pi.logger.Info().Msgf("we add the tokens tx(%v):%v", txID, tx.token.String())
+	pi.pendingInbounds[txID] = &tx
 	return nil
 }
 
@@ -111,10 +103,10 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 				continue
 			}
 			payTxID := tx.Data()
-			account := pi.updateBridgeTx(hex.EncodeToString(payTxID), tx.Value(), inBound)
+			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), config.InBound)
 			if account != nil {
 				item := newAccountInboundReq(account.address, *tx.To(), account.token, block.Number().Int64())
-				pi.AccountInboundReqChan <- &item
+				pi.InboundReqChan <- &item
 			}
 		}
 	}
@@ -153,16 +145,16 @@ func (pi *PubChainInstance) checkToBridge(dest common.Address) bool {
 
 //DeleteExpired delete the expired tx
 func (pi *PubChainInstance) DeleteExpired(currentHeight uint64) {
-	pi.pendingAccountLocker.Lock()
-	defer pi.pendingAccountLocker.Unlock()
+	pi.pendingInboundTxLocker.Lock()
+	defer pi.pendingInboundTxLocker.Unlock()
 	var expiredTx []string
-	for key, el := range pi.pendingAccounts {
-		if currentHeight-el.blockHeight > txTimeout {
+	for key, el := range pi.pendingInbounds {
+		if currentHeight-el.blockHeight > config.TxTimeout {
 			expiredTx = append(expiredTx, key)
 		}
 	}
 	for _, el := range expiredTx {
 		pi.logger.Warn().Msgf("we delete the expired tx %s", el)
-		delete(pi.pendingAccounts, el)
+		delete(pi.pendingInbounds, el)
 	}
 }

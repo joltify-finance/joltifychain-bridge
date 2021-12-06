@@ -81,7 +81,7 @@ func TestAccount_Verify(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := &bridgeTx{
+			a := &inboundTx{
 				address:   tt.fields.address,
 				direction: tt.fields.direction,
 				token:     tt.fields.token,
