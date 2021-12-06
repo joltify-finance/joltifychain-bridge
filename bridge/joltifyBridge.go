@@ -86,7 +86,7 @@ func NewBridgeService(config config.Config) {
 	fmt.Printf("we quit gracefully\n")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybridge.JoltifyChainBridge, ci *pubchain.PubChainInstance) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybridge.JoltifyChainBridge, pi *pubchain.PubChainInstance) {
 	defer wg.Done()
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(ctx, time.Second*5)
@@ -108,7 +108,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 	wg.Add(1)
 
 	// pubNewBlockChan is the channel for the new blocks for the public chain
-	pubNewBlockChan, err := ci.StartSubscription(ctx, wg)
+	pubNewBlockChan, err := pi.StartSubscription(ctx, wg)
 	if err != nil {
 		fmt.Printf("fail to subscribe the token transfer with err %v\n", err)
 		return
@@ -136,47 +136,48 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 			case block := <-newBlockChan:
 				updated, poolPubKey := joltBridge.CheckAndUpdatePool(block.Data.(tmtypes.EventDataNewBlock).Block.Height)
 				if updated {
-					// var poolPubkey []
 					addr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
 					if err != nil {
 						fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
 						continue
 					}
-					ci.UpdatePool(addr)
+					pi.UpdatePool(addr)
 
-					fmt.Printf("update the address %v\n", ci.GetPool())
-					err = ci.UpdateSubscribe()
+					fmt.Printf("update the address %v\n", pi.GetPool())
+					err = pi.UpdateSubscribe()
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
 					}
 				}
 
 				// process the public chain inbound message to the channel
-			case tokenTransfer := <-ci.GetSubChannel():
-				err := ci.ProcessInBound(tokenTransfer)
+			case tokenTransfer := <-pi.GetSubChannel():
+				err := pi.ProcessInBound(tokenTransfer)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
 				}
 
 				// process the public chain new block event
 			case head := <-pubNewBlockChan:
-				err := ci.ProcessNewBlock(head.Number)
+				err := pi.ProcessNewBlock(head.Number)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
 				}
+				// we delete the expired tx
+				pi.DeleteExpired(head.Number.Uint64())
 				// now we need to put the failed inbound request to the process channel, for each new joltify block
 				// we process one failure
 				select {
-				case item := <-ci.RetryInboundReq:
+				case item := <-pi.RetryInboundReq:
 					item.SetItemHeight(head.Number.Int64())
-					ci.AccountInboundReqChan <- item
+					pi.AccountInboundReqChan <- item
 					continue
 				default:
 					continue
 				}
 
 			// process the in-bound top up event which will mint coin for users
-			case item := <-ci.AccountInboundReqChan:
+			case item := <-pi.AccountInboundReqChan:
 				// first we check whether this tx has already been submitted by others
 				found, err := joltBridge.CheckWhetherSigner()
 				if err != nil {
@@ -187,7 +188,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				if found {
 					err := joltBridge.MintCoin(item)
 					if err != nil {
-						ci.RetryInboundReq <- item
+						pi.RetryInboundReq <- item
 						zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
 					}
 				}

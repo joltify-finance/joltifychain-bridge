@@ -23,6 +23,7 @@ const (
 	PendingAccountsize = 1024
 	iNBoundToken       = "0x0cD80A18df1C5eAd4B5Fb549391d58B06EFfDBC4"
 	iNBoundDenom       = "jusd"
+	txTimeout          = 300
 )
 
 const (
@@ -94,11 +95,11 @@ type PubChainInstance struct {
 }
 
 type bridgeTx struct {
-	address   common.Address
-	direction direction
-	timeStamp time.Time
-	token     sdk.Coin
-	fee       sdk.Coin
+	address     common.Address
+	direction   direction
+	blockHeight uint64
+	token       sdk.Coin
+	fee         sdk.Coin
 }
 
 // NewChainInstance initialize the joltify_bridge entity

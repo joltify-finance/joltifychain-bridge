@@ -20,7 +20,7 @@ func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
 		return errors.New("the tx is the revert tx")
 	}
 	tokenAddr := transfer.Raw.Address
-	err := pi.addBridgeTx(transfer.Raw.TxHash.Hex()[2:], transfer.From, transfer.Value, tokenAddr, inBound)
+	err := pi.addBridgeTx(transfer.Raw.TxHash.Hex()[2:], transfer.Raw.BlockNumber, transfer.From, transfer.Value, tokenAddr, inBound)
 	return err
 }
 
@@ -63,7 +63,7 @@ func (pi *PubChainInstance) updateBridgeTx(txID string, amount *big.Int, directi
 	return thisAccount
 }
 
-func (pi *PubChainInstance) addBridgeTx(txID string, from common.Address, value *big.Int, addr common.Address, direction direction) error {
+func (pi *PubChainInstance) addBridgeTx(txID string, blockHeight uint64, from common.Address, value *big.Int, addr common.Address, direction direction) error {
 	pi.pendingAccountLocker.Lock()
 	defer pi.pendingAccountLocker.Unlock()
 	_, ok := pi.pendingAccounts[txID]
@@ -89,7 +89,7 @@ func (pi *PubChainInstance) addBridgeTx(txID string, from common.Address, value 
 	acc := bridgeTx{
 		from,
 		direction,
-		time.Now(),
+		blockHeight,
 		token,
 		fee,
 	}
@@ -149,4 +149,20 @@ func (pi *PubChainInstance) checkToBridge(dest common.Address) bool {
 		}
 	}
 	return false
+}
+
+//DeleteExpired delete the expired tx
+func (pi *PubChainInstance) DeleteExpired(currentHeight uint64) {
+	pi.pendingAccountLocker.Lock()
+	defer pi.pendingAccountLocker.Unlock()
+	var expiredTx []string
+	for key, el := range pi.pendingAccounts {
+		if currentHeight-el.blockHeight > txTimeout {
+			expiredTx = append(expiredTx, key)
+		}
+	}
+	for _, el := range expiredTx {
+		pi.logger.Warn().Msgf("we delete the expired tx %s", el)
+		delete(pi.pendingAccounts, el)
+	}
 }
