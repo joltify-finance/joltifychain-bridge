@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/joltifybridge"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/pubchain"
+	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/joltifybridge"
+	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 
 	zlog "github.com/rs/zerolog/log"
 

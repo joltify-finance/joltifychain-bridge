@@ -1,4 +1,4 @@
-module gitlab.com/joltify/joltifychain/joltifychain-bridge
+module gitlab.com/joltify/joltifychain-bridge
 
 go 1.16
 
@@ -17,7 +17,6 @@ require (
 	github.com/tendermint/tendermint v0.34.11
 	gitlab.com/joltify/joltifychain v0.0.0-20211201232207-2a06cc4c9941
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
-	google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1 // indirect
 	google.golang.org/grpc v1.42.0
 )
 

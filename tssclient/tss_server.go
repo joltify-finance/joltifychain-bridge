@@ -8,7 +8,7 @@ import (
 	"path"
 
 	"github.com/joltgeorge/tss/keysign"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/config"
 
 	"github.com/joltgeorge/tss/keygen"
 

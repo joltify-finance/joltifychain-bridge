@@ -16,9 +16,9 @@ import (
 	"github.com/joltgeorge/tss/keysign"
 	"github.com/tendermint/tendermint/crypto"
 	tmclienthttp "github.com/tendermint/tendermint/rpc/client/http"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/tssclient"
+	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	"gitlab.com/joltify/joltifychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/client"

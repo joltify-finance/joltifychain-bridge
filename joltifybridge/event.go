@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"strconv"
 
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/tssclient"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	"github.com/joltgeorge/tss/common"
 

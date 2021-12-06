@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/pubchain"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/tssclient"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/pubchain"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 )
 
@@ -33,7 +33,6 @@ func (jc *JoltifyChainBridge) MintCoin(item *pubchain.AccountInboundReq) error {
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("error in get pool with error %v", err)
 		return err
-
 	}
 	if len(poolInfo) != 2 {
 		jc.logger.Info().Msgf("fail to query the pool with length %v", len(poolInfo))
@@ -47,12 +46,15 @@ func (jc *JoltifyChainBridge) MintCoin(item *pubchain.AccountInboundReq) error {
 		return err
 	}
 
-	index := strconv.FormatUint(acc.GetSequence(), 10) + creatorAddr.String()
-	if jc.CheckWhetherAlreadyExist(index) {
+	//we need to check against the previous account sequence
+	preIndex := strconv.FormatUint(acc.GetSequence(), 10) + creatorAddr.String()
+	if jc.CheckWhetherAlreadyExist(preIndex) {
 		jc.logger.Warn().Msg("already submitted by others")
 		return nil
 	}
 
+	index := strconv.FormatUint(acc.GetSequence(), 10) + creatorAddr.String()
+	jc.logger.Info().Msgf("we are about the prepare the tx with other nodes with index %v", index)
 	issueReq, err := prepareIssueTokenRequest(item, creatorAddr.String(), index)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to prepare the issuing of the token")

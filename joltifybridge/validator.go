@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/validators"
+	"gitlab.com/joltify/joltifychain-bridge/validators"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
