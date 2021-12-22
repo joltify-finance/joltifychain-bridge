@@ -2,14 +2,12 @@ package pubchain
 
 import (
 	"context"
-	"github.com/ethereum/go-ethereum/common"
-	"gitlab.com/joltify/joltifychain-bridge/joltifybridge"
-
-	//"gitlab.com/joltify/joltifychain-bridge/joltifybridge"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
-//SendToken sends the token to the public chain
+// SendToken sends the token to the public chain
 func (pi *PubChainInstance) SendToken(sender, receiver common.Address, amount *big.Int, blockHeight int64) error {
 	tokenInstance := pi.tokenSb.tokenInstance
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
@@ -35,9 +33,8 @@ func (pi *PubChainInstance) SendToken(sender, receiver common.Address, amount *b
 	return nil
 }
 
-//ProcessOutBound send the money to public chain
-func (pi *PubChainInstance) ProcessOutBound(item *joltifybridge.OutBoundReq) error {
-	toAddr, fromAddr, amount, blockHeight := item.GetOutBoundInfo()
+// ProcessOutBound send the money to public chain
+func (pi *PubChainInstance) ProcessOutBound(toAddr, fromAddr common.Address, amount *big.Int, blockHeight int64) error {
 	err := pi.SendToken(fromAddr, toAddr, amount, blockHeight)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to send the token with err %v", err)

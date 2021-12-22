@@ -12,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
+	tsscommon "github.com/joltgeorge/tss/common"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 // StartSubscription start the subscription of the token
@@ -23,8 +25,8 @@ func (pi *PubChainInstance) StartSubscription(ctx context.Context, wg *sync.Wait
 	pools := pi.GetPool()
 	var watchList []common.Address
 	for _, el := range pools {
-		if len(el) != 0 {
-			watchList = append(watchList, el)
+		if len(el.address) != 0 {
+			watchList = append(watchList, el.address)
 		}
 	}
 	sbEvent, err := pi.tokenSb.tokenInstance.WatchTransfer(&watchOpt, pi.tokenSb.sb, nil, watchList)
@@ -60,8 +62,8 @@ func (pi *PubChainInstance) UpdateSubscribe() error {
 	pools := pi.GetPool()
 	var watchList []common.Address
 	for _, el := range pools {
-		if len(el) != 0 {
-			watchList = append(watchList, el)
+		if len(el.address) != 0 {
+			watchList = append(watchList, el.address)
 		}
 	}
 	// cancel the previous subscription
@@ -104,6 +106,20 @@ func (pi *PubChainInstance) composeTx(sender common.Address, chainID *big.Int, b
 				return nil, err
 			}
 
+			if resp.Status != tsscommon.Success {
+				pi.logger.Error().Err(err).Msg("fail to generate the signature")
+				// todo we need to handle the blame
+				return nil, err
+			}
+			if len(resp.Signatures) != 1 {
+				pi.logger.Error().Msgf("we should only have 1 signature")
+				return nil, errors.New("more than 1 signature received")
+			}
+			signature, err := misc.SerializeSig(&resp.Signatures[0])
+			if err != nil {
+				pi.logger.Error().Msgf("fail to encode the signature")
+				return nil, err
+			}
 			return tx.WithSignature(signer, signature)
 		},
 		Context: context.Background(),

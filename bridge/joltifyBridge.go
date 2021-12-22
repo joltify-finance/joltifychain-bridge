@@ -216,8 +216,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					continue
 				}
 				if found {
-					_ = item
-					pi.ProcessOutBound(item)
+					toAddr, fromAddr, amount, blockHeight := item.GetOutBoundInfo()
+					pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight)
 				}
 
 			}
