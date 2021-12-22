@@ -84,14 +84,14 @@ func (pi *PubChainInstance) composeTx(sender common.Address, chainID *big.Int, b
 	if chainID == nil {
 		return nil, bind.ErrNoChainID
 	}
-	cPk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeAccPub, pk)
+
+	lastPool := pi.GetPool()[1]
+	cPk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeAccPub, lastPool.pk)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
 		return nil, err
 	}
 
-	lastPool := pi.GetPool()[0]
-	lastPool.Bytes()
 	signer := etypes.LatestSignerForChainID(chainID)
 	return &bind.TransactOpts{
 		From: sender,

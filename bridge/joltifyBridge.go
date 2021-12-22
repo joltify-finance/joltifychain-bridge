@@ -3,7 +3,6 @@ package bridge
 import (
 	"context"
 	"fmt"
-	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	"log"
 	"os"
 	"os/signal"
@@ -11,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	"gitlab.com/joltify/joltifychain-bridge/config"
 	"gitlab.com/joltify/joltifychain-bridge/joltifybridge"
@@ -143,15 +142,22 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				// process the new joltify block, validator may need to submit the pool address
 			case block := <-newBlockChan:
 				blockHeight := block.Data.(tmtypes.EventDataNewBlock).Block.Height
-				updated, poolPubKey := joltBridge.CheckAndUpdatePool(blockHeight)
+				updated, _ := joltBridge.CheckAndUpdatePool(blockHeight)
 				if updated {
-					addr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
+
+					// we query the pool from the chain directly.
+					poolInfo, err := joltBridge.QueryLastPoolAddress()
 					if err != nil {
-						fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
+						zlog.Logger.Error().Err(err).Msgf("error in get pool with error %v", err)
 						continue
 					}
-					pi.UpdatePool(addr)
+					if len(poolInfo) != 2 {
+						zlog.Logger.Error().Err(err).Msgf("fail to query the pool with length %v", len(poolInfo))
+						continue
+					}
 
+					pi.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
+					joltBridge.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
 					fmt.Printf("update the address %v\n", pi.GetPool())
 					err = pi.UpdateSubscribe()
 					if err != nil {
@@ -159,7 +165,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					}
 				}
 				// we now check whether we have the outbound tx
-				joltBridge.CheckOutBoundTx(blockHeight, block.Data.(tmtypes.EventDataNewBlock).Block.Data.Txs, pi.GetPool())
+				joltBridge.CheckOutBoundTx(blockHeight, block.Data.(tmtypes.EventDataNewBlock).Block.Data.Txs)
 
 			// process the public chain inbound message to the channel
 			case tokenTransfer := <-pi.GetSubChannel():

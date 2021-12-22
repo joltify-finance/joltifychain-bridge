@@ -72,8 +72,9 @@ func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer *tssclie
 	joltifyBridge.tssServer = tssServer
 
 	joltifyBridge.msgSendCache = []tssPoolMsg{}
-	joltifyBridge.LastTwoTssPoolMsg = []*tssPoolMsg{nil, nil}
-	joltifyBridge.poolUpdateLocker = &sync.Mutex{}
+	joltifyBridge.lastTwoPools = []*poolInfo{nil, nil}
+	joltifyBridge.poolUpdateLocker = &sync.RWMutex{}
+	joltifyBridge.lastTwoPoolLocker = &sync.RWMutex{}
 	encode := MakeEncodingConfig()
 	joltifyBridge.encoding = &encode
 	joltifyBridge.pendingOutbounds = make(map[string]*outboundTx)
@@ -337,8 +338,6 @@ func (jc *JoltifyChainBridge) prepareTssPool(creator sdk.AccAddress, pubKey, hei
 	}
 	jc.poolUpdateLocker.Lock()
 	// we store the latest two tss pool outReceiverAddress
-	jc.LastTwoTssPoolMsg[0] = jc.LastTwoTssPoolMsg[1]
-	jc.LastTwoTssPoolMsg[1] = &item
 	jc.msgSendCache = append(jc.msgSendCache, item)
 	jc.poolUpdateLocker.Unlock()
 	return nil
@@ -377,7 +376,10 @@ func (jc *JoltifyChainBridge) CheckAndUpdatePool(blockHeight int64) (bool, strin
 }
 
 // CheckOutBoundTx checks
-func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, txs tendertypes.Txs, poolAddress []ethcommon.Address) {
+func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, txs tendertypes.Txs) {
+	pools := jc.GetPool()
+	poolAddress := []ethcommon.Address{pools[0].address, pools[1].address}
+
 	config := jc.encoding
 
 	for _, el := range txs {

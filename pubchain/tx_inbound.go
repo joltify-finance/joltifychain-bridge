@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"math/big"
+
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"gitlab.com/joltify/joltifychain-bridge/config"
-	"math/big"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 // ProcessInBound process the inbound contract token top-up
@@ -46,7 +49,6 @@ func (pi *PubChainInstance) updateInboundTx(txID string, amount *big.Int, direct
 
 	thisAccount.fee.Amount = thisAccount.fee.Amount.Add(types.NewIntFromBigInt(amount))
 	err := thisAccount.Verify()
-
 	if err != nil {
 		pi.pendingInbounds[txID] = thisAccount
 		pi.logger.Warn().Msgf("the account cannot be processed on joltify pub_chain this round")
@@ -113,21 +115,32 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 }
 
 // UpdatePool update the tss pool address
-func (pi *PubChainInstance) UpdatePool(poolAddr common.Address) {
+func (pi *PubChainInstance) UpdatePool(poolPubKey string) {
+	addr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
+	if err != nil {
+		fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
+		return
+	}
 	pi.poolLocker.Lock()
 	defer pi.poolLocker.Unlock()
-	if len(pi.lastTwoPools[1]) != 0 {
+
+	p := poolInfo{
+		poolPubKey,
+		addr,
+	}
+
+	if pi.lastTwoPools[1] != nil {
 		pi.lastTwoPools[0] = pi.lastTwoPools[1]
 	}
-	pi.lastTwoPools[1] = poolAddr
+	pi.lastTwoPools[1] = &p
 	return
 }
 
 // GetPool get the latest two pool address
-func (pi *PubChainInstance) GetPool() []common.Address {
+func (pi *PubChainInstance) GetPool() []*poolInfo {
 	pi.poolLocker.RLock()
 	defer pi.poolLocker.RUnlock()
-	var ret []common.Address
+	var ret []*poolInfo
 	ret = append(ret, pi.lastTwoPools...)
 	return ret
 }
@@ -136,14 +149,14 @@ func (pi *PubChainInstance) GetPool() []common.Address {
 func (pi *PubChainInstance) checkToBridge(dest common.Address) bool {
 	pools := pi.GetPool()
 	for _, el := range pools {
-		if dest.String() == el.String() {
+		if dest.String() == el.address.String() {
 			return true
 		}
 	}
 	return false
 }
 
-//DeleteExpired delete the expired tx
+// DeleteExpired delete the expired tx
 func (pi *PubChainInstance) DeleteExpired(currentHeight uint64) {
 	pi.pendingInboundTxLocker.Lock()
 	defer pi.pendingInboundTxLocker.Unlock()

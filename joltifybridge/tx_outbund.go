@@ -4,15 +4,16 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"gitlab.com/joltify/joltifychain-bridge/config"
-	"strings"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []ethcommon.Address, msg *banktypes.MsgSend, txHash []byte, memo string) error {
-
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 	jc.pendingOutboundLocker.Lock()
 	_, ok := jc.pendingOutbounds[txID]
@@ -47,7 +48,7 @@ func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []ethcommon.
 		return nil
 	}
 
-	//it means the sender pay the fee in one tx
+	// it means the sender pay the fee in one tx
 	if len(msg.Amount) == 2 {
 		jc.processDemon(txID, blockHeight, fromAddress, msg.Amount[0].Amount)
 		item := jc.processFee(txID, msg.Amount[1].Amount)
@@ -77,15 +78,12 @@ func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []ethcommon.
 			return nil
 
 		}
-
 	}
 
 	return nil
-
 }
 
 func (jc *JoltifyChainBridge) processFee(txID string, amount types.Int) *outboundTx {
-
 	jc.pendingOutboundLocker.Lock()
 	defer jc.pendingOutboundLocker.Unlock()
 	thisAccount, ok := jc.pendingOutbounds[strings.ToLower(txID)]
@@ -104,8 +102,8 @@ func (jc *JoltifyChainBridge) processFee(txID string, amount types.Int) *outboun
 	// since this tx is processed,we do not need to store it any longer
 	delete(jc.pendingOutbounds, txID)
 	return thisAccount
-
 }
+
 func (jc *JoltifyChainBridge) processDemon(txID string, blockHeight int64, fromAddress types.AccAddress, amount types.Int) {
 	token := types.Coin{
 		Denom:  config.OutBoundDenom,
@@ -126,4 +124,35 @@ func (jc *JoltifyChainBridge) processDemon(txID string, blockHeight int64, fromA
 	jc.poolUpdateLocker.Lock()
 	jc.pendingOutbounds[txID] = &tx
 	jc.poolUpdateLocker.Unlock()
+}
+
+// GetPool get the latest two pool address
+func (jc *JoltifyChainBridge) GetPool() []*poolInfo {
+	jc.poolUpdateLocker.RLock()
+	defer jc.poolUpdateLocker.RUnlock()
+	var ret []*poolInfo
+	ret = append(ret, jc.lastTwoPools...)
+	return ret
+}
+
+// UpdatePool update the tss pool address
+func (jc *JoltifyChainBridge) UpdatePool(poolPubKey string) {
+	addr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
+	if err != nil {
+		fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
+		return
+	}
+	jc.poolUpdateLocker.Lock()
+	defer jc.poolUpdateLocker.Unlock()
+
+	p := poolInfo{
+		poolPubKey,
+		addr,
+	}
+
+	if jc.lastTwoPools[1] != nil {
+		jc.lastTwoPools[0] = jc.lastTwoPools[1]
+	}
+	jc.lastTwoPools[1] = &p
+	return
 }

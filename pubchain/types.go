@@ -2,10 +2,11 @@ package pubchain
 
 import (
 	"errors"
-	"github.com/ethereum/go-ethereum/common"
-	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -62,9 +63,14 @@ func (acq *InboundReq) GetInboundReqInfo() (common.Address, common.Address, sdk.
 	return acq.address, acq.toPoolAddr, acq.coin, acq.blockHeight
 }
 
-//SetItemHeight sets the block height of the tx
+// SetItemHeight sets the block height of the tx
 func (acq *InboundReq) SetItemHeight(blockHeight int64) {
 	acq.blockHeight = blockHeight
+}
+
+type poolInfo struct {
+	pk      string
+	address common.Address
 }
 
 // PubChainInstance hold the joltify_bridge entity
@@ -73,7 +79,7 @@ type PubChainInstance struct {
 	tokenAddr              string
 	logger                 zerolog.Logger
 	pendingInbounds        map[string]*inboundTx
-	lastTwoPools           []common.Address
+	lastTwoPools           []*poolInfo
 	poolLocker             *sync.RWMutex
 	pendingInboundTxLocker *sync.RWMutex
 	tokenSb                *tokenSb
@@ -114,7 +120,7 @@ func NewChainInstance(ws, tokenAddr string, tssServer *tssclient.BridgeTssServer
 		poolLocker:             &sync.RWMutex{},
 		pendingInboundTxLocker: &sync.RWMutex{},
 		tssServer:              tssServer,
-		lastTwoPools:           make([]common.Address, 2),
+		lastTwoPools:           make([]*poolInfo, 2),
 		tokenSb:                newTokenSb(tokenIns, sink, nil),
 		InboundReqChan:         make(chan *InboundReq, reqCacheSize),
 		RetryInboundReq:        make(chan *InboundReq, retryCacheSize),

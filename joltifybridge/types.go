@@ -3,15 +3,16 @@ package joltifybridge
 import (
 	"errors"
 	"fmt"
+	"math/big"
+	"sync"
+	"time"
+
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"gitlab.com/joltify/joltifychain-bridge/config"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	"gitlab.com/joltify/joltifychain-bridge/validators"
-	"math/big"
-	"sync"
-	"time"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/rs/zerolog"
@@ -33,6 +34,11 @@ type tssPoolMsg struct {
 	blockHeight int64
 }
 
+type poolInfo struct {
+	pk      string
+	address common.Address
+}
+
 // JoltifyChainBridge defines the types for joltify pub_chain side
 type JoltifyChainBridge struct {
 	grpcClient            *grpc.ClientConn
@@ -43,9 +49,10 @@ type JoltifyChainBridge struct {
 	validatorSet          *validators.ValidatorSet
 	myValidatorInfo       info
 	tssServer             *tssclient.BridgeTssServer
-	poolUpdateLocker      *sync.Mutex
+	poolUpdateLocker      *sync.RWMutex
 	msgSendCache          []tssPoolMsg
-	LastTwoTssPoolMsg     []*tssPoolMsg
+	lastTwoPools          []*poolInfo
+	lastTwoPoolLocker     *sync.RWMutex
 	pendingOutbounds      map[string]*outboundTx
 	pendingOutboundLocker *sync.RWMutex
 	OutboundReqChan       chan *OutBoundReq
@@ -72,7 +79,7 @@ type outboundTx struct {
 	fee                sdk.Coin
 }
 
-//Verify checks whether the outbound tx has paid enough fee
+// Verify checks whether the outbound tx has paid enough fee
 func (a *outboundTx) Verify() error {
 	if a.fee.Denom != config.OutBoundDenomFee {
 		return errors.New("invalid outbound fee denom")
@@ -87,7 +94,7 @@ func (a *outboundTx) Verify() error {
 	return nil
 }
 
-//OutBoundReq is the entity for the outbound tx
+// OutBoundReq is the entity for the outbound tx
 type OutBoundReq struct {
 	outReceiverAddress common.Address
 	fromPoolAddr       common.Address
@@ -95,7 +102,7 @@ type OutBoundReq struct {
 	blockHeight        int64
 }
 
-//GetOutBoundInfo return the outbound tx info
+// GetOutBoundInfo return the outbound tx info
 func (o *OutBoundReq) GetOutBoundInfo() (common.Address, common.Address, *big.Int, int64) {
 	return o.outReceiverAddress, o.fromPoolAddr, o.coin.Amount.BigInt(), o.blockHeight
 }
