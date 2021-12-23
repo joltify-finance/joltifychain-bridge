@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"math/big"
 
 	"github.com/cosmos/cosmos-sdk/types"
@@ -51,7 +52,7 @@ func (pi *PubChainInstance) updateInboundTx(txID string, amount *big.Int, direct
 	err := thisAccount.Verify()
 	if err != nil {
 		pi.pendingInbounds[txID] = thisAccount
-		pi.logger.Warn().Msgf("the account cannot be processed on joltify pub_chain this round")
+		pi.logger.Warn().Msgf("the account cannot be processed on joltify pub_chain this round with err %v\n", err)
 		return nil
 	}
 	// since this tx is processed,we do not need to store it any longer
@@ -124,9 +125,9 @@ func (pi *PubChainInstance) UpdatePool(poolPubKey string) {
 	pi.poolLocker.Lock()
 	defer pi.poolLocker.Unlock()
 
-	p := poolInfo{
-		poolPubKey,
-		addr,
+	p := bcommon.PoolInfo{
+		Pk:      poolPubKey,
+		Address: addr,
 	}
 
 	if pi.lastTwoPools[1] != nil {
@@ -137,10 +138,10 @@ func (pi *PubChainInstance) UpdatePool(poolPubKey string) {
 }
 
 // GetPool get the latest two pool address
-func (pi *PubChainInstance) GetPool() []*poolInfo {
+func (pi *PubChainInstance) GetPool() []*bcommon.PoolInfo {
 	pi.poolLocker.RLock()
 	defer pi.poolLocker.RUnlock()
-	var ret []*poolInfo
+	var ret []*bcommon.PoolInfo
 	ret = append(ret, pi.lastTwoPools...)
 	return ret
 }
@@ -149,7 +150,7 @@ func (pi *PubChainInstance) GetPool() []*poolInfo {
 func (pi *PubChainInstance) checkToBridge(dest common.Address) bool {
 	pools := pi.GetPool()
 	for _, el := range pools {
-		if dest.String() == el.address.String() {
+		if el != nil && dest.String() == el.Address.String() {
 			return true
 		}
 	}

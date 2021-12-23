@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"strings"
 
 	"github.com/cosmos/cosmos-sdk/types"
@@ -127,10 +128,10 @@ func (jc *JoltifyChainBridge) processDemon(txID string, blockHeight int64, fromA
 }
 
 // GetPool get the latest two pool address
-func (jc *JoltifyChainBridge) GetPool() []*poolInfo {
+func (jc *JoltifyChainBridge) GetPool() []*bcommon.PoolInfo {
 	jc.poolUpdateLocker.RLock()
 	defer jc.poolUpdateLocker.RUnlock()
-	var ret []*poolInfo
+	var ret []*bcommon.PoolInfo
 	ret = append(ret, jc.lastTwoPools...)
 	return ret
 }
@@ -145,9 +146,9 @@ func (jc *JoltifyChainBridge) UpdatePool(poolPubKey string) {
 	jc.poolUpdateLocker.Lock()
 	defer jc.poolUpdateLocker.Unlock()
 
-	p := poolInfo{
-		poolPubKey,
-		addr,
+	p := bcommon.PoolInfo{
+		Pk:      poolPubKey,
+		Address: addr,
 	}
 
 	if jc.lastTwoPools[1] != nil {

@@ -3,6 +3,7 @@ package joltifybridge
 import (
 	"errors"
 	"fmt"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"math/big"
 	"sync"
 	"time"
@@ -34,11 +35,6 @@ type tssPoolMsg struct {
 	blockHeight int64
 }
 
-type poolInfo struct {
-	pk      string
-	address common.Address
-}
-
 // JoltifyChainBridge defines the types for joltify pub_chain side
 type JoltifyChainBridge struct {
 	grpcClient            *grpc.ClientConn
@@ -51,7 +47,7 @@ type JoltifyChainBridge struct {
 	tssServer             *tssclient.BridgeTssServer
 	poolUpdateLocker      *sync.RWMutex
 	msgSendCache          []tssPoolMsg
-	lastTwoPools          []*poolInfo
+	lastTwoPools          []*bcommon.PoolInfo
 	lastTwoPoolLocker     *sync.RWMutex
 	pendingOutbounds      map[string]*outboundTx
 	pendingOutboundLocker *sync.RWMutex

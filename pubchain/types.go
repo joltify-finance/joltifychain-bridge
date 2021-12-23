@@ -14,6 +14,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/ethereum/go-ethereum/event"
+
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 )
 
 const (
@@ -68,18 +70,13 @@ func (acq *InboundReq) SetItemHeight(blockHeight int64) {
 	acq.blockHeight = blockHeight
 }
 
-type poolInfo struct {
-	pk      string
-	address common.Address
-}
-
 // PubChainInstance hold the joltify_bridge entity
 type PubChainInstance struct {
 	EthClient              *ethclient.Client
 	tokenAddr              string
 	logger                 zerolog.Logger
 	pendingInbounds        map[string]*inboundTx
-	lastTwoPools           []*poolInfo
+	lastTwoPools           []*bcommon.PoolInfo
 	poolLocker             *sync.RWMutex
 	pendingInboundTxLocker *sync.RWMutex
 	tokenSb                *tokenSb
@@ -120,7 +117,7 @@ func NewChainInstance(ws, tokenAddr string, tssServer *tssclient.BridgeTssServer
 		poolLocker:             &sync.RWMutex{},
 		pendingInboundTxLocker: &sync.RWMutex{},
 		tssServer:              tssServer,
-		lastTwoPools:           make([]*poolInfo, 2),
+		lastTwoPools:           make([]*bcommon.PoolInfo, 2),
 		tokenSb:                newTokenSb(tokenIns, sink, nil),
 		InboundReqChan:         make(chan *InboundReq, reqCacheSize),
 		RetryInboundReq:        make(chan *InboundReq, retryCacheSize),

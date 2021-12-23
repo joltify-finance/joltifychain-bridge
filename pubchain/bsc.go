@@ -23,10 +23,11 @@ func (pi *PubChainInstance) StartSubscription(ctx context.Context, wg *sync.Wait
 		Context: ctxWatch,
 	}
 	pools := pi.GetPool()
+	fmt.Printf(">>>%v\n", pools)
 	var watchList []common.Address
 	for _, el := range pools {
-		if len(el.address) != 0 {
-			watchList = append(watchList, el.address)
+		if el != nil && len(el.Address) != 0 {
+			watchList = append(watchList, el.Address)
 		}
 	}
 	sbEvent, err := pi.tokenSb.tokenInstance.WatchTransfer(&watchOpt, pi.tokenSb.sb, nil, watchList)
@@ -62,8 +63,8 @@ func (pi *PubChainInstance) UpdateSubscribe() error {
 	pools := pi.GetPool()
 	var watchList []common.Address
 	for _, el := range pools {
-		if len(el.address) != 0 {
-			watchList = append(watchList, el.address)
+		if el != nil {
+			watchList = append(watchList, el.Address)
 		}
 	}
 	// cancel the previous subscription
@@ -88,7 +89,7 @@ func (pi *PubChainInstance) composeTx(sender common.Address, chainID *big.Int, b
 	}
 
 	lastPool := pi.GetPool()[1]
-	cPk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeAccPub, lastPool.pk)
+	cPk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeAccPub, lastPool.Pk)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
 		return nil, err

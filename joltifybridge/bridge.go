@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"io/ioutil"
 	"log"
 	"strconv"
@@ -72,7 +73,7 @@ func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer *tssclie
 	joltifyBridge.tssServer = tssServer
 
 	joltifyBridge.msgSendCache = []tssPoolMsg{}
-	joltifyBridge.lastTwoPools = []*poolInfo{nil, nil}
+	joltifyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
 	joltifyBridge.poolUpdateLocker = &sync.RWMutex{}
 	joltifyBridge.lastTwoPoolLocker = &sync.RWMutex{}
 	encode := MakeEncodingConfig()
@@ -378,7 +379,10 @@ func (jc *JoltifyChainBridge) CheckAndUpdatePool(blockHeight int64) (bool, strin
 // CheckOutBoundTx checks
 func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, txs tendertypes.Txs) {
 	pools := jc.GetPool()
-	poolAddress := []ethcommon.Address{pools[0].address, pools[1].address}
+	if pools[0] == nil || pools[1] == nil {
+		return
+	}
+	poolAddress := []ethcommon.Address{pools[0].Address, pools[1].Address}
 
 	config := jc.encoding
 

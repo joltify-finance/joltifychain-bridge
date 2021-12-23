@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
@@ -19,7 +20,6 @@ func prepareIssueTokenRequest(item *pubchain.InboundReq, creatorAddr, index stri
 	if err != nil {
 		return nil, err
 	}
-
 	a, err := vaulttypes.NewMsgCreateIssueToken(creatorAddr, index, coin.String(), receiver.String())
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
 		jc.logger.Info().Msgf("fail to query the pool with length 1")
 		return errors.New("not enough signer")
 	}
-	creatorAddr := pool[1].address
+	creatorAddr := pool[1].Address
 	joltCreatorAddr, err := misc.EthAddressToJoltAddr(creatorAddr)
 	if err != nil {
 		jc.logger.Info().Msgf("fail to convert the eth address to jolt address")
@@ -55,25 +55,26 @@ func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
 		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
 		return err
 	}
-
+	creatorAddrStr := strings.ToLower(creatorAddr.String())
 	// we need to check against the previous account sequence
-	preIndex := strconv.FormatUint(acc.GetSequence(), 10) + creatorAddr.String()
+	preIndex := strconv.FormatUint(acc.GetSequence(), 10) + creatorAddrStr
 	if jc.CheckWhetherAlreadyExist(preIndex) {
 		jc.logger.Warn().Msg("already submitted by others")
 		return nil
 	}
 
-	index := strconv.FormatUint(acc.GetSequence(), 10) + creatorAddr.String()
+	index := strconv.FormatUint(acc.GetSequence(), 10) + creatorAddrStr
 	jc.logger.Info().Msgf("we are about the prepare the tx with other nodes with index %v", index)
-	issueReq, err := prepareIssueTokenRequest(item, creatorAddr.String(), index)
+	issueReq, err := prepareIssueTokenRequest(item, joltCreatorAddr.String(), index)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to prepare the issuing of the token")
+		return err
 	}
 
 	_, _, _, height := item.GetInboundReqInfo()
 	jc.logger.Info().Msgf("we do the top up for %v at height %v", issueReq.Receiver.String(), height)
 	signMsg := tssclient.TssSignigMsg{
-		Pk:          pool[1].pk,
+		Pk:          pool[1].Pk,
 		Signers:     nil,
 		BlockHeight: height,
 		Version:     tssclient.TssVersion,

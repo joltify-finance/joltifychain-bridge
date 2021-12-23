@@ -2,6 +2,7 @@ package pubchain
 
 import (
 	"errors"
+	"fmt"
 
 	"gitlab.com/joltify/joltifychain-bridge/config"
 
@@ -10,8 +11,8 @@ import (
 
 // Verify is the function  to verify the correctness of the account on joltify_bridge
 func (a *inboundTx) Verify() error {
-	if a.fee.Denom != config.InBoundDenom {
-		return errors.New("invalid inbound fee denom")
+	if a.fee.Denom != config.InBoundDenomFee {
+		return fmt.Errorf("invalid inbound fee denom with fee demo : %v and want %v", a.fee.Denom, config.InBoundDenom)
 	}
 	amount, err := sdk.NewDecFromStr(config.InBoundFeeMin)
 	if err != nil {

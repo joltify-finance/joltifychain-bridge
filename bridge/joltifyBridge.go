@@ -142,28 +142,30 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				// process the new joltify block, validator may need to submit the pool address
 			case block := <-newBlockChan:
 				blockHeight := block.Data.(tmtypes.EventDataNewBlock).Block.Height
-				updated, _ := joltBridge.CheckAndUpdatePool(blockHeight)
-				if updated {
+				joltBridge.CheckAndUpdatePool(blockHeight)
 
-					// we query the pool from the chain directly.
-					poolInfo, err := joltBridge.QueryLastPoolAddress()
-					if err != nil {
-						zlog.Logger.Error().Err(err).Msgf("error in get pool with error %v", err)
-						continue
-					}
-					if len(poolInfo) != 2 {
-						zlog.Logger.Error().Err(err).Msgf("fail to query the pool with length %v", len(poolInfo))
-						continue
-					}
+				// now we check whether we need to update the pool
+				// we query the pool from the chain directly.
+				poolInfo, err := joltBridge.QueryLastPoolAddress()
+				if err != nil {
+					zlog.Logger.Error().Err(err).Msgf("error in get pool with error %v", err)
+					continue
+				}
+				if len(poolInfo) != 2 {
+					zlog.Logger.Warn().Msgf("the pool only have %v address, bridge will not work", len(poolInfo))
+					continue
+				}
 
+				currentPool := pi.GetPool()
+				if NeedUpdate(poolInfo, currentPool) {
 					pi.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
 					joltBridge.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
-					fmt.Printf("update the address %v\n", pi.GetPool())
 					err = pi.UpdateSubscribe()
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
 					}
 				}
+
 				// we now check whether we have the outbound tx
 				joltBridge.CheckOutBoundTx(blockHeight, block.Data.(tmtypes.EventDataNewBlock).Block.Data.Txs)
 
