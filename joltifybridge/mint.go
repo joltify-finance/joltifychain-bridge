@@ -29,22 +29,14 @@ func prepareIssueTokenRequest(item *pubchain.InboundReq, creatorAddr, index stri
 
 // ProcessInBound mint the token in joltify chain
 func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
-	//poolInfo, err := jc.QueryLastPoolAddress()
-	//if err != nil {
-	//	jc.logger.Error().Err(err).Msgf("error in get pool with error %v", err)
-	//	return err
-	//}
-	//if len(poolInfo) != 2 {
-	//	jc.logger.Info().Msgf("fail to query the pool with length %v", len(poolInfo))
-	//	return errors.New("not enough signer")
-	//}
+
 	pool := jc.GetPool()
 	if pool[0] == nil {
 		jc.logger.Info().Msgf("fail to query the pool with length 1")
 		return errors.New("not enough signer")
 	}
-	creatorAddr := pool[1].Address
-	joltCreatorAddr, err := misc.EthAddressToJoltAddr(creatorAddr)
+	// we need to get the address from the pubkey rather than the eth address
+	joltCreatorAddr, err := misc.PoolPubKeyToJoltAddress(pool[1].Pk)
 	if err != nil {
 		jc.logger.Info().Msgf("fail to convert the eth address to jolt address")
 		return errors.New("invalid address")
@@ -55,7 +47,7 @@ func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
 		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
 		return err
 	}
-	creatorAddrStr := strings.ToLower(creatorAddr.String())
+	creatorAddrStr := strings.ToLower(joltCreatorAddr.String())
 	// we need to check against the previous account sequence
 	preIndex := strconv.FormatUint(acc.GetSequence(), 10) + creatorAddrStr
 	if jc.CheckWhetherAlreadyExist(preIndex) {

@@ -14,7 +14,7 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
-func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []ethcommon.Address, msg *banktypes.MsgSend, txHash []byte, memo string) error {
+func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []ethcommon.Address, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte, memo string) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 	jc.pendingOutboundLocker.Lock()
 	_, ok := jc.pendingOutbounds[txID]
@@ -51,10 +51,31 @@ func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []ethcommon.
 
 	// it means the sender pay the fee in one tx
 	if len(msg.Amount) == 2 {
-		jc.processDemon(txID, blockHeight, fromAddress, msg.Amount[0].Amount)
-		item := jc.processFee(txID, msg.Amount[1].Amount)
+		// now we search for the index of the outboundemo and the outbounddemofee
+		found := false
+		indexDemo := 0
+		indexDemoFee := 0
+		if msg.Amount[0].GetDenom() == config.OutBoundDenom && msg.Amount[1].GetDenom() == config.OutBoundDenomFee {
+			indexDemo = 0
+			indexDemoFee = 1
+			found = true
+		}
+
+		if msg.Amount[1].GetDenom() == config.OutBoundDenom && msg.Amount[0].GetDenom() == config.OutBoundDenomFee {
+			indexDemo = 1
+			indexDemoFee = 0
+			found = true
+		}
+		if !found {
+			return errors.New("invalid fee pair")
+		}
+
+		jc.processDemon(txID, blockHeight, fromAddress, msg.Amount[indexDemo].Amount)
+
+		item := jc.processFee(txID, msg.Amount[indexDemoFee].Amount)
+		//since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 		if item != nil {
-			itemReq := newAccountOutboundReq(item.outReceiverAddress, ethcommon.BytesToAddress(currentPoolAddr.Bytes()), item.token, blockHeight)
+			itemReq := newAccountOutboundReq(item.outReceiverAddress, curEthAddr, item.token, blockHeight)
 			jc.OutboundReqChan <- &itemReq
 		}
 		return nil

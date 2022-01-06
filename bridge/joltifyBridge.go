@@ -219,7 +219,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				}
 				if found {
 					toAddr, fromAddr, amount, blockHeight := item.GetOutBoundInfo()
-					pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight)
+					err := pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight)
+					if err != nil {
+						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
+						continue
+					}
+					zlog.Logger.Info().Msgf("####we have send outbound token from %v to %v (%v)", fromAddr, toAddr, amount.String())
 				}
 
 			}

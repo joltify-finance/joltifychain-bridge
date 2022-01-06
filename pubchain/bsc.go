@@ -5,10 +5,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
 	"sync"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
@@ -87,21 +87,17 @@ func (pi *PubChainInstance) composeTx(sender common.Address, chainID *big.Int, b
 	if chainID == nil {
 		return nil, bind.ErrNoChainID
 	}
-
 	lastPool := pi.GetPool()[1]
-	cPk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeAccPub, lastPool.Pk)
-	if err != nil {
-		pi.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
-		return nil, err
-	}
-
 	signer := etypes.LatestSignerForChainID(chainID)
 	return &bind.TransactOpts{
 		From: sender,
 		Signer: func(address common.Address, tx *etypes.Transaction) (*etypes.Transaction, error) {
+			if address != sender {
+				return nil, errors.New("the address is different from the sender")
+			}
 			msg := signer.Hash(tx).Bytes()
 			encodedMsg := base64.StdEncoding.EncodeToString(msg)
-			resp, err := pi.tssServer.KeySign(cPk.String(), []string{encodedMsg}, blockHeight, nil, "0.15.0")
+			resp, err := pi.tssServer.KeySign(lastPool.Pk, []string{encodedMsg}, blockHeight, nil, "0.15.0")
 			if err != nil {
 				pi.logger.Error().Err(err).Msg("fail to run the keysign")
 				return nil, err
@@ -116,11 +112,19 @@ func (pi *PubChainInstance) composeTx(sender common.Address, chainID *big.Int, b
 				pi.logger.Error().Msgf("we should only have 1 signature")
 				return nil, errors.New("more than 1 signature received")
 			}
-			signature, err := misc.SerializeSig(&resp.Signatures[0])
+			signature, err := misc.SerializeSig(&resp.Signatures[0], true)
 			if err != nil {
 				pi.logger.Error().Msgf("fail to encode the signature")
 				return nil, err
 			}
+
+			sigPublicKeyECDSA, err := crypto.SigToPub(msg, signature)
+			if err != nil {
+				panic(err)
+			}
+
+			addr := crypto.PubkeyToAddress(*sigPublicKeyECDSA)
+			fmt.Printf(">>>>recovered address is %v", addr.String())
 			return tx.WithSignature(signer, signature)
 		},
 		Context: context.Background(),

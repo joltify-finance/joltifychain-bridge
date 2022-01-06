@@ -23,6 +23,7 @@ const (
 	retryCacheSize    = 128
 	chainQueryTimeout = time.Second * 5
 	GasLimit          = 2100000
+	GasPrice          = "0.00000001"
 )
 
 type tokenSb struct {

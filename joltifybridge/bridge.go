@@ -228,7 +228,7 @@ func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.
 			jc.logger.Error().Msgf("we should only have 1 signature")
 			return signing.SignatureV2{}, errors.New("more than 1 signature received")
 		}
-		signature, err = misc.SerializeSig(&resp.Signatures[0])
+		signature, err = misc.SerializeSig(&resp.Signatures[0], false)
 		if err != nil {
 			jc.logger.Error().Msgf("fail to encode the signature")
 			return signing.SignatureV2{}, err
@@ -383,7 +383,11 @@ func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, txs tendertypes
 		return
 	}
 	poolAddress := []ethcommon.Address{pools[0].Address, pools[1].Address}
-
+	curPoolEthAddress, err := misc.PoolPubKeyToEthAddress(pools[1].Pk)
+	if err != nil {
+		jc.logger.Error().Err(err).Msgf("fail to query the current pool eth address")
+		return
+	}
 	config := jc.encoding
 
 	for _, el := range txs {
@@ -397,7 +401,7 @@ func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, txs tendertypes
 		for _, msg := range txWithMemo.GetMsgs() {
 			switch eachMsg := msg.(type) {
 			case *banktypes.MsgSend:
-				err := jc.processMsg(blockHeight, poolAddress, eachMsg, el.Hash(), memo)
+				err := jc.processMsg(blockHeight, poolAddress, curPoolEthAddress, eachMsg, el.Hash(), memo)
 				if err != nil {
 					jc.logger.Error().Err(err).Msgf("fail to process the send message")
 				}
