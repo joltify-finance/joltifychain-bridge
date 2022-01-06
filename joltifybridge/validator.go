@@ -106,7 +106,7 @@ func (jc *JoltifyChainBridge) CheckWhetherSigner() (bool, error) {
 	return found, nil
 }
 
-//CheckWhetherAlreadyExist check whether it is already existed
+// CheckWhetherAlreadyExist check whether it is already existed
 func (jc *JoltifyChainBridge) CheckWhetherAlreadyExist(index string) bool {
 	ret, err := queryGivenToeknIssueTx(jc.grpcClient, index)
 	if err != nil {
@@ -155,7 +155,7 @@ func (jc *JoltifyChainBridge) doInitValidator(i info, blockHeight int64, values 
 //
 //		types2.NewAnyWithValue(el.PubKey)
 //		each := tmservice.Validator{
-//			Address:          el.Address.String(),
+//			JoltifyAddress:          el.JoltifyAddress.String(),
 //			PubKey:           el.PubKey,
 //			VotingPower:      el.VotingPower,
 //			ProposerPriority: el.ProposerPriority,

@@ -14,17 +14,22 @@ func NeedUpdate(qcPools []*vaulttypes.PoolInfo, curPools []*common.PoolInfo) boo
 	var qPools []common.PoolInfo
 	for i := 0; i < 2; i++ {
 		pk := qcPools[i].GetCreatePool().GetPoolPubKey()
-		addr, err := misc.PoolPubKeyToEthAddress(pk)
+		ethAddr, err := misc.PoolPubKeyToEthAddress(pk)
+		if err != nil {
+			return false
+		}
+		addr, err := misc.PoolPubKeyToJoltAddress(pk)
 		if err != nil {
 			return false
 		}
 		v1 := common.PoolInfo{
-			Pk:      pk,
-			Address: addr,
+			Pk:             pk,
+			JoltifyAddress: addr,
+			EthAddress:     ethAddr,
 		}
 		qPools = append(qPools, v1)
 	}
-	if qPools[0].Address == curPools[1].Address && qPools[1].Address == curPools[0].Address {
+	if qPools[0].JoltifyAddress.Equals(curPools[1].JoltifyAddress) && qPools[1].JoltifyAddress.Equals(curPools[0].JoltifyAddress) {
 		return false
 	}
 	return true

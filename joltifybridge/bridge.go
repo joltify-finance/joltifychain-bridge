@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"io/ioutil"
 	"log"
 	"strconv"
 	"sync"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+
 	tendertypes "github.com/tendermint/tendermint/types"
 
 	coscrypto "github.com/cosmos/cosmos-sdk/crypto/types"
@@ -382,12 +382,7 @@ func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, txs tendertypes
 	if pools[0] == nil || pools[1] == nil {
 		return
 	}
-	poolAddress := []ethcommon.Address{pools[0].Address, pools[1].Address}
-	curPoolEthAddress, err := misc.PoolPubKeyToEthAddress(pools[1].Pk)
-	if err != nil {
-		jc.logger.Error().Err(err).Msgf("fail to query the current pool eth address")
-		return
-	}
+	poolAddress := []sdk.AccAddress{pools[0].JoltifyAddress, pools[1].JoltifyAddress}
 	config := jc.encoding
 
 	for _, el := range txs {
@@ -401,7 +396,7 @@ func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, txs tendertypes
 		for _, msg := range txWithMemo.GetMsgs() {
 			switch eachMsg := msg.(type) {
 			case *banktypes.MsgSend:
-				err := jc.processMsg(blockHeight, poolAddress, curPoolEthAddress, eachMsg, el.Hash(), memo)
+				err := jc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, el.Hash(), memo)
 				if err != nil {
 					jc.logger.Error().Err(err).Msgf("fail to process the send message")
 				}

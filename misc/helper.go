@@ -2,8 +2,10 @@ package misc
 
 import (
 	"encoding/base64"
-	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
+
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -19,7 +21,7 @@ func SetupBech32Prefix() {
 	config.SetBech32PrefixForConsensusNode("joltvalcons", "joltcpub")
 }
 
-//PoolPubKeyToJoltAddress return the jolt encoded pubkey
+// PoolPubKeyToJoltAddress return the jolt encoded pubkey
 func PoolPubKeyToJoltAddress(pk string) (types.AccAddress, error) {
 	pubkey, err := types.GetPubKeyFromBech32(types.Bech32PubKeyTypeAccPub, pk)
 	if err != nil {
@@ -35,14 +37,21 @@ func PoolPubKeyToEthAddress(pk string) (common.Address, error) {
 	if err != nil {
 		return common.Address{}, err
 	}
-
 	pk2, err := btcec.ParsePubKey(pubkey.Bytes(), btcec.S256())
 	if err != nil {
 		return common.Address{}, err
 	}
-
 	addr := crypto.PubkeyToAddress(*pk2.ToECDSA())
+	return addr, nil
+}
 
+// AccountPubKeyToEthAddress export the joltify pubkey to the ETH format address
+func AccountPubKeyToEthAddress(pk cryptotypes.PubKey) (common.Address, error) {
+	pk2, err := btcec.ParsePubKey(pk.Bytes(), btcec.S256())
+	if err != nil {
+		return common.Address{}, err
+	}
+	addr := crypto.PubkeyToAddress(*pk2.ToECDSA())
 	return addr, nil
 }
 
@@ -52,7 +61,7 @@ func EthAddressToJoltAddr(addr common.Address) (types.AccAddress, error) {
 	return jAddr, err
 }
 
-//SerializeSig for both joltify chain and public chain
+// SerializeSig for both joltify chain and public chain
 func SerializeSig(sig *keysign.Signature, needRecovery bool) ([]byte, error) {
 	rBytes, err := base64.StdEncoding.DecodeString(sig.R)
 	if err != nil {

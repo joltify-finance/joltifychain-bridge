@@ -4,8 +4,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"strings"
+
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -14,7 +15,7 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
-func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []ethcommon.Address, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte, memo string) error {
+func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte, memo string) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 	jc.pendingOutboundLocker.Lock()
 	_, ok := jc.pendingOutbounds[txID]
@@ -36,15 +37,27 @@ func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []ethcommon.
 		return err
 	}
 
-	currentPoolAddr, err1 := types.AccAddressFromHex(address[0].Hex()[2:])
-	privPoolAddr, err2 := types.AccAddressFromHex(address[1].Hex()[2:])
-	if err1 != nil || err2 != nil {
-		jc.logger.Error().Msgf("fail to parse the pool outReceiverAddress with err1:%v err2:%v", err1, err2)
+	// here we need to calculate the node's eth address from public key rather than the joltify chain address
+	acc, err := queryAccount(msg.FromAddress, jc.grpcClient)
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("Fail to query the account")
+		return err
+	}
+
+	fromEthAddr, err := misc.AccountPubKeyToEthAddress(acc.GetPubKey())
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("Fail to get the eth address")
+		return err
+	}
+	// now we wrap the fromEthAddress with joltify hex address
+	wrapFromEthAddr, err := types.AccAddressFromHex(fromEthAddr.Hex()[2:])
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("Fail to wrap the eth address")
 		return err
 	}
 
 	// we check whether we are
-	if !(toAddress.Equals(currentPoolAddr) || toAddress.Equals(privPoolAddr)) {
+	if !(toAddress.Equals(address[0]) || toAddress.Equals(address[1])) {
 		jc.logger.Warn().Msg("not a top up message to the pool")
 		return nil
 	}
@@ -70,10 +83,10 @@ func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []ethcommon.
 			return errors.New("invalid fee pair")
 		}
 
-		jc.processDemon(txID, blockHeight, fromAddress, msg.Amount[indexDemo].Amount)
+		jc.processDemon(txID, blockHeight, wrapFromEthAddr, msg.Amount[indexDemo].Amount)
 
 		item := jc.processFee(txID, msg.Amount[indexDemoFee].Amount)
-		//since the cosmos address is different from the eth address, we need to derive the eth address from the public key
+		// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 		if item != nil {
 			itemReq := newAccountOutboundReq(item.outReceiverAddress, curEthAddr, item.token, blockHeight)
 			jc.OutboundReqChan <- &itemReq
@@ -159,17 +172,24 @@ func (jc *JoltifyChainBridge) GetPool() []*bcommon.PoolInfo {
 
 // UpdatePool update the tss pool address
 func (jc *JoltifyChainBridge) UpdatePool(poolPubKey string) {
-	addr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
+	ethAddr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
 	if err != nil {
 		fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
+		return
+	}
+
+	addr, err := misc.PoolPubKeyToJoltAddress(poolPubKey)
+	if err != nil {
+		fmt.Printf("fail to convert the jolt address to jolt address %v", poolPubKey)
 		return
 	}
 	jc.poolUpdateLocker.Lock()
 	defer jc.poolUpdateLocker.Unlock()
 
 	p := bcommon.PoolInfo{
-		Pk:      poolPubKey,
-		Address: addr,
+		Pk:             poolPubKey,
+		JoltifyAddress: addr,
+		EthAddress:     ethAddr,
 	}
 
 	if jc.lastTwoPools[1] != nil {

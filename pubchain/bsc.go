@@ -5,9 +5,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
 	"sync"
+
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -26,8 +27,8 @@ func (pi *PubChainInstance) StartSubscription(ctx context.Context, wg *sync.Wait
 	fmt.Printf(">>>%v\n", pools)
 	var watchList []common.Address
 	for _, el := range pools {
-		if el != nil && len(el.Address) != 0 {
-			watchList = append(watchList, el.Address)
+		if el != nil && len(el.JoltifyAddress) != 0 {
+			watchList = append(watchList, el.EthAddress)
 		}
 	}
 	sbEvent, err := pi.tokenSb.tokenInstance.WatchTransfer(&watchOpt, pi.tokenSb.sb, nil, watchList)
@@ -64,7 +65,7 @@ func (pi *PubChainInstance) UpdateSubscribe() error {
 	var watchList []common.Address
 	for _, el := range pools {
 		if el != nil {
-			watchList = append(watchList, el.Address)
+			watchList = append(watchList, el.EthAddress)
 		}
 	}
 	// cancel the previous subscription

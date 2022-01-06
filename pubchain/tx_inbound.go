@@ -5,8 +5,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"math/big"
+
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -117,17 +118,25 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 
 // UpdatePool update the tss pool address
 func (pi *PubChainInstance) UpdatePool(poolPubKey string) {
-	addr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
+	addr, err := misc.PoolPubKeyToJoltAddress(poolPubKey)
 	if err != nil {
 		fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
 		return
 	}
+
+	ethAddr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
+	if err != nil {
+		fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
+		return
+	}
+
 	pi.poolLocker.Lock()
 	defer pi.poolLocker.Unlock()
 
 	p := bcommon.PoolInfo{
-		Pk:      poolPubKey,
-		Address: addr,
+		Pk:             poolPubKey,
+		JoltifyAddress: addr,
+		EthAddress:     ethAddr,
 	}
 
 	if pi.lastTwoPools[1] != nil {
@@ -150,7 +159,7 @@ func (pi *PubChainInstance) GetPool() []*bcommon.PoolInfo {
 func (pi *PubChainInstance) checkToBridge(dest common.Address) bool {
 	pools := pi.GetPool()
 	for _, el := range pools {
-		if el != nil && dest.String() == el.Address.String() {
+		if el != nil && dest.String() == el.EthAddress.String() {
 			return true
 		}
 	}
