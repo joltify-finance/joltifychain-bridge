@@ -162,6 +162,15 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					joltBridge.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
 				}
 
+				select {
+				case item := <-joltBridge.RetryOutboundReq:
+					height := block.Data.(tmtypes.EventDataNewBlock).Block.Height
+					item.SetItemHeight(height)
+					joltBridge.OutboundReqChan <- item
+				default:
+				}
+				fmt.Printf(">>>>>latest pool %v\n", joltBridge.GetPool())
+
 			case r := <-*joltBridge.TransferChan[0]:
 				blockHeight := r.Data.(tmtypes.EventDataTx).Height
 				tx := r.Data.(tmtypes.EventDataTx).Tx
@@ -205,7 +214,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
 					continue
 				}
-
 				if found {
 					err := joltBridge.ProcessInBound(item)
 					if err != nil {
@@ -213,6 +221,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 						zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
 					}
 				}
+
 			case item := <-joltBridge.OutboundReqChan:
 				found, err := joltBridge.CheckWhetherSigner()
 				if err != nil {
@@ -221,11 +230,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				}
 				if found {
 					toAddr, fromAddr, amount, blockHeight := item.GetOutBoundInfo()
-					err := pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight)
+					txHash, err := pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
+						joltBridge.RetryOutboundReq <- item
 						continue
 					}
+					fmt.Printf("hash of the tx is %v\n", txHash)
 					zlog.Logger.Info().Msgf("####we have send outbound token from %v to %v (%v)", fromAddr, toAddr, amount.String())
 				}
 

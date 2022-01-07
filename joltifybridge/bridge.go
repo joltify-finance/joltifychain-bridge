@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"io/ioutil"
 	"log"
 	"strconv"
 	"sync"
+
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
@@ -90,6 +91,7 @@ func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer *tssclie
 	joltifyBridge.pendingOutbounds = make(map[string]*outboundTx)
 	joltifyBridge.pendingOutboundLocker = &sync.RWMutex{}
 	joltifyBridge.OutboundReqChan = make(chan *OutBoundReq, reqCacheSize)
+	joltifyBridge.RetryOutboundReq = make(chan *OutBoundReq, reqCacheSize)
 
 	return &joltifyBridge, nil
 }

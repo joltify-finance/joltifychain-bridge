@@ -3,11 +3,12 @@ package joltifybridge
 import (
 	"errors"
 	"fmt"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"math/big"
 	"sync"
 	"time"
+
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -53,6 +54,7 @@ type JoltifyChainBridge struct {
 	pendingOutboundLocker *sync.RWMutex
 	OutboundReqChan       chan *OutBoundReq
 	TransferChan          []*<-chan ctypes.ResultEvent
+	RetryOutboundReq      chan *OutBoundReq // if a tx fail to process, we need to put in this channel and wait for retry
 }
 
 // info the import structure of the cosmos validator info
@@ -102,6 +104,11 @@ type OutBoundReq struct {
 // GetOutBoundInfo return the outbound tx info
 func (o *OutBoundReq) GetOutBoundInfo() (common.Address, common.Address, *big.Int, int64) {
 	return o.outReceiverAddress, o.fromPoolAddr, o.coin.Amount.BigInt(), o.blockHeight
+}
+
+// SetItemHeight sets the block height of the tx
+func (o *OutBoundReq) SetItemHeight(blockHeight int64) {
+	o.blockHeight = blockHeight
 }
 
 func newAccountOutboundReq(address, fromPoolAddr common.Address, coin sdk.Coin, blockHeight int64) OutBoundReq {
