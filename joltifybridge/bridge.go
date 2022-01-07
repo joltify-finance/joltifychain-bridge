@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"io/ioutil"
 	"log"
 	"strconv"
@@ -75,7 +76,15 @@ func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer *tssclie
 	joltifyBridge.msgSendCache = []tssPoolMsg{}
 	joltifyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
 	joltifyBridge.poolUpdateLocker = &sync.RWMutex{}
-	joltifyBridge.lastTwoPoolLocker = &sync.RWMutex{}
+
+	// we put the dummy query here to avoid the panic
+	query := "tm.event = 'Tx' AND transfer.sender = 'jolt1x'"
+	out, err := client.Subscribe(context.Background(), "query", query)
+	if err != nil {
+		zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
+	}
+	joltifyBridge.TransferChan = make([]*<-chan ctypes.ResultEvent, 2)
+	joltifyBridge.TransferChan = []*<-chan ctypes.ResultEvent{&out, &out}
 	encode := MakeEncodingConfig()
 	joltifyBridge.encoding = &encode
 	joltifyBridge.pendingOutbounds = make(map[string]*outboundTx)
@@ -377,7 +386,7 @@ func (jc *JoltifyChainBridge) CheckAndUpdatePool(blockHeight int64) (bool, strin
 }
 
 // CheckOutBoundTx checks
-func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, txs tendertypes.Txs) {
+func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, rawTx tendertypes.Tx) {
 	pools := jc.GetPool()
 	if pools[0] == nil || pools[1] == nil {
 		return
@@ -385,24 +394,22 @@ func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, txs tendertypes
 	poolAddress := []sdk.AccAddress{pools[0].JoltifyAddress, pools[1].JoltifyAddress}
 	config := jc.encoding
 
-	for _, el := range txs {
-		tx, err := config.TxConfig.TxDecoder()(el)
-		if err != nil {
-			jc.logger.Info().Msgf("fail to decode the data and skip this tx")
-			continue
-		}
-		txWithMemo := tx.(sdk.TxWithMemo)
-		memo := txWithMemo.GetMemo()
-		for _, msg := range txWithMemo.GetMsgs() {
-			switch eachMsg := msg.(type) {
-			case *banktypes.MsgSend:
-				err := jc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, el.Hash(), memo)
-				if err != nil {
-					jc.logger.Error().Err(err).Msgf("fail to process the send message")
-				}
-			default:
-				continue
+	tx, err := config.TxConfig.TxDecoder()(rawTx)
+	if err != nil {
+		jc.logger.Info().Msgf("fail to decode the data and skip this tx")
+		return
+	}
+	txWithMemo := tx.(sdk.TxWithMemo)
+	memo := txWithMemo.GetMemo()
+	for _, msg := range txWithMemo.GetMsgs() {
+		switch eachMsg := msg.(type) {
+		case *banktypes.MsgSend:
+			err := jc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, rawTx.Hash(), memo)
+			if err != nil {
+				jc.logger.Error().Err(err).Msgf("fail to process the send message")
 			}
+		default:
+			continue
 		}
 	}
 }

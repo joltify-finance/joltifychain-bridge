@@ -160,14 +160,16 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				if NeedUpdate(poolInfo, currentPool) {
 					pi.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
 					joltBridge.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
-					err = pi.UpdateSubscribe()
-					if err != nil {
-						zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
-					}
 				}
 
-				// we now check whether we have the outbound tx
-				joltBridge.CheckOutBoundTx(blockHeight, block.Data.(tmtypes.EventDataNewBlock).Block.Data.Txs)
+			case r := <-*joltBridge.TransferChan[0]:
+				blockHeight := r.Data.(tmtypes.EventDataTx).Height
+				tx := r.Data.(tmtypes.EventDataTx).Tx
+				joltBridge.CheckOutBoundTx(blockHeight, tx)
+			case r := <-*joltBridge.TransferChan[1]:
+				blockHeight := r.Data.(tmtypes.EventDataTx).Height
+				tx := r.Data.(tmtypes.EventDataTx).Tx
+				joltBridge.CheckOutBoundTx(blockHeight, tx)
 
 			// process the public chain inbound message to the channel
 			case tokenTransfer := <-pi.GetSubChannel():

@@ -1,9 +1,11 @@
 package joltifybridge
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	zlog "github.com/rs/zerolog/log"
 	"strings"
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
@@ -183,18 +185,33 @@ func (jc *JoltifyChainBridge) UpdatePool(poolPubKey string) {
 		fmt.Printf("fail to convert the jolt address to jolt address %v", poolPubKey)
 		return
 	}
-	jc.poolUpdateLocker.Lock()
-	defer jc.poolUpdateLocker.Unlock()
 
 	p := bcommon.PoolInfo{
 		Pk:             poolPubKey,
 		JoltifyAddress: addr,
 		EthAddress:     ethAddr,
 	}
+	query := fmt.Sprintf("tm.event = 'Tx' AND transfer.recipient= '%s'", p.JoltifyAddress.String())
+	out, err := jc.wsClient.Subscribe(context.Background(), p.JoltifyAddress.String(), query)
+	if err != nil {
+		zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
+	}
 
+	jc.poolUpdateLocker.Lock()
+	defer jc.poolUpdateLocker.Unlock()
+	//jc.transferChanUpdateLocker.Lock()
+	//defer jc.transferChanUpdateLocker.Unlock()
 	if jc.lastTwoPools[1] != nil {
+		if jc.lastTwoPools[0] != nil && jc.lastTwoPools[0].JoltifyAddress.String() != p.JoltifyAddress.String() {
+			delQuery := fmt.Sprintf("tm.event = 'Tx' AND transfer.recipient= '%s'", jc.lastTwoPools[0].JoltifyAddress.String())
+			err := jc.wsClient.Unsubscribe(context.Background(), "quitQuery", delQuery)
+			if err != nil {
+				jc.logger.Error().Err(err).Msgf("fail to unsubscribe the address %v", err)
+			}
+		}
 		jc.lastTwoPools[0] = jc.lastTwoPools[1]
+		jc.TransferChan[0] = jc.TransferChan[1]
 	}
 	jc.lastTwoPools[1] = &p
-	return
+	jc.TransferChan[1] = &out
 }

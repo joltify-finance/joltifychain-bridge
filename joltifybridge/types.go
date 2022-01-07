@@ -3,6 +3,7 @@ package joltifybridge
 import (
 	"errors"
 	"fmt"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"math/big"
 	"sync"
@@ -48,10 +49,10 @@ type JoltifyChainBridge struct {
 	poolUpdateLocker      *sync.RWMutex
 	msgSendCache          []tssPoolMsg
 	lastTwoPools          []*bcommon.PoolInfo
-	lastTwoPoolLocker     *sync.RWMutex
 	pendingOutbounds      map[string]*outboundTx
 	pendingOutboundLocker *sync.RWMutex
 	OutboundReqChan       chan *OutBoundReq
+	TransferChan          []*<-chan ctypes.ResultEvent
 }
 
 // info the import structure of the cosmos validator info
