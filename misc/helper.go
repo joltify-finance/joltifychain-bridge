@@ -4,11 +4,11 @@ import (
 	"encoding/base64"
 	"math/big"
 
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/joltgeorge/tss/keysign"
 	"github.com/tendermint/btcd/btcec"
 )
@@ -37,28 +37,26 @@ func PoolPubKeyToEthAddress(pk string) (common.Address, error) {
 	if err != nil {
 		return common.Address{}, err
 	}
-	pk2, err := btcec.ParsePubKey(pubkey.Bytes(), btcec.S256())
-	if err != nil {
-		return common.Address{}, err
-	}
-	addr := crypto.PubkeyToAddress(*pk2.ToECDSA())
+	//pk2, err := btcec.ParsePubKey(pubkey.Bytes(), btcec.S256())
+	//if err != nil {
+	//	return common.Address{}, err
+	//}
+
+	pk2, err := crypto.DecompressPubkey(pubkey.Bytes())
+	addr := crypto.PubkeyToAddress(*pk2)
 	return addr, nil
 }
 
 // AccountPubKeyToEthAddress export the joltify pubkey to the ETH format address
 func AccountPubKeyToEthAddress(pk cryptotypes.PubKey) (common.Address, error) {
-	pk2, err := btcec.ParsePubKey(pk.Bytes(), btcec.S256())
+	pubkey, err := crypto.DecompressPubkey(pk.Bytes())
+	// expectedAddr := crypto.PubkeyToAddress(*pubkey)
+	// pk2, err := btcec.ParsePubKey(pk.Bytes(), btcec.S256())
 	if err != nil {
 		return common.Address{}, err
 	}
-	addr := crypto.PubkeyToAddress(*pk2.ToECDSA())
+	addr := crypto.PubkeyToAddress(*pubkey)
 	return addr, nil
-}
-
-// EthAddressToJoltAddr export the joltify pubkey to the ETH format address
-func EthAddressToJoltAddr(addr common.Address) (types.AccAddress, error) {
-	jAddr, err := types.AccAddressFromHex(addr.Hex()[2:])
-	return jAddr, err
 }
 
 // SerializeSig for both joltify chain and public chain
@@ -106,4 +104,55 @@ func SerializeSig(sig *keysign.Signature, needRecovery bool) ([]byte, error) {
 	copy(sigBytes[32-len(rBytes):32], rBytes)
 	copy(sigBytes[64-len(sBytes):64], sBytes)
 	return sigBytes, nil
+}
+
+// MakeSignature serialize the r,s,v to the signature bytes
+func MakeSignature(r, s, v *big.Int) []byte {
+	rBytes := r.Bytes()
+	sBytes := s.Bytes()
+
+	sigBytes := make([]byte, 65)
+	// 0 pad the byte arrays from the left if they aren't big enough.
+	copy(sigBytes[32-len(rBytes):32], rBytes)
+	copy(sigBytes[64-len(sBytes):64], sBytes)
+	sigBytes[64] = byte(v.Uint64())
+	return sigBytes
+}
+
+// EthSignPubKeytoJoltAddr derives the joltify address from the pubkey derived from the signature
+func EthSignPubKeyToJoltAddr(pk []byte) (types.AccAddress, error) {
+	pk2, err := btcec.ParsePubKey(pk, btcec.S256())
+	if err != nil {
+		return types.AccAddress{}, err
+	}
+
+	pk3 := secp256k1.PubKey{Key: pk2.SerializeCompressed()}
+	joltAddr, err := types.AccAddressFromHex(pk3.Address().String())
+	return joltAddr, err
+}
+
+func isProtectedV(v *big.Int) bool {
+	if v.BitLen() <= 8 {
+		v := v.Uint64()
+		return v != 27 && v != 28 && v != 1 && v != 0
+	}
+	// anything not 27 or 28 is considered protected
+	return true
+}
+
+func RecoverRecID(chainID uint64, v *big.Int) *big.Int {
+	if v.Uint64() == 0 || v.Uint64() == 1 {
+		return v
+	}
+
+	if isProtectedV(v) {
+		plainV := new(big.Int).SetUint64(v.Uint64() - 35 - 2*chainID)
+		return plainV
+	} else {
+		// Only EIP-155 signatures can be optionally protected. Since
+		// we determined this v value is not protected, it must be a
+		// raw 27 or 28.
+		plainV := new(big.Int).SetUint64(v.Uint64() - 27)
+		return plainV
+	}
 }

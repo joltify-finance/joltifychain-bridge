@@ -14,13 +14,9 @@ import (
 )
 
 func prepareIssueTokenRequest(item *pubchain.InboundReq, creatorAddr, index string) (*vaulttypes.MsgCreateIssueToken, error) {
-	userAcc, _, coin, _ := item.GetInboundReqInfo()
+	userAddr, _, coin, _ := item.GetInboundReqInfo()
 
-	receiver, err := misc.EthAddressToJoltAddr(userAcc)
-	if err != nil {
-		return nil, err
-	}
-	a, err := vaulttypes.NewMsgCreateIssueToken(creatorAddr, index, coin.String(), receiver.String())
+	a, err := vaulttypes.NewMsgCreateIssueToken(creatorAddr, index, coin.String(), userAddr.String())
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +25,6 @@ func prepareIssueTokenRequest(item *pubchain.InboundReq, creatorAddr, index stri
 
 // ProcessInBound mint the token in joltify chain
 func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
-
 	pool := jc.GetPool()
 	if pool[0] == nil {
 		jc.logger.Info().Msgf("fail to query the pool with length 1")

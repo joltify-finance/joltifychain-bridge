@@ -160,6 +160,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				if NeedUpdate(poolInfo, currentPool) {
 					pi.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
 					joltBridge.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
+					pools := pi.GetPool()
+					var poolsInfo []string
+					for _, el := range pools {
+						if el != nil {
+							poolsInfo = append(poolsInfo, el.EthAddress.String())
+						}
+					}
+					zlog.Logger.Info().Msgf("the current pools are %v \n", poolsInfo)
 				}
 
 				select {
@@ -235,7 +243,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 						joltBridge.RetryOutboundReq <- item
 						continue
 					}
-					zlog.Logger.Info().Msgf("####we have send outbound tx(%v) from %v to %v (%v)", txHash, fromAddr, toAddr, amount.String())
+					zlog.Logger.Info().Msgf(">>we have send outbound tx(%v) from %v to %v (%v)", txHash, fromAddr, toAddr, amount.String())
 				}
 
 			}

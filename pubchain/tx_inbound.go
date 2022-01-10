@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/types"
@@ -22,7 +23,33 @@ func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
 		return errors.New("the tx is the revert tx")
 	}
 	tokenAddr := transfer.Raw.Address
-	err := pi.processInboundTx(transfer.Raw.TxHash.Hex()[2:], transfer.Raw.BlockNumber, transfer.From, transfer.Value, tokenAddr)
+	tx, isPending, err := pi.EthClient.TransactionByHash(context.Background(), transfer.Raw.TxHash)
+	if err != nil || isPending {
+		pi.logger.Error().Err(err).Msg("fail to get this transaction.")
+		return err
+	}
+	if isPending {
+		return fmt.Errorf("pending transaction with hash id %v", transfer.Raw.TxHash.String())
+	}
+	v, r, s := tx.RawSignatureValues()
+	plainV := misc.RecoverRecID(tx.ChainId().Uint64(), v)
+	sigBytes := misc.MakeSignature(r, s, plainV)
+	sigPublicKey, err := crypto.Ecrecover(transfer.Raw.TxHash.Bytes(), sigBytes)
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to recover the public key")
+		return err
+	}
+
+	transferFrom, err := misc.EthSignPubKeyToJoltAddr(sigPublicKey)
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to get the joltify address from the public key recoverred from sig")
+		return err
+	}
+
+	err = pi.processInboundTx(transfer.Raw.TxHash.Hex()[2:], transfer.Raw.BlockNumber, transferFrom, transfer.Value, tokenAddr)
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
+	}
 	return err
 }
 
@@ -40,7 +67,7 @@ func (pi *PubChainInstance) ProcessNewBlock(number *big.Int) error {
 }
 
 // updateInboundTx update the top-up token with fee
-func (pi *PubChainInstance) updateInboundTx(txID string, amount *big.Int, direction config.Direction) *inboundTx {
+func (pi *PubChainInstance) updateInboundTx(txID string, amount *big.Int) *inboundTx {
 	pi.pendingInboundTxLocker.Lock()
 	defer pi.pendingInboundTxLocker.Unlock()
 	thisAccount, ok := pi.pendingInbounds[txID]
@@ -61,7 +88,7 @@ func (pi *PubChainInstance) updateInboundTx(txID string, amount *big.Int, direct
 	return thisAccount
 }
 
-func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, from common.Address, value *big.Int, addr common.Address) error {
+func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, from types.AccAddress, value *big.Int, addr common.Address) error {
 	pi.pendingInboundTxLocker.Lock()
 	defer pi.pendingInboundTxLocker.Unlock()
 	_, ok := pi.pendingInbounds[txID]
@@ -107,7 +134,7 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 				continue
 			}
 			payTxID := tx.Data()
-			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), config.InBound)
+			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value())
 			if account != nil {
 				item := newAccountInboundReq(account.address, *tx.To(), account.token, block.Number().Int64())
 				pi.InboundReqChan <- &item

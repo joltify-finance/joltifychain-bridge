@@ -46,13 +46,13 @@ func (tk *tokenSb) UpdateSbEvent(sbEvent event.Subscription) {
 
 // InboundReq is the account that top up account info to joltify pub_chain
 type InboundReq struct {
-	address     common.Address
+	address     sdk.AccAddress
 	toPoolAddr  common.Address
 	coin        sdk.Coin
 	blockHeight int64
 }
 
-func newAccountInboundReq(address, toPoolAddr common.Address, coin sdk.Coin, blockHeight int64) InboundReq {
+func newAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coin sdk.Coin, blockHeight int64) InboundReq {
 	return InboundReq{
 		address,
 		toPoolAddr,
@@ -62,7 +62,7 @@ func newAccountInboundReq(address, toPoolAddr common.Address, coin sdk.Coin, blo
 }
 
 // GetInboundReqInfo returns the info of the inbound transaction
-func (acq *InboundReq) GetInboundReqInfo() (common.Address, common.Address, sdk.Coin, int64) {
+func (acq *InboundReq) GetInboundReqInfo() (sdk.AccAddress, common.Address, sdk.Coin, int64) {
 	return acq.address, acq.toPoolAddr, acq.coin, acq.blockHeight
 }
 
@@ -87,7 +87,7 @@ type PubChainInstance struct {
 }
 
 type inboundTx struct {
-	address     common.Address
+	address     sdk.AccAddress
 	blockHeight uint64
 	token       sdk.Coin
 	fee         sdk.Coin
