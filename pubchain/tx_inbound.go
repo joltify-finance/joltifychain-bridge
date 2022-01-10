@@ -22,6 +22,7 @@ func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
 	if transfer.Raw.Removed {
 		return errors.New("the tx is the revert tx")
 	}
+
 	tokenAddr := transfer.Raw.Address
 	tx, isPending, err := pi.EthClient.TransactionByHash(context.Background(), transfer.Raw.TxHash)
 	if err != nil || isPending {
@@ -45,7 +46,6 @@ func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
 		pi.logger.Error().Err(err).Msg("fail to get the joltify address from the public key recoverred from sig")
 		return err
 	}
-
 	err = pi.processInboundTx(transfer.Raw.TxHash.Hex()[2:], transfer.Raw.BlockNumber, transferFrom, transfer.Value, tokenAddr)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
@@ -170,6 +170,7 @@ func (pi *PubChainInstance) UpdatePool(poolPubKey string) {
 		pi.lastTwoPools[0] = pi.lastTwoPools[1]
 	}
 	pi.lastTwoPools[1] = &p
+	pi.UpdateSubscribe(pi.lastTwoPools)
 	return
 }
 

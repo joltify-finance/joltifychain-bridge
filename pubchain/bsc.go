@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -55,13 +56,12 @@ func (pi *PubChainInstance) StartSubscription(ctx context.Context, wg *sync.Wait
 }
 
 // UpdateSubscribe update the subscribed pool address
-func (pi *PubChainInstance) UpdateSubscribe() error {
+func (pi *PubChainInstance) UpdateSubscribe(pools []*bcommon.PoolInfo) error {
 	// fixme ctx should be global parameter
 	ctx, _ := context.WithTimeout(context.Background(), chainQueryTimeout)
 	watchOpt := bind.WatchOpts{
 		Context: ctx,
 	}
-	pools := pi.GetPool()
 	var watchList []common.Address
 	for _, el := range pools {
 		if el != nil {
