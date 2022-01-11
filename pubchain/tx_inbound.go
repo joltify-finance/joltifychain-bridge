@@ -33,17 +33,52 @@ func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
 		return fmt.Errorf("pending transaction with hash id %v", transfer.Raw.TxHash.String())
 	}
 	v, r, s := tx.RawSignatureValues()
+	signer := ethTypes.LatestSignerForChainID(tx.ChainId())
 	plainV := misc.RecoverRecID(tx.ChainId().Uint64(), v)
 	sigBytes := misc.MakeSignature(r, s, plainV)
-	sigPublicKey, err := crypto.Ecrecover(transfer.Raw.TxHash.Bytes(), sigBytes)
+	fmt.Printf("#############%v\n", plainV.String())
+
+	sigPublicKey, err := crypto.Ecrecover(signer.Hash(tx).Bytes(), sigBytes)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to recover the public key")
 		return err
 	}
 
 	transferFrom, err := misc.EthSignPubKeyToJoltAddr(sigPublicKey)
+	fmt.Printf(">>>>>>>>transfer from %v\n", transferFrom.String())
+
+	pubkeystrc, err := crypto.UnmarshalPubkey(sigPublicKey)
 	if err != nil {
-		pi.logger.Error().Err(err).Msg("fail to get the joltify address from the public key recoverred from sig")
+		pi.logger.Error().Err(err).Msg("fail to recover the public key eth")
+		return err
+	}
+	address := crypto.PubkeyToAddress(*pubkeystrc)
+	fmt.Printf(">>>>>eth address %v and should be %v\n", address, transfer.From.String())
+
+	if plainV.Uint64() == 1 {
+		plainV = big.NewInt(0)
+	} else {
+		plainV = big.NewInt(1)
+	}
+
+	sigBytes = misc.MakeSignature(r, s, plainV)
+
+	sigPublicKey2, err := crypto.Ecrecover(transfer.Raw.TxHash.Bytes(), sigBytes)
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to recover the public key")
+		return err
+	}
+
+	pubkeystrc2, err := crypto.UnmarshalPubkey(sigPublicKey2)
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to recover the public key eth")
+		return err
+	}
+	address2 := crypto.PubkeyToAddress(*pubkeystrc2)
+	fmt.Printf(">>>>>eth2 address %v and should be %v\n", address2, transfer.From.String())
+
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to get the joltify address from the public key recovered from sig")
 		return err
 	}
 	err = pi.processInboundTx(transfer.Raw.TxHash.Hex()[2:], transfer.Raw.BlockNumber, transferFrom, transfer.Value, tokenAddr)

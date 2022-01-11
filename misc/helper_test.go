@@ -1,14 +1,13 @@
 package misc
 
 import (
-	"encoding/hex"
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/btcd/btcec"
 )
@@ -35,7 +34,9 @@ func TestPoolPubkeyToEthAddress(t *testing.T) {
 
 func TestGetJoltAddressFromETHSignature(t *testing.T) {
 	sk := secp256k1.GenPrivKey()
-	skECDSA, err := crypto.HexToECDSA(hex.EncodeToString(sk.Bytes()))
+	ske := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
+	// skECDSA, err := crypto.HexToECDSA(hex.EncodeToString(sk.Bytes()))
+	skECDSA, err := crypto.HexToECDSA(ske)
 	require.Nil(t, err)
 
 	JoltAddr, err := types.AccAddressFromHex(sk.PubKey().Address().String())
@@ -51,6 +52,11 @@ func TestGetJoltAddressFromETHSignature(t *testing.T) {
 	sigPublicKey, err := crypto.Ecrecover(hash.Bytes(), signature)
 	require.Nil(t, err)
 
+	pubkeystrc, err := crypto.UnmarshalPubkey(sigPublicKey)
+	assert.Nil(t, err)
+
+	address := crypto.PubkeyToAddress(*pubkeystrc)
+	fmt.Printf(">>>>>%v\n", address)
 	pk2, err := btcec.ParsePubKey(sigPublicKey, btcec.S256())
 	require.Nil(t, err)
 
@@ -59,14 +65,4 @@ func TestGetJoltAddressFromETHSignature(t *testing.T) {
 	expectedJoltAddr, err := types.AccAddressFromHex(pk3.Address().String())
 	require.Nil(t, err)
 	require.True(t, expectedJoltAddr.Equals(JoltAddr))
-
-	R, _ := new(big.Int).SetString("67606333147281522726157602227936966047617416004627204291913366769272514064697", 10)
-	S, _ := new(big.Int).SetString("5475031428760630727513767655728116229184222599154855988385984175155192504097", 10)
-	V, _ := new(big.Int).SetString("229", 10)
-	r, s := R.Bytes(), S.Bytes()
-	sig := make([]byte, crypto.SignatureLength)
-	copy(sig[32-len(r):32], r)
-	copy(sig[64-len(s):64], s)
-	sig[64] = byte(V.Uint64())
-	fmt.Printf(">>>>%v:%v\n", sig, len(sig))
 }
