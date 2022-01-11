@@ -43,6 +43,9 @@ func PoolPubKeyToEthAddress(pk string) (common.Address, error) {
 	//}
 
 	pk2, err := crypto.DecompressPubkey(pubkey.Bytes())
+	if err != nil {
+		return common.Address{}, err
+	}
 	addr := crypto.PubkeyToAddress(*pk2)
 	return addr, nil
 }

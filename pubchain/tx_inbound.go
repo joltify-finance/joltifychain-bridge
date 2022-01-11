@@ -33,19 +33,18 @@ func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
 		return fmt.Errorf("pending transaction with hash id %v", transfer.Raw.TxHash.String())
 	}
 	v, r, s := tx.RawSignatureValues()
+	signer := ethTypes.LatestSignerForChainID(tx.ChainId())
 	plainV := misc.RecoverRecID(tx.ChainId().Uint64(), v)
 	sigBytes := misc.MakeSignature(r, s, plainV)
-	sigPublicKey, err := crypto.Ecrecover(transfer.Raw.TxHash.Bytes(), sigBytes)
+	fmt.Printf("#############%v\n", plainV.String())
+
+	sigPublicKey, err := crypto.Ecrecover(signer.Hash(tx).Bytes(), sigBytes)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to recover the public key")
 		return err
 	}
 
 	transferFrom, err := misc.EthSignPubKeyToJoltAddr(sigPublicKey)
-	if err != nil {
-		pi.logger.Error().Err(err).Msg("fail to get the joltify address from the public key recoverred from sig")
-		return err
-	}
 	err = pi.processInboundTx(transfer.Raw.TxHash.Hex()[2:], transfer.Raw.BlockNumber, transferFrom, transfer.Value, tokenAddr)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
