@@ -3,6 +3,7 @@ package joltifybridge
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -37,20 +38,17 @@ func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
 		return errors.New("invalid address")
 	}
 
-	acc, err := queryAccount(joltCreatorAddr.String(), jc.grpcClient)
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
-		return err
-	}
+	// we always increase the account seq regardless the tx successful or not
+	accNum, accSeq := jc.AcquirePoolAccountInfo()
 	creatorAddrStr := strings.ToLower(joltCreatorAddr.String())
 	// we need to check against the previous account sequence
-	preIndex := strconv.FormatUint(acc.GetSequence(), 10) + creatorAddrStr
+	preIndex := strconv.FormatUint(accSeq, 10) + creatorAddrStr
 	if jc.CheckWhetherAlreadyExist(preIndex) {
 		jc.logger.Warn().Msg("already submitted by others")
 		return nil
 	}
 
-	index := strconv.FormatUint(acc.GetSequence(), 10) + creatorAddrStr
+	index := strconv.FormatUint(accSeq, 10) + creatorAddrStr
 	jc.logger.Info().Msgf("we are about the prepare the tx with other nodes with index %v", index)
 	issueReq, err := prepareIssueTokenRequest(item, joltCreatorAddr.String(), index)
 	if err != nil {
@@ -67,20 +65,45 @@ func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
 		Version:     tssclient.TssVersion,
 	}
 
-	txbytes, _, err := jc.genSendTx([]sdk.Msg{issueReq}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg)
+	txBuilder, err := jc.genSendTx([]sdk.Msg{issueReq}, accSeq, accNum, &signMsg)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the tx")
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-	defer cancel()
-	ok, resp, err := jc.BroadcastTx(ctx, txbytes)
-	if err != nil || !ok {
-		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
+	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to encode the tx")
 		return err
 	}
-	jc.logger.Info().Msgf("we have successfully top up %s with %v", issueReq.Receiver.String(), issueReq.Coin.String())
 
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
+
+	gasUsed, err := jc.SimBroadcastTx(ctx, txBytes)
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to estimate gas consumption")
+		return err
+	}
+
+	fmt.Printf("GGGGGGGGGGAAAAAAAAAA>>>>%v\n", gasUsed)
+
+	gasUsedDec := sdk.NewDecFromIntWithPrec(sdk.NewIntFromUint64(gasUsed), 18)
+	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr("1.2")).RoundInt64()
+	txBuilder.SetGasLimit(uint64(gasWanted))
+
+	txBytes, err = jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to encode the tx")
+		return err
+	}
+
+	ok, resp, err := jc.BroadcastTx(ctx, txBytes)
+	if err != nil || !ok {
+		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
+		return errors.New("fail to process the inbound tx")
+	}
+
+	jc.logger.Info().Msgf("txid(%v) have successfully top up %s with %v", resp, issueReq.Receiver.String(), issueReq.Coin.String())
 	return nil
 }

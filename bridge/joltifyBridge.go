@@ -160,6 +160,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				if NeedUpdate(poolInfo, currentPool) {
 					pi.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
 					joltBridge.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
+					joltBridge.CreatePoolAccInfo(poolInfo[0].CreatePool.PoolAddr.String())
 					pools := pi.GetPool()
 					var poolsInfo []string
 					for _, el := range pools {

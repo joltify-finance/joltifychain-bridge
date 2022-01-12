@@ -16,6 +16,7 @@ require (
 	github.com/tendermint/btcd v0.1.1
 	github.com/tendermint/tendermint v0.34.14
 	gitlab.com/joltify/joltifychain v0.0.0-20220114010643-2d3dfce706a2
+	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
 	google.golang.org/grpc v1.43.0
 )

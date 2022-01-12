@@ -4,13 +4,17 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"strconv"
 	"sync"
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
+	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
+
+	"go.uber.org/atomic"
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
@@ -28,7 +32,6 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	"github.com/cosmos/cosmos-sdk/types/tx"
 	zlog "github.com/rs/zerolog/log"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -92,7 +95,7 @@ func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer *tssclie
 	joltifyBridge.pendingOutboundLocker = &sync.RWMutex{}
 	joltifyBridge.OutboundReqChan = make(chan *OutBoundReq, reqCacheSize)
 	joltifyBridge.RetryOutboundReq = make(chan *OutBoundReq, reqCacheSize)
-
+	joltifyBridge.poolAccLocker = &sync.Mutex{}
 	return &joltifyBridge, nil
 }
 
@@ -115,7 +118,7 @@ func (jc *JoltifyChainBridge) TerminateBridge() error {
 	return nil
 }
 
-func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64, tssSignMsg *tssclient.TssSignigMsg) ([]byte, string, error) {
+func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64, tssSignMsg *tssclient.TssSignigMsg) (client.TxBuilder, error) {
 	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
 	// following function.
 	encCfg := *jc.encoding
@@ -124,10 +127,10 @@ func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64,
 
 	err := txBuilder.SetMsgs(sdkMsg...)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	// we use the default here
-	txBuilder.SetGasLimit(200000)
+	txBuilder.SetGasLimit(180000)
 	// txBuilder.SetFeeAmount(...)
 	// txBuilder.SetMemo(...)
 	// txBuilder.SetTimeoutHeight(...)
@@ -135,7 +138,7 @@ func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64,
 	key, err := jc.keyring.Key("operator")
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to get the operator key")
-		return nil, "", err
+		return nil, err
 	}
 
 	var sigV2 signing.SignatureV2
@@ -153,7 +156,7 @@ func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64,
 		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk)
 		if err != nil {
 			jc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
-			return nil, "", err
+			return nil, err
 		}
 		sigV2 = signing.SignatureV2{
 			PubKey: cPk,
@@ -168,7 +171,7 @@ func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64,
 
 	err = txBuilder.SetSignatures(sigV2)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	signerData := xauthsigning.SignerData{
@@ -179,18 +182,12 @@ func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64,
 	signatureV2, err := jc.signTx(encCfg.TxConfig, txBuilder, signerData, tssSignMsg)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the signature")
-		return nil, "", err
+		return nil, err
 	}
 	err = txBuilder.SetSignatures(signatureV2)
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to set the signature")
-		return nil, "", err
-	}
-
-	// Generated Protobuf-encoded bytes.
-	txBytes, err := encCfg.TxConfig.TxEncoder()(txBuilder.GetTx())
-	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	// the following code is for debug only
@@ -201,7 +198,7 @@ func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64,
 	//}
 	//txJSON := string(txJSONBytes)
 	//jc.logger.Debug().Msg(txJSON)
-	return txBytes, "", nil
+	return txBuilder, nil
 }
 
 func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.TxBuilder, signerData xauthsigning.SignerData, signMsg *tssclient.TssSignigMsg) (signing.SignatureV2, error) {
@@ -276,16 +273,31 @@ func (jc *JoltifyChainBridge) doTssSign(msg *tssclient.TssSignigMsg) (keysign.Re
 	return resp, nil
 }
 
+// SimBroadcastTx broadcast the tx to the joltifyChain to get gas estimation
+func (jc *JoltifyChainBridge) SimBroadcastTx(ctx context.Context, txbytes []byte) (uint64, error) {
+	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
+	// service.
+	txClient := cosTx.NewServiceClient(jc.grpcClient)
+	// We then call the BroadcastTx method on this client.
+
+	grpcRes, err := txClient.Simulate(ctx, &cosTx.SimulateRequest{TxBytes: txbytes})
+	if err != nil {
+		return 0, err
+	}
+	gasUsed := grpcRes.GetGasInfo().GasUsed
+	return gasUsed, nil
+}
+
 // BroadcastTx broadcast the tx to the joltifyChain
 func (jc *JoltifyChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (bool, string, error) {
 	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
 	// service.
-	txClient := tx.NewServiceClient(jc.grpcClient)
+	txClient := cosTx.NewServiceClient(jc.grpcClient)
 	// We then call the BroadcastTx method on this client.
 	grpcRes, err := txClient.BroadcastTx(
 		ctx,
-		&tx.BroadcastTxRequest{
-			Mode:    tx.BroadcastMode_BROADCAST_MODE_SYNC,
+		&cosTx.BroadcastTxRequest{
+			Mode:    cosTx.BroadcastMode_BROADCAST_MODE_BLOCK,
 			TxBytes: txBytes, // Proto-binary of the signed transaction, see previous step.
 		},
 	)
@@ -298,29 +310,37 @@ func (jc *JoltifyChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (
 		return false, "", nil
 	}
 	txHash := grpcRes.GetTxResponse().TxHash
+	fmt.Printf("#########%v\n", grpcRes.TxResponse.Code)
+	fmt.Printf("#########%v\n", grpcRes.TxResponse.Logs.String())
+	fmt.Printf("#########%v\n", grpcRes.TxResponse.Info)
+	fmt.Printf("#########%v\n", grpcRes.String())
+	fmt.Printf("#########%v\n", grpcRes.GetTxResponse().String())
 	return true, txHash, nil
 }
 
-// todo this functions current is not used
-func (jc *JoltifyChainBridge) sendToken(coins sdk.Coins, from, to sdk.AccAddress, tssSignMsg *tssclient.TssSignigMsg) error {
-	msg := banktypes.NewMsgSend(from, to, coins)
-
-	acc, err := queryAccount(from.String(), jc.grpcClient)
+func (jc *JoltifyChainBridge) CreatePoolAccInfo(accAddr string) error {
+	acc, err := queryAccount(accAddr, jc.grpcClient)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("Fail to quer the account")
+		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
 		return err
 	}
-	txbytes, _, err := jc.genSendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber(), tssSignMsg)
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to generate the tx")
-		return err
+	accInfo := poolAccInfo{
+		acc.GetAccountNumber(),
+		atomic.NewUint64(acc.GetSequence()),
 	}
-	ok, _, err := jc.BroadcastTx(context.Background(), txbytes)
-	if err != nil || !ok {
-		jc.logger.Error().Err(err).Msg("fail to broadcast the tx")
-		return err
-	}
+	jc.poolAccLocker.Lock()
+	jc.poolAccInfo = &accInfo
+	jc.poolAccLocker.Unlock()
 	return nil
+}
+
+func (jc *JoltifyChainBridge) AcquirePoolAccountInfo() (uint64, uint64) {
+	jc.poolUpdateLocker.Lock()
+	accSeq := jc.poolAccInfo.accSeq.Inc()
+	accSeq -= 1
+	accNum := jc.poolAccInfo.accountNum
+	jc.poolUpdateLocker.Unlock()
+	return accNum, accSeq
 }
 
 func (jc *JoltifyChainBridge) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
@@ -332,9 +352,34 @@ func (jc *JoltifyChainBridge) prepareTssPool(creator sdk.AccAddress, pubKey, hei
 		return err
 	}
 
-	txbytes, _, err := jc.genSendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber(), nil)
+	txBuilder, err := jc.genSendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber(), nil)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the tx")
+		return err
+	}
+
+	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to encode the tx")
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
+	gasUsed, err := jc.SimBroadcastTx(ctx, txBytes)
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to estimate gas consumption")
+		return err
+	}
+
+	fmt.Printf("GGGGGGGGGGAAAAAAAAAA>>>>%v\n", gasUsed)
+
+	gasUsedDec := sdk.NewDecFromIntWithPrec(sdk.NewIntFromUint64(gasUsed), 18)
+	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr("1.2")).RoundInt64()
+	txBuilder.SetGasLimit(uint64(gasWanted))
+	fmt.Printf("2222222222222>>>>%v\n", txBuilder.GetTx().GetGas())
+	txBytesSend, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to encode the tx")
 		return err
 	}
 
@@ -345,7 +390,7 @@ func (jc *JoltifyChainBridge) prepareTssPool(creator sdk.AccAddress, pubKey, hei
 	}
 
 	item := tssPoolMsg{
-		txbytes,
+		txBytesSend,
 		pubKey,
 		dHeight,
 	}

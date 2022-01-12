@@ -9,6 +9,7 @@ import (
 
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"go.uber.org/atomic"
 
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -55,6 +56,13 @@ type JoltifyChainBridge struct {
 	OutboundReqChan       chan *OutBoundReq
 	TransferChan          []*<-chan ctypes.ResultEvent
 	RetryOutboundReq      chan *OutBoundReq // if a tx fail to process, we need to put in this channel and wait for retry
+	poolAccInfo           *poolAccInfo
+	poolAccLocker         *sync.Mutex
+}
+
+type poolAccInfo struct {
+	accountNum uint64
+	accSeq     *atomic.Uint64
 }
 
 // info the import structure of the cosmos validator info
