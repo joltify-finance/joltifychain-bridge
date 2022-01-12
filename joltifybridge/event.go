@@ -90,7 +90,7 @@ func (jc *JoltifyChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes
 			jc.logger.Error().Msgf("fail to broadcast the tss generated key on pub_chain")
 			return err
 		}
-		jc.logger.Info().Msgf("successfully upload the tss key info on pub_chain")
+		jc.logger.Info().Msgf("successfully prepared the tss key info on pub_chain")
 		return nil
 	}
 	return nil

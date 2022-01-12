@@ -7,8 +7,11 @@ import (
 	"sync"
 	"time"
 
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain/x/vault/types"
+	"go.uber.org/atomic"
 
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -32,7 +35,8 @@ const (
 
 // tssPoolMsg this is the pool pre-submit message for the given height
 type tssPoolMsg struct {
-	data        []byte
+	msg         *types.MsgCreateCreatePool
+	acc         authtypes.AccountI
 	poolPubKey  string
 	blockHeight int64
 }
@@ -55,6 +59,13 @@ type JoltifyChainBridge struct {
 	OutboundReqChan       chan *OutBoundReq
 	TransferChan          []*<-chan ctypes.ResultEvent
 	RetryOutboundReq      chan *OutBoundReq // if a tx fail to process, we need to put in this channel and wait for retry
+	poolAccInfo           *poolAccInfo
+	poolAccLocker         *sync.Mutex
+}
+
+type poolAccInfo struct {
+	accountNum uint64
+	accSeq     *atomic.Uint64
 }
 
 // info the import structure of the cosmos validator info

@@ -10,6 +10,7 @@ const (
 	InBoundDenom     = "JUSD"
 	OutBoundDenom    = "JUSD"
 	TxTimeout        = 300
+	GASFEERATIO      = "1.2"
 )
 
 const (

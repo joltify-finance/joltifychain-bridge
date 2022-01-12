@@ -36,7 +36,6 @@ func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
 	signer := ethTypes.LatestSignerForChainID(tx.ChainId())
 	plainV := misc.RecoverRecID(tx.ChainId().Uint64(), v)
 	sigBytes := misc.MakeSignature(r, s, plainV)
-	fmt.Printf("#############%v\n", plainV.String())
 
 	sigPublicKey, err := crypto.Ecrecover(signer.Hash(tx).Bytes(), sigBytes)
 	if err != nil {
