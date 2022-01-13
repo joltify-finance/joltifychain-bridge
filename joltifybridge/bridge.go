@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
@@ -16,7 +17,6 @@ import (
 	tendertypes "github.com/tendermint/tendermint/types"
 
 	coscrypto "github.com/cosmos/cosmos-sdk/crypto/types"
-	sdktypes "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/joltgeorge/tss/common"
 	"github.com/joltgeorge/tss/keysign"
@@ -150,7 +150,7 @@ func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64,
 		}
 	} else {
 		pk := tssSignMsg.Pk
-		cPk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeAccPub, pk)
+		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk)
 		if err != nil {
 			jc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
 			return nil, "", err
@@ -244,7 +244,8 @@ func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.
 			jc.logger.Error().Msgf("fail to encode the signature")
 			return signing.SignatureV2{}, err
 		}
-		pubkey, err := sdktypes.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeAccPub, signMsg.Pk)
+
+		pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, signMsg.Pk)
 		if err != nil {
 			jc.logger.Error().Err(err).Msgf("fail to get the pubkey")
 			return signing.SignatureV2{}, err

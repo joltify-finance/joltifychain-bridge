@@ -6,6 +6,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,10 +24,10 @@ func TestPoolPubkeyToEthAddress(t *testing.T) {
 
 	expectedAddr2, err := AccountPubKeyToEthAddress(sk.PubKey())
 	require.Nil(t, err)
-	pk, err := types.Bech32ifyPubKey(types.Bech32PubKeyTypeAccPub, sk.PubKey())
+	pk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, sk.PubKey().String())
 	require.Nil(t, err)
 
-	ethAddr, err := PoolPubKeyToEthAddress(pk)
+	ethAddr, err := PoolPubKeyToEthAddress(pk.String())
 	require.Nil(t, err)
 	require.EqualValues(t, ethAddr.Bytes(), expectedAddr.Bytes())
 	require.EqualValues(t, ethAddr.Bytes(), expectedAddr2.Bytes())

@@ -5,14 +5,13 @@ import (
 	"encoding/base64"
 	"strconv"
 
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	"github.com/joltgeorge/tss/common"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 
-	"github.com/cosmos/cosmos-sdk/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 )
@@ -49,7 +48,7 @@ func (jc *JoltifyChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes
 		}
 		ret := &key
 
-		pk, err := types.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, ret)
+		pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, ret)
 		if err != nil {
 			return err
 		}
