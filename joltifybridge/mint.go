@@ -3,7 +3,6 @@ package joltifybridge
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -65,7 +64,12 @@ func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
 		Version:     tssclient.TssVersion,
 	}
 
-	txBuilder, err := jc.genSendTx([]sdk.Msg{issueReq}, accSeq, accNum, &signMsg)
+	gasWanted, err := jc.GasEstimation([]sdk.Msg{issueReq}, accSeq, &signMsg)
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("Fail to get the gas estimation")
+		return err
+	}
+	txBuilder, err := jc.genSendTx([]sdk.Msg{issueReq}, accSeq, accNum, gasWanted, &signMsg)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the tx")
 		return err
@@ -79,18 +83,6 @@ func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
-
-	gasUsed, err := jc.SimBroadcastTx(ctx, txBytes)
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to estimate gas consumption")
-		return err
-	}
-
-	fmt.Printf("GGGGGGGGGGAAAAAAAAAA>>>>%v\n", gasUsed)
-
-	gasUsedDec := sdk.NewDecFromIntWithPrec(sdk.NewIntFromUint64(gasUsed), 18)
-	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr("1.2")).RoundInt64()
-	txBuilder.SetGasLimit(uint64(gasWanted))
 
 	txBytes, err = jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	if err != nil {

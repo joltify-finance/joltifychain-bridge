@@ -13,6 +13,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
+	"gitlab.com/joltify/joltifychain-bridge/config"
 
 	"go.uber.org/atomic"
 
@@ -118,7 +119,7 @@ func (jc *JoltifyChainBridge) TerminateBridge() error {
 	return nil
 }
 
-func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64, tssSignMsg *tssclient.TssSignigMsg) (client.TxBuilder, error) {
+func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (client.TxBuilder, error) {
 	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
 	// following function.
 	encCfg := *jc.encoding
@@ -129,8 +130,9 @@ func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64,
 	if err != nil {
 		return nil, err
 	}
+
 	// we use the default here
-	txBuilder.SetGasLimit(180000)
+	txBuilder.SetGasLimit(gasWanted)
 	// txBuilder.SetFeeAmount(...)
 	// txBuilder.SetMemo(...)
 	// txBuilder.SetTimeoutHeight(...)
@@ -190,14 +192,6 @@ func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum uint64,
 		return nil, err
 	}
 
-	// the following code is for debug only
-	//txJSONBytes, err := encCfg.TxConfig.TxJSONEncoder()(txBuilder.GetTx())
-	//if err != nil {
-	//	fmt.Printf(">>>>fail to see the json %v", err)
-	//	return nil, "", err
-	//}
-	//txJSON := string(txJSONBytes)
-	//jc.logger.Debug().Msg(txJSON)
 	return txBuilder, nil
 }
 
@@ -279,13 +273,78 @@ func (jc *JoltifyChainBridge) SimBroadcastTx(ctx context.Context, txbytes []byte
 	// service.
 	txClient := cosTx.NewServiceClient(jc.grpcClient)
 	// We then call the BroadcastTx method on this client.
-
 	grpcRes, err := txClient.Simulate(ctx, &cosTx.SimulateRequest{TxBytes: txbytes})
 	if err != nil {
 		return 0, err
 	}
 	gasUsed := grpcRes.GetGasInfo().GasUsed
 	return gasUsed, nil
+}
+
+// GasEstimation this function get the estimation of the fee
+func (jc *JoltifyChainBridge) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssSignMsg *tssclient.TssSignigMsg) (uint64, error) {
+	encoding := MakeEncodingConfig()
+	encCfg := encoding
+	// Create a new TxBuilder.
+	txBuilder := encCfg.TxConfig.NewTxBuilder()
+
+	err := txBuilder.SetMsgs(sdkMsg...)
+	if err != nil {
+		panic(err)
+		return 0, err
+	}
+	txBuilder.SetGasLimit(200000)
+
+	key, err := jc.keyring.Key("operator")
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to get the operator key")
+		return 0, err
+	}
+	var pubKey coscrypto.PubKey
+	if tssSignMsg == nil {
+		pubKey = key.GetPubKey()
+	} else {
+		pk := tssSignMsg.Pk
+		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk)
+		if err != nil {
+			jc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
+			return 0, err
+		}
+		pubKey = cPk
+
+	}
+
+	sigV2 := signing.SignatureV2{
+		PubKey: pubKey,
+		Data: &signing.SingleSignatureData{
+			SignMode:  encCfg.TxConfig.SignModeHandler().DefaultMode(),
+			Signature: nil,
+		},
+		Sequence: accSeq,
+	}
+
+	err = txBuilder.SetSignatures(sigV2)
+	if err != nil {
+		return 0, err
+	}
+
+	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to encode the tx")
+		return 0, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
+	gasUsed, err := jc.SimBroadcastTx(ctx, txBytes)
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to estimate gas consumption")
+		return 0, err
+	}
+
+	gasUsedDec := sdk.NewDecFromIntWithPrec(sdk.NewIntFromUint64(gasUsed), 0)
+	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO)).RoundInt64()
+	fmt.Printf(">>>>>>######>>>>>>%v\n", gasWanted)
+	return uint64(gasWanted), nil
 }
 
 // BroadcastTx broadcast the tx to the joltifyChain
@@ -352,37 +411,6 @@ func (jc *JoltifyChainBridge) prepareTssPool(creator sdk.AccAddress, pubKey, hei
 		return err
 	}
 
-	txBuilder, err := jc.genSendTx([]sdk.Msg{msg}, acc.GetSequence(), acc.GetAccountNumber(), nil)
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to generate the tx")
-		return err
-	}
-
-	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to encode the tx")
-		return err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-	defer cancel()
-	gasUsed, err := jc.SimBroadcastTx(ctx, txBytes)
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to estimate gas consumption")
-		return err
-	}
-
-	fmt.Printf("GGGGGGGGGGAAAAAAAAAA>>>>%v\n", gasUsed)
-
-	gasUsedDec := sdk.NewDecFromIntWithPrec(sdk.NewIntFromUint64(gasUsed), 18)
-	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr("1.2")).RoundInt64()
-	txBuilder.SetGasLimit(uint64(gasWanted))
-	fmt.Printf("2222222222222>>>>%v\n", txBuilder.GetTx().GetGas())
-	txBytesSend, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to encode the tx")
-		return err
-	}
-
 	dHeight, err := strconv.ParseInt(height, 10, 64)
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to parse the height")
@@ -390,7 +418,8 @@ func (jc *JoltifyChainBridge) prepareTssPool(creator sdk.AccAddress, pubKey, hei
 	}
 
 	item := tssPoolMsg{
-		txBytesSend,
+		msg,
+		acc,
 		pubKey,
 		dHeight,
 	}
@@ -419,10 +448,26 @@ func (jc *JoltifyChainBridge) CheckAndUpdatePool(blockHeight int64) (bool, strin
 	if el.blockHeight == blockHeight {
 		jc.logger.Info().Msgf("we are submit the block at height>>>>>>>>%v\n", el.blockHeight)
 		ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-		ok, resp, err := jc.BroadcastTx(ctx, el.data)
+		defer cancel()
+
+		gasWanted, err := jc.GasEstimation([]sdk.Msg{el.msg}, el.acc.GetSequence(), nil)
+		if err != nil {
+			jc.logger.Error().Err(err).Msg("Fail to get the gas estimation")
+			return false, ""
+		}
+		txBuilder, err := jc.genSendTx([]sdk.Msg{el.msg}, el.acc.GetSequence(), el.acc.GetAccountNumber(), gasWanted, nil)
+		if err != nil {
+			jc.logger.Error().Err(err).Msg("fail to generate the tx")
+			return false, ""
+		}
+		txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+		if err != nil {
+			jc.logger.Error().Err(err).Msg("fail to encode the tx")
+			return false, ""
+		}
+		ok, resp, err := jc.BroadcastTx(ctx, txBytes)
 		if err != nil || !ok {
 			jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
-			cancel()
 			return false, ""
 		}
 		jc.msgSendCache = jc.msgSendCache[1:]

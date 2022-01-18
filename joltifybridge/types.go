@@ -7,8 +7,10 @@ import (
 	"sync"
 	"time"
 
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain/x/vault/types"
 	"go.uber.org/atomic"
 
 	"github.com/cosmos/cosmos-sdk/simapp/params"
@@ -33,7 +35,8 @@ const (
 
 // tssPoolMsg this is the pool pre-submit message for the given height
 type tssPoolMsg struct {
-	data        []byte
+	msg         *types.MsgCreateCreatePool
+	acc         authtypes.AccountI
 	poolPubKey  string
 	blockHeight int64
 }
