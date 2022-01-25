@@ -13,8 +13,10 @@ func main() {
 	misc.SetupBech32Prefix()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	config := config.DefaultConfig()
-
-	_ = golog.SetLogLevel("tss-lib", "INFO")
+	err := golog.SetLogLevel("tss-lib", "INFO")
+	if err != nil {
+		panic(err)
+	}
 	common.InitLog("info", true, "joltifyBridge_service")
 	bridge.NewBridgeService(config)
 }

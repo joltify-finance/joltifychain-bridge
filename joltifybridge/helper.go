@@ -73,6 +73,7 @@ func QueryTipValidator(grpcClient *grpc.ClientConn) (int64, []*tmservice.Validat
 	return resp.BlockHeight, resp.Validators, nil
 }
 
+// GetLastBlockHeight get the last height of the joltify chain
 func GetLastBlockHeight(grpcClient *grpc.ClientConn) (int64, error) {
 	ts := tmservice.NewServiceClient(grpcClient)
 

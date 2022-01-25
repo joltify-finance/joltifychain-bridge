@@ -29,6 +29,7 @@ func NewBridgeService(config config.Config) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
+	// Todo we need to have more save way to load the passowrd
 	passcodeLength := 32
 	passcode := make([]byte, passcodeLength)
 	n, err := os.Stdin.Read(passcode)
@@ -40,6 +41,8 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
+	keyringPath := path.Join(config.HomeDir, config.KeyringAddress)
+
 	// fixme, in docker it needs to be changed to basehome
 	tssServer, _, err := tssclient.StartTssServer(config.HomeDir, config.TssConfig)
 	if err != nil {
@@ -47,7 +50,6 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	keyringPath := path.Join(config.HomeDir, config.KeyringAddress)
 	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.InvoiceChainConfig.GrpcAddress, keyringPath, "12345678", tssServer)
 	if err != nil {
 		log.Fatalln("fail to create the invoice joltify_bridge", err)
@@ -63,14 +65,6 @@ func NewBridgeService(config config.Config) {
 	err = joltifyBridge.InitValidators(config.InvoiceChainConfig.RPCAddress)
 	if err != nil {
 		fmt.Printf("error in init the validators %v", err)
-		cancel()
-		return
-	}
-	tssHTTPServer := NewTssHttpServer(config.TssConfig.HttpAddr, joltifyBridge.GetTssNodeID(), ctx)
-
-	wg.Add(1)
-	ret := tssHTTPServer.Start(&wg)
-	if ret != nil {
 		cancel()
 		return
 	}
@@ -160,7 +154,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				if NeedUpdate(poolInfo, currentPool) {
 					pi.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
 					joltBridge.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
-					joltBridge.CreatePoolAccInfo(poolInfo[0].CreatePool.PoolAddr.String())
+					err := joltBridge.CreatePoolAccInfo(poolInfo[0].CreatePool.PoolAddr.String())
+					if err != nil {
+						zlog.Logger.Error().Err(err).Msgf("we fail to get the account info")
+						continue
+					}
 					pools := pi.GetPool()
 					var poolsInfo []string
 					for _, el := range pools {

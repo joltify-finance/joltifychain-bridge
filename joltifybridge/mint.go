@@ -25,6 +25,7 @@ func prepareIssueTokenRequest(item *pubchain.InboundReq, creatorAddr, index stri
 
 // ProcessInBound mint the token in joltify chain
 func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
+	var txBytes []byte
 	pool := jc.GetPool()
 	if pool[0] == nil {
 		jc.logger.Info().Msgf("fail to query the pool with length 1")
@@ -72,12 +73,6 @@ func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
 	txBuilder, err := jc.genSendTx([]sdk.Msg{issueReq}, accSeq, accNum, gasWanted, &signMsg)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the tx")
-		return err
-	}
-
-	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to encode the tx")
 		return err
 	}
 

@@ -70,7 +70,7 @@ func (pi *PubChainInstance) updateInboundTx(txID string, amount *big.Int) *inbou
 	defer pi.pendingInboundTxLocker.Unlock()
 	thisAccount, ok := pi.pendingInbounds[txID]
 	if !ok {
-		pi.logger.Warn().Msgf("fail to get the stored tx from pool with %v\n", pi.pendingInbounds)
+		pi.logger.Warn().Msgf("inbound fail to get the stored tx from pool with %v\n", pi.pendingInbounds)
 		return nil
 	}
 

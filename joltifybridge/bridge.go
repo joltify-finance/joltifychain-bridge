@@ -289,7 +289,7 @@ func (jc *JoltifyChainBridge) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tss
 
 	err := txBuilder.SetMsgs(sdkMsg...)
 	if err != nil {
-		panic(err)
+		jc.logger.Error().Err(err).Msg("fail to query the gas price")
 		return 0, err
 	}
 	txBuilder.SetGasLimit(200000)
