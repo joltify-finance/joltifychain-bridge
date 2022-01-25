@@ -5,8 +5,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	zlog "github.com/rs/zerolog/log"
 	"strings"
+
+	zlog "github.com/rs/zerolog/log"
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
@@ -19,9 +20,7 @@ import (
 
 func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte, memo string) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
-	jc.pendingOutboundLocker.Lock()
-	_, ok := jc.pendingOutbounds[txID]
-	jc.pendingOutboundLocker.Unlock()
+	_, ok := jc.pendingOutbounds.Load(txID)
 	if ok {
 		jc.logger.Error().Msgf("the tx already exist!!")
 		return errors.New("tx existed")
@@ -121,23 +120,21 @@ func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []types.AccA
 }
 
 func (jc *JoltifyChainBridge) processFee(txID string, amount types.Int) *outboundTx {
-	jc.pendingOutboundLocker.Lock()
-	defer jc.pendingOutboundLocker.Unlock()
-	thisAccount, ok := jc.pendingOutbounds[strings.ToLower(txID)]
+	data, ok := jc.pendingOutbounds.Load(strings.ToLower(txID))
 	if !ok {
 		jc.logger.Warn().Msgf("fail to get the stored tx from pool with %v\n", jc.pendingOutbounds)
 		return nil
 	}
-
+	thisAccount := data.(*outboundTx)
 	thisAccount.fee.Amount = thisAccount.fee.Amount.Add(amount)
 	err := thisAccount.Verify()
 	if err != nil {
-		jc.pendingOutbounds[txID] = thisAccount
+		jc.pendingOutbounds.Store(txID, thisAccount)
 		jc.logger.Warn().Err(err).Msgf("the account cannot be processed on joltify pub_chain this round")
 		return nil
 	}
 	// since this tx is processed,we do not need to store it any longer
-	delete(jc.pendingOutbounds, txID)
+	jc.pendingOutbounds.Delete(txID)
 	return thisAccount
 }
 
@@ -158,9 +155,7 @@ func (jc *JoltifyChainBridge) processDemon(txID string, blockHeight int64, fromA
 		fee,
 	}
 	jc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.token.String())
-	jc.poolUpdateLocker.Lock()
-	jc.pendingOutbounds[txID] = &tx
-	jc.poolUpdateLocker.Unlock()
+	jc.pendingOutbounds.Store(txID, &tx)
 }
 
 // GetPool get the latest two pool address
@@ -199,8 +194,8 @@ func (jc *JoltifyChainBridge) UpdatePool(poolPubKey string) {
 
 	jc.poolUpdateLocker.Lock()
 	defer jc.poolUpdateLocker.Unlock()
-	//jc.transferChanUpdateLocker.Lock()
-	//defer jc.transferChanUpdateLocker.Unlock()
+	// jc.transferChanUpdateLocker.Lock()
+	// defer jc.transferChanUpdateLocker.Unlock()
 	if jc.lastTwoPools[1] != nil {
 		if jc.lastTwoPools[0] != nil && jc.lastTwoPools[0].JoltifyAddress.String() != p.JoltifyAddress.String() {
 			delQuery := fmt.Sprintf("tm.event = 'Tx' AND transfer.recipient= '%s'", jc.lastTwoPools[0].JoltifyAddress.String())

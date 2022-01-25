@@ -134,10 +134,10 @@ func TestProcessInBound(t *testing.T) {
 
 func TestUpdateBridgeTx(t *testing.T) {
 	ci := PubChainInstance{
-		lastTwoPools:           make([]string, 2),
-		poolLocker:             sync.RWMutex{},
-		pendingInbounds:        make(map[string]*inboundTx),
-		pendingInboundTxLocker: sync.RWMutex{},
+		lastTwoPools:         make([]string, 2),
+		poolLocker:           sync.RWMutex{},
+		pendingInbounds:      make(map[string]*inboundTx),
+		pendingInboundLocker: sync.RWMutex{},
 	}
 
 	fromStr := "90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"
@@ -245,11 +245,11 @@ func TestProcessEachBlock(t *testing.T) {
 	tBlock := ethTypes.Block{}
 
 	ci := PubChainInstance{
-		lastTwoPools:           make([]common.Address, 2),
-		poolLocker:             sync.RWMutex{},
-		pendingInbounds:        make(map[string]*inboundTx),
-		pendingInboundTxLocker: sync.RWMutex{},
-		InboundReqChan:         make(chan *InboundReq, 1),
+		lastTwoPools:         make([]common.Address, 2),
+		poolLocker:           sync.RWMutex{},
+		pendingInbounds:      make(map[string]*inboundTx),
+		pendingInboundLocker: sync.RWMutex{},
+		InboundReqChan:       make(chan *InboundReq, 1),
 	}
 	fromStr := "90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"
 	coin := sdk.Coin{

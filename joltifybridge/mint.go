@@ -3,8 +3,7 @@ package joltifybridge
 import (
 	"context"
 	"errors"
-	"strconv"
-	"strings"
+	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
@@ -40,15 +39,14 @@ func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
 
 	// we always increase the account seq regardless the tx successful or not
 	accNum, accSeq := jc.AcquirePoolAccountInfo()
-	creatorAddrStr := strings.ToLower(joltCreatorAddr.String())
 	// we need to check against the previous account sequence
-	preIndex := strconv.FormatUint(accSeq, 10) + creatorAddrStr
-	if jc.CheckWhetherAlreadyExist(preIndex) {
+	index := item.Hash().Hex()
+	fmt.Printf(">>>>>>index:###>>%v\n", index)
+	if jc.CheckWhetherAlreadyExist(index) {
 		jc.logger.Warn().Msg("already submitted by others")
 		return nil
 	}
 
-	index := strconv.FormatUint(accSeq, 10) + creatorAddrStr
 	jc.logger.Info().Msgf("we are about the prepare the tx with other nodes with index %v", index)
 	issueReq, err := prepareIssueTokenRequest(item, joltCreatorAddr.String(), index)
 	if err != nil {

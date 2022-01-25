@@ -11,6 +11,7 @@ import (
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"gitlab.com/joltify/joltifychain-bridge/config"
@@ -44,7 +45,12 @@ func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
 	}
 
 	transferFrom, err := misc.EthSignPubKeyToJoltAddr(sigPublicKey)
-	err = pi.processInboundTx(transfer.Raw.TxHash.Hex()[2:], transfer.Raw.BlockNumber, transferFrom, transfer.Value, tokenAddr)
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to recover the joltify Address")
+		return err
+	}
+
+	err = pi.processInboundTx(transfer.Raw.TxHash.Hex()[2:], transfer.Raw.BlockNumber, transferFrom, transfer.To, transfer.Value, tokenAddr)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
 	}
@@ -65,31 +71,35 @@ func (pi *PubChainInstance) ProcessNewBlock(number *big.Int) error {
 }
 
 // updateInboundTx update the top-up token with fee
-func (pi *PubChainInstance) updateInboundTx(txID string, amount *big.Int) *inboundTx {
-	pi.pendingInboundTxLocker.Lock()
-	defer pi.pendingInboundTxLocker.Unlock()
-	thisAccount, ok := pi.pendingInbounds[txID]
+func (pi *PubChainInstance) updateInboundTx(txID string, amount *big.Int, blockNum uint64) *inboundTx {
+	data, ok := pi.pendingInbounds.Load(txID)
 	if !ok {
 		pi.logger.Warn().Msgf("inbound fail to get the stored tx from pool with %v\n", pi.pendingInbounds)
+		inBnB := inboundTxBnb{
+			blockHeight: blockNum,
+			txID:        txID,
+			fee:         sdk.NewCoin(config.InBoundDenomFee, sdk.NewIntFromBigInt(amount)),
+		}
+		pi.pendingInboundsBnB.Store(txID, &inBnB)
+		fmt.Printf(">>>>>>>>>>>>>>>>>we store the tx %v\n", txID)
 		return nil
 	}
 
+	thisAccount := data.(*inboundTx)
 	thisAccount.fee.Amount = thisAccount.fee.Amount.Add(types.NewIntFromBigInt(amount))
 	err := thisAccount.Verify()
 	if err != nil {
-		pi.pendingInbounds[txID] = thisAccount
+		pi.pendingInbounds.Store(txID, thisAccount)
 		pi.logger.Warn().Msgf("the account cannot be processed on joltify pub_chain this round with err %v\n", err)
 		return nil
 	}
 	// since this tx is processed,we do not need to store it any longer
-	delete(pi.pendingInbounds, txID)
+	pi.pendingInbounds.Delete(txID)
 	return thisAccount
 }
 
-func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, from types.AccAddress, value *big.Int, addr common.Address) error {
-	pi.pendingInboundTxLocker.Lock()
-	defer pi.pendingInboundTxLocker.Unlock()
-	_, ok := pi.pendingInbounds[txID]
+func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
+	_, ok := pi.pendingInbounds.Load(txID)
 	if ok {
 		pi.logger.Error().Msgf("the tx already exist!!")
 		return errors.New("tx existed")
@@ -104,19 +114,44 @@ func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, fr
 		Denom:  config.InBoundDenom,
 		Amount: types.NewIntFromBigInt(value),
 	}
-	fee := types.Coin{
-		Denom:  config.InBoundDenomFee,
-		Amount: types.NewInt(0),
-	}
 
+	inTxBnB, ok := pi.pendingInboundsBnB.LoadAndDelete(txID)
+	if !ok {
+		fee := types.Coin{
+			Denom:  config.InBoundDenomFee,
+			Amount: types.NewInt(0),
+		}
+
+		tx := inboundTx{
+			from,
+			blockHeight,
+			token,
+			fee,
+		}
+		pi.logger.Info().Msgf("we add the tokens tx(%v):%v", txID, tx.token.String())
+		pi.pendingInbounds.Store(txID, &tx)
+		return nil
+	}
+	fee := inTxBnB.(*inboundTxBnb).fee
 	tx := inboundTx{
 		from,
 		blockHeight,
 		token,
 		fee,
 	}
-	pi.logger.Info().Msgf("we add the tokens tx(%v):%v", txID, tx.token.String())
-	pi.pendingInbounds[txID] = &tx
+	err := tx.Verify()
+	if err != nil {
+		pi.pendingInbounds.Store(txID, tx)
+		pi.logger.Warn().Msgf("the account cannot be processed on joltify pub_chain this round with err %v\n", err)
+		return nil
+	}
+	txIDBytes, err := hex.DecodeString(txID)
+	if err != nil {
+		pi.logger.Warn().Msgf("invalid tx ID %v\n", txIDBytes)
+		return nil
+	}
+	item := newAccountInboundReq(tx.address, to, tx.token, txIDBytes, int64(blockHeight))
+	pi.InboundReqChan <- &item
 	return nil
 }
 
@@ -132,9 +167,9 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 				continue
 			}
 			payTxID := tx.Data()
-			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value())
+			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
-				item := newAccountInboundReq(account.address, *tx.To(), account.token, block.Number().Int64())
+				item := newAccountInboundReq(account.address, *tx.To(), account.token, payTxID, block.Number().Int64())
 				pi.InboundReqChan <- &item
 			}
 		}
@@ -194,16 +229,31 @@ func (pi *PubChainInstance) checkToBridge(dest common.Address) bool {
 
 // DeleteExpired delete the expired tx
 func (pi *PubChainInstance) DeleteExpired(currentHeight uint64) {
-	pi.pendingInboundTxLocker.Lock()
-	defer pi.pendingInboundTxLocker.Unlock()
 	var expiredTx []string
-	for key, el := range pi.pendingInbounds {
+	var expiredTxBnb []string
+	pi.pendingInbounds.Range(func(key, value interface{}) bool {
+		el := value.(*inboundTx)
 		if currentHeight-el.blockHeight > config.TxTimeout {
-			expiredTx = append(expiredTx, key)
+			expiredTx = append(expiredTx, key.(string))
 		}
-	}
+		return false
+	})
+
 	for _, el := range expiredTx {
 		pi.logger.Warn().Msgf("we delete the expired tx %s", el)
-		delete(pi.pendingInbounds, el)
+		pi.pendingInbounds.Delete(el)
+	}
+
+	pi.pendingInboundsBnB.Range(func(key, value interface{}) bool {
+		el := value.(*inboundTxBnb)
+		if currentHeight-el.blockHeight > config.TxTimeout {
+			expiredTxBnb = append(expiredTxBnb, key.(string))
+		}
+		return false
+	})
+
+	for _, el := range expiredTxBnb {
+		pi.logger.Warn().Msgf("we delete the expired tx %s in inbound bnb", el)
+		pi.pendingInboundsBnB.Delete(el)
 	}
 }

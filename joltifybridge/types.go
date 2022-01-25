@@ -43,24 +43,23 @@ type tssPoolMsg struct {
 
 // JoltifyChainBridge defines the types for joltify pub_chain side
 type JoltifyChainBridge struct {
-	grpcClient            *grpc.ClientConn
-	wsClient              *tmclienthttp.HTTP
-	encoding              *params.EncodingConfig
-	keyring               keyring.Keyring
-	logger                zerolog.Logger
-	validatorSet          *validators.ValidatorSet
-	myValidatorInfo       info
-	tssServer             *tssclient.BridgeTssServer
-	poolUpdateLocker      *sync.RWMutex
-	msgSendCache          []tssPoolMsg
-	lastTwoPools          []*bcommon.PoolInfo
-	pendingOutbounds      map[string]*outboundTx
-	pendingOutboundLocker *sync.RWMutex
-	OutboundReqChan       chan *OutBoundReq
-	TransferChan          []*<-chan ctypes.ResultEvent
-	RetryOutboundReq      chan *OutBoundReq // if a tx fail to process, we need to put in this channel and wait for retry
-	poolAccInfo           *poolAccInfo
-	poolAccLocker         *sync.Mutex
+	grpcClient       *grpc.ClientConn
+	wsClient         *tmclienthttp.HTTP
+	encoding         *params.EncodingConfig
+	keyring          keyring.Keyring
+	logger           zerolog.Logger
+	validatorSet     *validators.ValidatorSet
+	myValidatorInfo  info
+	tssServer        *tssclient.BridgeTssServer
+	poolUpdateLocker *sync.RWMutex
+	msgSendCache     []tssPoolMsg
+	lastTwoPools     []*bcommon.PoolInfo
+	pendingOutbounds *sync.Map
+	OutboundReqChan  chan *OutBoundReq
+	TransferChan     []*<-chan ctypes.ResultEvent
+	RetryOutboundReq chan *OutBoundReq // if a tx fail to process, we need to put in this channel and wait for retry
+	poolAccInfo      *poolAccInfo
+	poolAccLocker    *sync.Mutex
 }
 
 type poolAccInfo struct {

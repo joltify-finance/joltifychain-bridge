@@ -2,10 +2,12 @@ package pubchain
 
 import (
 	"errors"
+	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -47,14 +49,22 @@ func (tk *tokenSb) UpdateSbEvent(sbEvent event.Subscription) {
 // InboundReq is the account that top up account info to joltify pub_chain
 type InboundReq struct {
 	address     sdk.AccAddress
+	txID        []byte // this indicte the identical inbound req
 	toPoolAddr  common.Address
 	coin        sdk.Coin
 	blockHeight int64
 }
 
-func newAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coin sdk.Coin, blockHeight int64) InboundReq {
+func (i *InboundReq) Hash() common.Hash {
+	blockheightb := new(big.Int).SetInt64(i.blockHeight)
+	hash := crypto.Keccak256Hash(i.address.Bytes(), i.toPoolAddr.Bytes(), i.txID, blockheightb.Bytes())
+	return hash
+}
+
+func newAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coin sdk.Coin, txid []byte, blockHeight int64) InboundReq {
 	return InboundReq{
 		address,
+		txid,
 		toPoolAddr,
 		coin,
 		blockHeight,
@@ -73,23 +83,29 @@ func (acq *InboundReq) SetItemHeight(blockHeight int64) {
 
 // PubChainInstance hold the joltify_bridge entity
 type PubChainInstance struct {
-	EthClient              *ethclient.Client
-	tokenAddr              string
-	logger                 zerolog.Logger
-	pendingInbounds        map[string]*inboundTx
-	lastTwoPools           []*bcommon.PoolInfo
-	poolLocker             *sync.RWMutex
-	pendingInboundTxLocker *sync.RWMutex
-	tokenSb                *tokenSb
-	tssServer              *tssclient.BridgeTssServer
-	InboundReqChan         chan *InboundReq
-	RetryInboundReq        chan *InboundReq // if a tx fail to process, we need to put in this channel and wait for retry
+	EthClient          *ethclient.Client
+	tokenAddr          string
+	logger             zerolog.Logger
+	pendingInbounds    *sync.Map
+	pendingInboundsBnB *sync.Map
+	lastTwoPools       []*bcommon.PoolInfo
+	poolLocker         *sync.RWMutex
+	tokenSb            *tokenSb
+	tssServer          *tssclient.BridgeTssServer
+	InboundReqChan     chan *InboundReq
+	RetryInboundReq    chan *InboundReq // if a tx fail to process, we need to put in this channel and wait for retry
 }
 
 type inboundTx struct {
 	address     sdk.AccAddress
 	blockHeight uint64
 	token       sdk.Coin
+	fee         sdk.Coin
+}
+
+type inboundTxBnb struct {
+	blockHeight uint64
+	txID        string
 	fee         sdk.Coin
 }
 
@@ -111,17 +127,17 @@ func NewChainInstance(ws, tokenAddr string, tssServer *tssclient.BridgeTssServer
 	}
 
 	return &PubChainInstance{
-		logger:                 logger,
-		EthClient:              wsClient,
-		tokenAddr:              tokenAddr,
-		pendingInbounds:        make(map[string]*inboundTx),
-		poolLocker:             &sync.RWMutex{},
-		pendingInboundTxLocker: &sync.RWMutex{},
-		tssServer:              tssServer,
-		lastTwoPools:           make([]*bcommon.PoolInfo, 2),
-		tokenSb:                newTokenSb(tokenIns, sink, nil),
-		InboundReqChan:         make(chan *InboundReq, reqCacheSize),
-		RetryInboundReq:        make(chan *InboundReq, retryCacheSize),
+		logger:             logger,
+		EthClient:          wsClient,
+		tokenAddr:          tokenAddr,
+		pendingInbounds:    new(sync.Map),
+		pendingInboundsBnB: new(sync.Map),
+		poolLocker:         &sync.RWMutex{},
+		tssServer:          tssServer,
+		lastTwoPools:       make([]*bcommon.PoolInfo, 2),
+		tokenSb:            newTokenSb(tokenIns, sink, nil),
+		InboundReqChan:     make(chan *InboundReq, reqCacheSize),
+		RetryInboundReq:    make(chan *InboundReq, retryCacheSize),
 	}, nil
 }
 

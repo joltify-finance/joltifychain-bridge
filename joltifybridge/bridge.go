@@ -91,8 +91,7 @@ func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer *tssclie
 	joltifyBridge.TransferChan = []*<-chan ctypes.ResultEvent{&out, &out}
 	encode := MakeEncodingConfig()
 	joltifyBridge.encoding = &encode
-	joltifyBridge.pendingOutbounds = make(map[string]*outboundTx)
-	joltifyBridge.pendingOutboundLocker = &sync.RWMutex{}
+	joltifyBridge.pendingOutbounds = new(sync.Map)
 	joltifyBridge.OutboundReqChan = make(chan *OutBoundReq, reqCacheSize)
 	joltifyBridge.RetryOutboundReq = make(chan *OutBoundReq, reqCacheSize)
 	joltifyBridge.poolAccLocker = &sync.Mutex{}
@@ -387,11 +386,9 @@ func (jc *JoltifyChainBridge) CreatePoolAccInfo(accAddr string) error {
 }
 
 func (jc *JoltifyChainBridge) AcquirePoolAccountInfo() (uint64, uint64) {
-	jc.poolUpdateLocker.Lock()
 	accSeq := jc.poolAccInfo.accSeq.Inc()
 	accSeq -= 1
 	accNum := jc.poolAccInfo.accountNum
-	jc.poolUpdateLocker.Unlock()
 	return accNum, accSeq
 }
 
