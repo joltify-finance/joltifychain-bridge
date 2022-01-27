@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/crypto"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
@@ -155,17 +157,57 @@ func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, fr
 	return nil
 }
 
+func (pi *PubChainInstance) checkErc20(data []byte) (common.Address, *big.Int, error) {
+	contractAbi, err := abi.JSON(strings.NewReader(TokenMetaData.ABI))
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to get the contractAbi")
+		return common.Address{}, nil, err
+	}
+
+	if method, ok := contractAbi.Methods["transfer"]; ok {
+		params, err := method.Inputs.Unpack(data[4:])
+		if err != nil {
+			pi.logger.Error().Err(err).Msg("fail to get the contractAbi")
+			return common.Address{}, nil, err
+		}
+		if len(params) != 2 {
+			return common.Address{}, nil, errors.New("invalid transfer parameter")
+		}
+		toAddr, ok := params[0].(common.Address)
+		if !ok {
+			return common.Address{}, nil, errors.New("not valid address")
+		}
+		amount, ok := params[1].(*big.Int)
+		if !ok {
+			return common.Address{}, nil, errors.New("not valid amount")
+		}
+		return toAddr, amount, nil
+	}
+	return common.Address{}, nil, errors.New("invalid method for decode")
+}
+
 // fixme we need to check timeout to remove the pending transactions
 func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil || tx.Value() == nil {
 			continue
 		}
+
+		toAddr, amount, err := pi.checkErc20(tx.Data())
+		if err == nil {
+			// this is the ERC20 tx
+			if tx.To().Hex() !=config.contract
+
+
+		}
+
+		pi.logger.Info().Msg("not a erc20 transfer")
 		if pi.checkToBridge(*tx.To()) {
 			if tx.Data() == nil {
 				pi.logger.Warn().Msgf("we have received unknown fund")
 				continue
 			}
+
 			payTxID := tx.Data()
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
