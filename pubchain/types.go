@@ -2,10 +2,13 @@ package pubchain
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
@@ -14,8 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
-	"github.com/ethereum/go-ethereum/event"
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 )
@@ -27,24 +28,6 @@ const (
 	GasLimit          = 2100000
 	GasPrice          = "0.00000001"
 )
-
-type tokenSb struct {
-	tokenInstance *Token
-	sb            chan *TokenTransfer
-	sbEvent       event.Subscription
-	lock          *sync.RWMutex
-}
-
-// UpdateSbEvent at the start of the subscription
-func (tk *tokenSb) UpdateSbEvent(sbEvent event.Subscription) {
-	tk.lock.Lock()
-	defer tk.lock.Unlock()
-	// we unsubscribe the previous event
-	if tk.sbEvent != nil {
-		tk.sbEvent.Unsubscribe()
-	}
-	tk.sbEvent = sbEvent
-}
 
 // InboundReq is the account that top up account info to joltify pub_chain
 type InboundReq struct {
@@ -85,12 +68,13 @@ func (acq *InboundReq) SetItemHeight(blockHeight int64) {
 type PubChainInstance struct {
 	EthClient          *ethclient.Client
 	tokenAddr          string
+	tokenInstance      *Token
+	tokenAbi           *abi.ABI
 	logger             zerolog.Logger
 	pendingInbounds    *sync.Map
 	pendingInboundsBnB *sync.Map
 	lastTwoPools       []*bcommon.PoolInfo
 	poolLocker         *sync.RWMutex
-	tokenSb            *tokenSb
 	tssServer          *tssclient.BridgeTssServer
 	InboundReqChan     chan *InboundReq
 	RetryInboundReq    chan *InboundReq // if a tx fail to process, we need to put in this channel and wait for retry
@@ -119,34 +103,28 @@ func NewChainInstance(ws, tokenAddr string, tssServer *tssclient.BridgeTssServer
 		return nil, errors.New("fail to dial the network")
 	}
 
-	sink := make(chan *TokenTransfer)
-
 	tokenIns, err := NewToken(common.HexToAddress(tokenAddr), wsClient)
 	if err != nil {
 		return nil, errors.New("fail to get the new token")
+	}
+
+	tAbi, err := abi.JSON(strings.NewReader(TokenMetaData.ABI))
+	if err != nil {
+		return nil, fmt.Errorf("fail to get the tokenABI with err %v", err)
 	}
 
 	return &PubChainInstance{
 		logger:             logger,
 		EthClient:          wsClient,
 		tokenAddr:          tokenAddr,
+		tokenInstance:      tokenIns,
+		tokenAbi:           &tAbi,
 		pendingInbounds:    new(sync.Map),
 		pendingInboundsBnB: new(sync.Map),
 		poolLocker:         &sync.RWMutex{},
 		tssServer:          tssServer,
 		lastTwoPools:       make([]*bcommon.PoolInfo, 2),
-		tokenSb:            newTokenSb(tokenIns, sink, nil),
 		InboundReqChan:     make(chan *InboundReq, reqCacheSize),
 		RetryInboundReq:    make(chan *InboundReq, retryCacheSize),
 	}, nil
-}
-
-// newTokenSb create the token instance
-func newTokenSb(instance *Token, sb chan *TokenTransfer, sbEvent event.Subscription) *tokenSb {
-	return &tokenSb{
-		instance,
-		sb,
-		sbEvent,
-		&sync.RWMutex{},
-	}
 }

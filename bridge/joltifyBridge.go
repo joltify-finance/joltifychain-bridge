@@ -188,13 +188,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				tx := r.Data.(tmtypes.EventDataTx).Tx
 				joltBridge.CheckOutBoundTx(blockHeight, tx)
 
-			// process the public chain inbound message to the channel
-			case tokenTransfer := <-pi.GetSubChannel():
-				err := pi.ProcessInBound(tokenTransfer)
-				if err != nil {
-					zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
-				}
-
 				// process the public chain new block event
 			case head := <-pubNewBlockChan:
 				err := pi.ProcessNewBlock(head.Number)
