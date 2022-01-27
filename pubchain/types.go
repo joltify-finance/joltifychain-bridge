@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -32,7 +33,7 @@ const (
 // InboundReq is the account that top up account info to joltify pub_chain
 type InboundReq struct {
 	address     sdk.AccAddress
-	txID        []byte // this indicte the identical inbound req
+	txID        []byte // this indicates the identical inbound req
 	toPoolAddr  common.Address
 	coin        sdk.Coin
 	blockHeight int64
@@ -64,6 +65,53 @@ func (acq *InboundReq) SetItemHeight(blockHeight int64) {
 	acq.blockHeight = blockHeight
 }
 
+type sortedRetryList struct {
+	list   []*InboundReq
+	locker *sync.RWMutex
+}
+
+func (sl *sortedRetryList) AddItem(req *InboundReq) {
+	sl.locker.Lock()
+	defer sl.locker.Unlock()
+	sl.list = append(sl.list, req)
+	if len(sl.list) == 1 {
+		return
+	}
+	sort.SliceStable(sl, func(i, j int) bool {
+		a := sl.list[i].Hash().Big()
+		b := sl.list[j].Hash().Big()
+		if a.Cmp(b) > 0 {
+			return true
+		}
+		return false
+	})
+}
+
+func (sl *sortedRetryList) PopItem() *InboundReq {
+	sl.locker.Lock()
+	defer sl.locker.Unlock()
+	if len(sl.list) == 0 {
+		return nil
+	}
+	if len(sl.list) == 1 {
+		item := sl.list[0]
+		sl.list = []*InboundReq{}
+		return item
+	}
+	item := sl.list[0]
+	sl.list = sl.list[1:]
+	return item
+}
+
+func (sl *sortedRetryList) ShowItems() {
+	sl.locker.RLock()
+	defer sl.locker.RUnlock()
+	for i, el := range sl.list {
+		fmt.Printf("%v:%v\n", i, el.txID)
+	}
+	return
+}
+
 // PubChainInstance hold the joltify_bridge entity
 type PubChainInstance struct {
 	EthClient          *ethclient.Client
@@ -77,7 +125,7 @@ type PubChainInstance struct {
 	poolLocker         *sync.RWMutex
 	tssServer          *tssclient.BridgeTssServer
 	InboundReqChan     chan *InboundReq
-	RetryInboundReq    chan *InboundReq // if a tx fail to process, we need to put in this channel and wait for retry
+	RetryInboundReq    *sortedRetryList // if a tx fail to process, we need to put in this channel and wait for retry
 }
 
 type inboundTx struct {
@@ -113,6 +161,11 @@ func NewChainInstance(ws, tokenAddr string, tssServer *tssclient.BridgeTssServer
 		return nil, fmt.Errorf("fail to get the tokenABI with err %v", err)
 	}
 
+	sl := sortedRetryList{
+		[]*InboundReq{},
+		&sync.RWMutex{},
+	}
+
 	return &PubChainInstance{
 		logger:             logger,
 		EthClient:          wsClient,
@@ -125,6 +178,6 @@ func NewChainInstance(ws, tokenAddr string, tssServer *tssclient.BridgeTssServer
 		tssServer:          tssServer,
 		lastTwoPools:       make([]*bcommon.PoolInfo, 2),
 		InboundReqChan:     make(chan *InboundReq, reqCacheSize),
-		RetryInboundReq:    make(chan *InboundReq, retryCacheSize),
+		RetryInboundReq:    &sl,
 	}, nil
 }
