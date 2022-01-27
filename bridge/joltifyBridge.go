@@ -216,11 +216,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					continue
 				}
 				if found {
-					err := joltBridge.ProcessInBound(item)
-					if err != nil {
-						pi.RetryInboundReq <- item
-						zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
-					}
+					go func() {
+						err := joltBridge.ProcessInBound(item)
+						if err != nil {
+							pi.RetryInboundReq <- item
+							zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
+						}
+					}()
 				}
 
 			case item := <-joltBridge.OutboundReqChan:

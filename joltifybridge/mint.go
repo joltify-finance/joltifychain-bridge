@@ -3,7 +3,6 @@ package joltifybridge
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
@@ -41,7 +40,6 @@ func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
 	accNum, accSeq := jc.AcquirePoolAccountInfo()
 	// we need to check against the previous account sequence
 	index := item.Hash().Hex()
-	fmt.Printf(">>>>>>index:###>>%v\n", index)
 	if jc.CheckWhetherAlreadyExist(index) {
 		jc.logger.Warn().Msg("already submitted by others")
 		return nil
