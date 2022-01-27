@@ -7,18 +7,16 @@ import (
 	"sync"
 	"time"
 
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain/x/vault/types"
-	"go.uber.org/atomic"
-
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/ethereum/go-ethereum/common"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/config"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	"gitlab.com/joltify/joltifychain-bridge/validators"
+	"gitlab.com/joltify/joltifychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/rs/zerolog"
@@ -64,7 +62,7 @@ type JoltifyChainBridge struct {
 
 type poolAccInfo struct {
 	accountNum uint64
-	accSeq     *atomic.Uint64
+	accSeq     uint64
 }
 
 // info the import structure of the cosmos validator info

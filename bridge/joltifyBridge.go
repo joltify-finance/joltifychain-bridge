@@ -188,13 +188,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				tx := r.Data.(tmtypes.EventDataTx).Tx
 				joltBridge.CheckOutBoundTx(blockHeight, tx)
 
-			// process the public chain inbound message to the channel
-			case tokenTransfer := <-pi.GetSubChannel():
-				err := pi.ProcessInBound(tokenTransfer)
-				if err != nil {
-					zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
-				}
-
 				// process the public chain new block event
 			case head := <-pubNewBlockChan:
 				err := pi.ProcessNewBlock(head.Number)
@@ -205,13 +198,10 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				pi.DeleteExpired(head.Number.Uint64())
 				// now we need to put the failed inbound request to the process channel, for each new joltify block
 				// we process one failure
-				select {
-				case item := <-pi.RetryInboundReq:
-					item.SetItemHeight(head.Number.Int64())
+				pi.RetryInboundReq.ShowItems()
+				item := pi.RetryInboundReq.PopItem()
+				if item != nil {
 					pi.InboundReqChan <- item
-					continue
-				default:
-					continue
 				}
 
 			// process the in-bound top up event which will mint coin for users
@@ -223,11 +213,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					continue
 				}
 				if found {
-					err := joltBridge.ProcessInBound(item)
-					if err != nil {
-						pi.RetryInboundReq <- item
-						zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
-					}
+					go func() {
+						err := joltBridge.ProcessInBound(item)
+						if err != nil {
+							pi.RetryInboundReq.AddItem(item)
+							zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
+						}
+					}()
 				}
 
 			case item := <-joltBridge.OutboundReqChan:

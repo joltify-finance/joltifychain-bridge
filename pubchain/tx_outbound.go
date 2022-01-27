@@ -11,7 +11,7 @@ import (
 
 // SendToken sends the token to the public chain
 func (pi *PubChainInstance) SendToken(sender, receiver common.Address, amount *big.Int, blockHeight int64) (string, error) {
-	tokenInstance := pi.tokenSb.tokenInstance
+	tokenInstance := pi.tokenInstance
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
 	chainID, err := pi.EthClient.NetworkID(ctx)

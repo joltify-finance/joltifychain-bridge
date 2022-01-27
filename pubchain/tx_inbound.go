@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/types"
@@ -19,20 +20,7 @@ import (
 )
 
 // ProcessInBound process the inbound contract token top-up
-func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
-	if transfer.Raw.Removed {
-		return errors.New("the tx is the revert tx")
-	}
-
-	tokenAddr := transfer.Raw.Address
-	tx, isPending, err := pi.EthClient.TransactionByHash(context.Background(), transfer.Raw.TxHash)
-	if err != nil || isPending {
-		pi.logger.Error().Err(err).Msg("fail to get this transaction.")
-		return err
-	}
-	if isPending {
-		return fmt.Errorf("pending transaction with hash id %v", transfer.Raw.TxHash.String())
-	}
+func (pi *PubChainInstance) ProcessInBound(tx *ethTypes.Transaction, tokenAddr, transferTo common.Address, amount *big.Int, blockHeight uint64) error {
 	v, r, s := tx.RawSignatureValues()
 	signer := ethTypes.LatestSignerForChainID(tx.ChainId())
 	plainV := misc.RecoverRecID(tx.ChainId().Uint64(), v)
@@ -50,11 +38,11 @@ func (pi *PubChainInstance) ProcessInBound(transfer *TokenTransfer) error {
 		return err
 	}
 
-	err = pi.processInboundTx(transfer.Raw.TxHash.Hex()[2:], transfer.Raw.BlockNumber, transferFrom, transfer.To, transfer.Value, tokenAddr)
+	err = pi.processInboundTx(tx.Hash().Hex()[2:], blockHeight, transferFrom, transferTo, amount, tokenAddr)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
 	}
-	return err
+	return nil
 }
 
 // ProcessNewBlock process the blocks received from the public pub_chain
@@ -155,17 +143,62 @@ func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, fr
 	return nil
 }
 
+func (pi *PubChainInstance) checkErc20(data []byte) (common.Address, *big.Int, error) {
+	if method, ok := pi.tokenAbi.Methods["transfer"]; ok {
+		if len(data) < 4 {
+			return common.Address{}, nil, errors.New("invalid data")
+		}
+		params, err := method.Inputs.Unpack(data[4:])
+		if err != nil {
+			return common.Address{}, nil, err
+		}
+		if len(params) != 2 {
+			return common.Address{}, nil, errors.New("invalid transfer parameter")
+		}
+		toAddr, ok := params[0].(common.Address)
+		if !ok {
+			return common.Address{}, nil, errors.New("not valid address")
+		}
+		amount, ok := params[1].(*big.Int)
+		if !ok {
+			return common.Address{}, nil, errors.New("not valid amount")
+		}
+		return toAddr, amount, nil
+	}
+	return common.Address{}, nil, errors.New("invalid method for decode")
+}
+
 // fixme we need to check timeout to remove the pending transactions
 func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil || tx.Value() == nil {
 			continue
 		}
+
+		toAddr, amount, err := pi.checkErc20(tx.Data())
+		if err == nil {
+			if tx.To().Hex() != pi.tokenAddr {
+				// this indicates it is not to our smart contract
+				continue
+			}
+			// process the public chain inbound message to the channel
+			if !pi.checkToBridge(toAddr) {
+				pi.logger.Warn().Msg("the top up message is not to the bridge, ignored")
+				continue
+			}
+			err := pi.ProcessInBound(tx, *tx.To(), toAddr, amount, block.NumberU64())
+			if err != nil {
+				zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
+				continue
+			}
+		}
+
 		if pi.checkToBridge(*tx.To()) {
 			if tx.Data() == nil {
 				pi.logger.Warn().Msgf("we have received unknown fund")
 				continue
 			}
+
 			payTxID := tx.Data()
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
@@ -203,7 +236,6 @@ func (pi *PubChainInstance) UpdatePool(poolPubKey string) {
 		pi.lastTwoPools[0] = pi.lastTwoPools[1]
 	}
 	pi.lastTwoPools[1] = &p
-	pi.UpdateSubscribe(pi.lastTwoPools)
 	return
 }
 

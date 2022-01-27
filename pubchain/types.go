@@ -2,10 +2,14 @@ package pubchain
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
@@ -14,8 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
-	"github.com/ethereum/go-ethereum/event"
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 )
@@ -28,28 +30,10 @@ const (
 	GasPrice          = "0.00000001"
 )
 
-type tokenSb struct {
-	tokenInstance *Token
-	sb            chan *TokenTransfer
-	sbEvent       event.Subscription
-	lock          *sync.RWMutex
-}
-
-// UpdateSbEvent at the start of the subscription
-func (tk *tokenSb) UpdateSbEvent(sbEvent event.Subscription) {
-	tk.lock.Lock()
-	defer tk.lock.Unlock()
-	// we unsubscribe the previous event
-	if tk.sbEvent != nil {
-		tk.sbEvent.Unsubscribe()
-	}
-	tk.sbEvent = sbEvent
-}
-
 // InboundReq is the account that top up account info to joltify pub_chain
 type InboundReq struct {
 	address     sdk.AccAddress
-	txID        []byte // this indicte the identical inbound req
+	txID        []byte // this indicates the identical inbound req
 	toPoolAddr  common.Address
 	coin        sdk.Coin
 	blockHeight int64
@@ -81,19 +65,74 @@ func (acq *InboundReq) SetItemHeight(blockHeight int64) {
 	acq.blockHeight = blockHeight
 }
 
+type retrylist []*InboundReq
+
+func (a retrylist) Len() int           { return len(a) }
+func (a retrylist) Less(i, j int) bool { return a[i].Hash().Big().Cmp(a[j].Hash().Big()) == -1 }
+func (a retrylist) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
+type sortedRetryList struct {
+	list   retrylist
+	locker *sync.RWMutex
+}
+
+func (sl *sortedRetryList) AddItem(req *InboundReq) {
+	sl.locker.Lock()
+	defer sl.locker.Unlock()
+	sl.list = append(sl.list, req)
+	if len(sl.list) == 1 {
+		return
+	}
+	sort.Stable(sl.list)
+	//sort.SliceStable(sl, func(i, j int) bool {
+	//	a := sl.list[i].Hash().Big()
+	//	b := sl.list[j].Hash().Big()
+	//	if a.Cmp(b) > 0 {
+	//		return true
+	//	}
+	//	return false
+	//})
+}
+
+func (sl *sortedRetryList) PopItem() *InboundReq {
+	sl.locker.Lock()
+	defer sl.locker.Unlock()
+	if len(sl.list) == 0 {
+		return nil
+	}
+	if len(sl.list) == 1 {
+		item := sl.list[0]
+		sl.list = []*InboundReq{}
+		return item
+	}
+	item := sl.list[0]
+	sl.list = sl.list[1:]
+	return item
+}
+
+func (sl *sortedRetryList) ShowItems() {
+	sl.locker.RLock()
+	defer sl.locker.RUnlock()
+	for i, el := range sl.list {
+		fmt.Printf("%v:%v\n", i, el.txID)
+	}
+	return
+}
+
 // PubChainInstance hold the joltify_bridge entity
 type PubChainInstance struct {
 	EthClient          *ethclient.Client
 	tokenAddr          string
+	tokenInstance      *Token
+	tokenAbi           *abi.ABI
 	logger             zerolog.Logger
 	pendingInbounds    *sync.Map
 	pendingInboundsBnB *sync.Map
 	lastTwoPools       []*bcommon.PoolInfo
 	poolLocker         *sync.RWMutex
-	tokenSb            *tokenSb
 	tssServer          *tssclient.BridgeTssServer
 	InboundReqChan     chan *InboundReq
-	RetryInboundReq    chan *InboundReq // if a tx fail to process, we need to put in this channel and wait for retry
+	RetryInboundReq    *sortedRetryList // if a tx fail to process, we need to put in this channel and wait for retry
 }
 
 type inboundTx struct {
@@ -119,34 +158,33 @@ func NewChainInstance(ws, tokenAddr string, tssServer *tssclient.BridgeTssServer
 		return nil, errors.New("fail to dial the network")
 	}
 
-	sink := make(chan *TokenTransfer)
-
 	tokenIns, err := NewToken(common.HexToAddress(tokenAddr), wsClient)
 	if err != nil {
 		return nil, errors.New("fail to get the new token")
+	}
+
+	tAbi, err := abi.JSON(strings.NewReader(TokenMetaData.ABI))
+	if err != nil {
+		return nil, fmt.Errorf("fail to get the tokenABI with err %v", err)
+	}
+
+	sl := sortedRetryList{
+		[]*InboundReq{},
+		&sync.RWMutex{},
 	}
 
 	return &PubChainInstance{
 		logger:             logger,
 		EthClient:          wsClient,
 		tokenAddr:          tokenAddr,
+		tokenInstance:      tokenIns,
+		tokenAbi:           &tAbi,
 		pendingInbounds:    new(sync.Map),
 		pendingInboundsBnB: new(sync.Map),
 		poolLocker:         &sync.RWMutex{},
 		tssServer:          tssServer,
 		lastTwoPools:       make([]*bcommon.PoolInfo, 2),
-		tokenSb:            newTokenSb(tokenIns, sink, nil),
 		InboundReqChan:     make(chan *InboundReq, reqCacheSize),
-		RetryInboundReq:    make(chan *InboundReq, retryCacheSize),
+		RetryInboundReq:    &sl,
 	}, nil
-}
-
-// newTokenSb create the token instance
-func newTokenSb(instance *Token, sb chan *TokenTransfer, sbEvent event.Subscription) *tokenSb {
-	return &tokenSb{
-		instance,
-		sb,
-		sbEvent,
-		&sync.RWMutex{},
-	}
 }

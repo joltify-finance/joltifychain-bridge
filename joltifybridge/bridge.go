@@ -14,8 +14,6 @@ import (
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"gitlab.com/joltify/joltifychain-bridge/config"
 
-	"go.uber.org/atomic"
-
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	tendertypes "github.com/tendermint/tendermint/types"
@@ -377,7 +375,7 @@ func (jc *JoltifyChainBridge) CreatePoolAccInfo(accAddr string) error {
 	}
 	accInfo := poolAccInfo{
 		acc.GetAccountNumber(),
-		atomic.NewUint64(acc.GetSequence()),
+		acc.GetSequence(),
 	}
 	jc.poolAccLocker.Lock()
 	jc.poolAccInfo = &accInfo
@@ -386,7 +384,9 @@ func (jc *JoltifyChainBridge) CreatePoolAccInfo(accAddr string) error {
 }
 
 func (jc *JoltifyChainBridge) AcquirePoolAccountInfo() (uint64, uint64) {
-	accSeq := jc.poolAccInfo.accSeq.Inc()
+	jc.poolAccLocker.Lock()
+	defer jc.poolAccLocker.Unlock()
+	accSeq := jc.poolAccInfo.accSeq
 	accSeq -= 1
 	accNum := jc.poolAccInfo.accountNum
 	return accNum, accSeq
