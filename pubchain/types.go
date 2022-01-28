@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -65,57 +64,32 @@ func (acq *InboundReq) SetItemHeight(blockHeight int64) {
 	acq.blockHeight = blockHeight
 }
 
-type retrylist []*InboundReq
-
-func (a retrylist) Len() int           { return len(a) }
-func (a retrylist) Less(i, j int) bool { return a[i].Hash().Big().Cmp(a[j].Hash().Big()) == -1 }
-func (a retrylist) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-
-type sortedRetryList struct {
-	list   retrylist
-	locker *sync.RWMutex
+func (pi *PubChainInstance) AddItem(req *InboundReq) {
+	pi.RetryInboundReq.Store(req.Hash().Big(), req)
 }
 
-func (sl *sortedRetryList) AddItem(req *InboundReq) {
-	sl.locker.Lock()
-	defer sl.locker.Unlock()
-	sl.list = append(sl.list, req)
-	if len(sl.list) == 1 {
-		return
+func (pi *PubChainInstance) PopItem() *InboundReq {
+	max := big.NewInt(0)
+	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
+		h := key.(*big.Int)
+		if max.Cmp(h) == -1 {
+			max = h
+		}
+		return false
+	})
+	if max.Cmp(big.NewInt(0)) == 1 {
+		item, _ := pi.RetryInboundReq.LoadAndDelete(max)
+		return item.(*InboundReq)
 	}
-	sort.Stable(sl.list)
-	//sort.SliceStable(sl, func(i, j int) bool {
-	//	a := sl.list[i].Hash().Big()
-	//	b := sl.list[j].Hash().Big()
-	//	if a.Cmp(b) > 0 {
-	//		return true
-	//	}
-	//	return false
-	//})
+	return nil
 }
 
-func (sl *sortedRetryList) PopItem() *InboundReq {
-	sl.locker.Lock()
-	defer sl.locker.Unlock()
-	if len(sl.list) == 0 {
-		return nil
-	}
-	if len(sl.list) == 1 {
-		item := sl.list[0]
-		sl.list = []*InboundReq{}
-		return item
-	}
-	item := sl.list[0]
-	sl.list = sl.list[1:]
-	return item
-}
-
-func (sl *sortedRetryList) ShowItems() {
-	sl.locker.RLock()
-	defer sl.locker.RUnlock()
-	for i, el := range sl.list {
-		fmt.Printf("%v:%v\n", i, el.txID)
-	}
+func (pi *PubChainInstance) ShowItems() {
+	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
+		el := value.(*InboundReq)
+		pi.logger.Warn().Msgf("tx in the retry pool %v:%v\n", key, el.txID)
+		return false
+	})
 	return
 }
 
@@ -132,7 +106,7 @@ type PubChainInstance struct {
 	poolLocker         *sync.RWMutex
 	tssServer          *tssclient.BridgeTssServer
 	InboundReqChan     chan *InboundReq
-	RetryInboundReq    *sortedRetryList // if a tx fail to process, we need to put in this channel and wait for retry
+	RetryInboundReq    *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 }
 
 type inboundTx struct {
@@ -168,11 +142,6 @@ func NewChainInstance(ws, tokenAddr string, tssServer *tssclient.BridgeTssServer
 		return nil, fmt.Errorf("fail to get the tokenABI with err %v", err)
 	}
 
-	sl := sortedRetryList{
-		[]*InboundReq{},
-		&sync.RWMutex{},
-	}
-
 	return &PubChainInstance{
 		logger:             logger,
 		EthClient:          wsClient,
@@ -185,6 +154,6 @@ func NewChainInstance(ws, tokenAddr string, tssServer *tssclient.BridgeTssServer
 		tssServer:          tssServer,
 		lastTwoPools:       make([]*bcommon.PoolInfo, 2),
 		InboundReqChan:     make(chan *InboundReq, reqCacheSize),
-		RetryInboundReq:    &sl,
+		RetryInboundReq:    &sync.Map{},
 	}, nil
 }

@@ -3,6 +3,7 @@ package joltifybridge
 import (
 	"context"
 	"errors"
+	"html"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
@@ -86,7 +87,7 @@ func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
 		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
 		return errors.New("fail to process the inbound tx")
 	}
-
-	jc.logger.Info().Msgf("txid(%v) have successfully top up %s with %v", resp, issueReq.Receiver.String(), issueReq.Coin.String())
+	tick := html.UnescapeString("&#" + "9989" + ";")
+	jc.logger.Info().Msgf("%v txid(%v) have successfully top up %s with %v", tick, resp, issueReq.Receiver.String(), issueReq.Coin.String())
 	return nil
 }
