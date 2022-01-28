@@ -45,6 +45,10 @@ func (i *InboundReq) Hash() common.Hash {
 	return hash
 }
 
+func (i *InboundReq) IsEmpty() bool {
+	return i.address.Empty()
+}
+
 func newAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coin sdk.Coin, txid []byte, blockHeight int64) InboundReq {
 	return InboundReq{
 		address,
@@ -66,11 +70,11 @@ func (acq *InboundReq) SetItemHeight(blockHeight int64) {
 }
 
 type sortedRetryList struct {
-	list   []*InboundReq
+	list   []InboundReq
 	locker *sync.RWMutex
 }
 
-func (sl *sortedRetryList) AddItem(req *InboundReq) {
+func (sl *sortedRetryList) AddItem(req InboundReq) {
 	sl.locker.Lock()
 	defer sl.locker.Unlock()
 	sl.list = append(sl.list, req)
@@ -87,15 +91,15 @@ func (sl *sortedRetryList) AddItem(req *InboundReq) {
 	})
 }
 
-func (sl *sortedRetryList) PopItem() *InboundReq {
+func (sl *sortedRetryList) PopItem() InboundReq {
 	sl.locker.Lock()
 	defer sl.locker.Unlock()
 	if len(sl.list) == 0 {
-		return nil
+		return InboundReq{}
 	}
 	if len(sl.list) == 1 {
 		item := sl.list[0]
-		sl.list = []*InboundReq{}
+		sl.list = []InboundReq{}
 		return item
 	}
 	item := sl.list[0]
@@ -162,7 +166,7 @@ func NewChainInstance(ws, tokenAddr string, tssServer *tssclient.BridgeTssServer
 	}
 
 	sl := sortedRetryList{
-		[]*InboundReq{},
+		[]InboundReq{},
 		&sync.RWMutex{},
 	}
 
