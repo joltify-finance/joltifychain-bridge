@@ -387,7 +387,7 @@ func (jc *JoltifyChainBridge) AcquirePoolAccountInfo() (uint64, uint64) {
 	jc.poolAccLocker.Lock()
 	defer jc.poolAccLocker.Unlock()
 	accSeq := jc.poolAccInfo.accSeq
-	accSeq -= 1
+	jc.poolAccInfo.accSeq += 1
 	accNum := jc.poolAccInfo.accountNum
 	return accNum, accSeq
 }

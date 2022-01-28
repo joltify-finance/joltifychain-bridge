@@ -1,7 +1,7 @@
 package misc
 
 import (
-	"fmt"
+	"crypto/ecdsa"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -15,32 +15,53 @@ import (
 
 func TestPoolPubkeyToEthAddress(t *testing.T) {
 	SetupBech32Prefix()
-	sk := secp256k1.GenPrivKey()
+	privkey991 := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
+	privateKey, err := crypto.HexToECDSA(privkey991)
+	if err != nil {
+		panic(err)
+	}
 
-	pubkey, err := crypto.DecompressPubkey(sk.PubKey().Bytes())
-	require.Nil(t, err)
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		panic("fail to convert to ecdsa pubkey")
+	}
 
-	expectedAddr := crypto.PubkeyToAddress(*pubkey)
+	expectedAddr := crypto.PubkeyToAddress(*publicKeyECDSA)
 
-	expectedAddr2, err := AccountPubKeyToEthAddress(sk.PubKey())
-	require.Nil(t, err)
-	pk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, sk.PubKey().String())
-	require.Nil(t, err)
+	pkCompressed := crypto.CompressPubkey(publicKeyECDSA)
+	cpk := secp256k1.PubKey{
+		Key: pkCompressed,
+	}
 
-	ethAddr, err := PoolPubKeyToEthAddress(pk.String())
+	// we generate the eth address from jolt
+	poolPk := legacybech32.MustMarshalPubKey(legacybech32.AccPK, &cpk)
+	ethAddr, err := PoolPubKeyToEthAddress(poolPk)
+
+	addrJolt, err := types.AccAddressFromHex(cpk.Address().String())
+
 	require.Nil(t, err)
-	require.EqualValues(t, ethAddr.Bytes(), expectedAddr.Bytes())
-	require.EqualValues(t, ethAddr.Bytes(), expectedAddr2.Bytes())
+	require.EqualValues(t, ethAddr.Hex(), expectedAddr.Hex())
+	require.EqualValues(t, addrJolt.String(), "jolt1txtsnx4gr4effr8542778fsxc20j5vzqxet7t0")
 }
 
 func TestGetJoltAddressFromETHSignature(t *testing.T) {
-	sk := secp256k1.GenPrivKey()
 	ske := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
 	// skECDSA, err := crypto.HexToECDSA(hex.EncodeToString(sk.Bytes()))
 	skECDSA, err := crypto.HexToECDSA(ske)
 	require.Nil(t, err)
 
-	JoltAddr, err := types.AccAddressFromHex(sk.PubKey().Address().String())
+	publicKey := skECDSA.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		panic("err")
+	}
+	pkCompressed := crypto.CompressPubkey(publicKeyECDSA)
+	cpk := secp256k1.PubKey{
+		Key: pkCompressed,
+	}
+
+	JoltAddr, err := types.AccAddressFromHex(cpk.Address().String())
 	require.Nil(t, err)
 
 	data := []byte("hello")
@@ -48,7 +69,6 @@ func TestGetJoltAddressFromETHSignature(t *testing.T) {
 
 	signature, err := crypto.Sign(hash.Bytes(), skECDSA)
 	require.Nil(t, err)
-	fmt.Printf(">>>%v\n", signature)
 
 	sigPublicKey, err := crypto.Ecrecover(hash.Bytes(), signature)
 	require.Nil(t, err)
@@ -57,7 +77,7 @@ func TestGetJoltAddressFromETHSignature(t *testing.T) {
 	assert.Nil(t, err)
 
 	address := crypto.PubkeyToAddress(*pubkeystrc)
-	fmt.Printf(">>>>>%v\n", address)
+	assert.Equal(t, address.Hex(), "0xbDf7Fb0Ad9b0D722ea54D808b79751608E7AE991")
 	pk2, err := btcec.ParsePubKey(sigPublicKey, btcec.S256())
 	require.Nil(t, err)
 

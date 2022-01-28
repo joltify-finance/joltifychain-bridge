@@ -38,11 +38,6 @@ func PoolPubKeyToEthAddress(pk string) (common.Address, error) {
 	if err != nil {
 		return common.Address{}, err
 	}
-	//pk2, err := btcec.ParsePubKey(pubkey.Bytes(), btcec.S256())
-	//if err != nil {
-	//	return common.Address{}, err
-	//}
-
 	pk2, err := crypto.DecompressPubkey(pubkey.Bytes())
 	if err != nil {
 		return common.Address{}, err
@@ -54,8 +49,6 @@ func PoolPubKeyToEthAddress(pk string) (common.Address, error) {
 // AccountPubKeyToEthAddress export the joltify pubkey to the ETH format address
 func AccountPubKeyToEthAddress(pk cryptotypes.PubKey) (common.Address, error) {
 	pubkey, err := crypto.DecompressPubkey(pk.Bytes())
-	// expectedAddr := crypto.PubkeyToAddress(*pubkey)
-	// pk2, err := btcec.ParsePubKey(pk.Bytes(), btcec.S256())
 	if err != nil {
 		return common.Address{}, err
 	}

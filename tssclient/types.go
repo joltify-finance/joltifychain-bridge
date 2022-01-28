@@ -1,5 +1,10 @@
 package tssclient
 
+import (
+	"github.com/joltgeorge/tss/keygen"
+	"github.com/joltgeorge/tss/keysign"
+)
+
 type CosPrivKey struct {
 	Address string `json:"address"`
 	PubKey  struct {
@@ -19,4 +24,10 @@ type TssSignigMsg struct {
 	Signers     []string
 	BlockHeight int64
 	Version     string
+}
+
+type TssSign interface {
+	KeySign(pk string, msgs []string, blockHeight int64, signers []string, version string) (keysign.Response, error)
+	KeyGen(keys []string, blockHeight int64, version string) (keygen.Response, error)
+	GetTssNodeID() string
 }
