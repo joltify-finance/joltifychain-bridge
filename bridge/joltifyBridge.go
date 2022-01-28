@@ -198,8 +198,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				pi.DeleteExpired(head.Number.Uint64())
 				// now we need to put the failed inbound request to the process channel, for each new joltify block
 				// we process one failure
-				pi.RetryInboundReq.ShowItems()
-				item := pi.RetryInboundReq.PopItem()
+				pi.ShowItems()
+				item := pi.PopItem()
 				if item != nil {
 					pi.InboundReqChan <- item
 				}
@@ -216,7 +216,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					go func() {
 						err := joltBridge.ProcessInBound(item)
 						if err != nil {
-							pi.RetryInboundReq.AddItem(item)
+							pi.AddItem(item)
 							zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
 						}
 					}()
