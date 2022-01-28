@@ -387,6 +387,7 @@ func (jc *JoltifyChainBridge) CreatePoolAccInfo(accAddr string) error {
 
 func (jc *JoltifyChainBridge) AcquirePoolAccountInfo() (uint64, uint64) {
 	accSeq := jc.poolAccInfo.accSeq.Inc()
+	accSeq -= 1
 	accNum := jc.poolAccInfo.accountNum
 	return accNum, accSeq
 }

@@ -65,8 +65,14 @@ func (acq *InboundReq) SetItemHeight(blockHeight int64) {
 	acq.blockHeight = blockHeight
 }
 
+type retrylist []*InboundReq
+
+func (a retrylist) Len() int           { return len(a) }
+func (a retrylist) Less(i, j int) bool { return a[i].Hash().Big().Cmp(a[j].Hash().Big()) == -1 }
+func (a retrylist) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
 type sortedRetryList struct {
-	list   []*InboundReq
+	list   retrylist
 	locker *sync.RWMutex
 }
 
@@ -77,14 +83,15 @@ func (sl *sortedRetryList) AddItem(req *InboundReq) {
 	if len(sl.list) == 1 {
 		return
 	}
-	sort.SliceStable(sl, func(i, j int) bool {
-		a := sl.list[i].Hash().Big()
-		b := sl.list[j].Hash().Big()
-		if a.Cmp(b) > 0 {
-			return true
-		}
-		return false
-	})
+	sort.Stable(sl.list)
+	//sort.SliceStable(sl, func(i, j int) bool {
+	//	a := sl.list[i].Hash().Big()
+	//	b := sl.list[j].Hash().Big()
+	//	if a.Cmp(b) > 0 {
+	//		return true
+	//	}
+	//	return false
+	//})
 }
 
 func (sl *sortedRetryList) PopItem() *InboundReq {
