@@ -41,14 +41,15 @@ type tssPoolMsg struct {
 
 // JoltifyChainBridge defines the types for joltify pub_chain side
 type JoltifyChainBridge struct {
-	grpcClient       *grpc.ClientConn
-	wsClient         *tmclienthttp.HTTP
-	encoding         *params.EncodingConfig
-	keyring          keyring.Keyring
-	logger           zerolog.Logger
-	validatorSet     *validators.ValidatorSet
-	myValidatorInfo  info
-	tssServer        *tssclient.BridgeTssServer
+	grpcClient      *grpc.ClientConn
+	wsClient        *tmclienthttp.HTTP
+	encoding        *params.EncodingConfig
+	keyring         keyring.Keyring
+	logger          zerolog.Logger
+	validatorSet    *validators.ValidatorSet
+	myValidatorInfo info
+	// tssServer        *tssclient.BridgeTssServer
+	tssServer        tssclient.TssSign
 	poolUpdateLocker *sync.RWMutex
 	msgSendCache     []tssPoolMsg
 	lastTwoPools     []*bcommon.PoolInfo

@@ -40,7 +40,7 @@ import (
 )
 
 // NewJoltifyBridge new the instance for the joltify pub_chain
-func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer *tssclient.BridgeTssServer) (*JoltifyChainBridge, error) {
+func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer tssclient.TssSign) (*JoltifyChainBridge, error) {
 	var joltifyBridge JoltifyChainBridge
 	var err error
 	joltifyBridge.logger = zlog.With().Str("module", "joltifyChain").Logger()

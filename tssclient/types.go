@@ -30,4 +30,10 @@ type TssSign interface {
 	KeySign(pk string, msgs []string, blockHeight int64, signers []string, version string) (keysign.Response, error)
 	KeyGen(keys []string, blockHeight int64, version string) (keygen.Response, error)
 	GetTssNodeID() string
+	Stop()
+	// KeySign(pk string, strings []string, height int64, t interface{}, s string) (interface{}, interface{})
+}
+
+// Response key sign response
+type Response interface {
 }
