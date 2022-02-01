@@ -1,11 +1,10 @@
 package joltifybridge
 
 import (
-	"errors"
-	"fmt"
-	"math/big"
 	"sync"
 	"time"
+
+	grpc1 "github.com/gogo/protobuf/grpc"
 
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -13,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/config"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	"gitlab.com/joltify/joltifychain-bridge/validators"
 	"gitlab.com/joltify/joltifychain/x/vault/types"
@@ -21,14 +19,12 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/rs/zerolog"
 	tmclienthttp "github.com/tendermint/tendermint/rpc/client/http"
-	"google.golang.org/grpc"
 )
 
 const (
-	grpcTimeout    = time.Second * 10
-	chainID        = "joltifyChain"
-	reqCacheSize   = 512
-	retryCacheSize = 128
+	grpcTimeout  = time.Second * 10
+	chainID      = "joltifyChain"
+	reqCacheSize = 512
 )
 
 // tssPoolMsg this is the pool pre-submit message for the given height
@@ -41,19 +37,17 @@ type tssPoolMsg struct {
 
 // JoltifyChainBridge defines the types for joltify pub_chain side
 type JoltifyChainBridge struct {
-	grpcClient      *grpc.ClientConn
-	wsClient        *tmclienthttp.HTTP
-	encoding        *params.EncodingConfig
-	keyring         keyring.Keyring
-	logger          zerolog.Logger
-	validatorSet    *validators.ValidatorSet
-	myValidatorInfo info
-	// tssServer        *tssclient.BridgeTssServer
+	grpcClient       grpc1.ClientConn
+	wsClient         *tmclienthttp.HTTP
+	encoding         *params.EncodingConfig
+	Keyring          keyring.Keyring
+	logger           zerolog.Logger
+	validatorSet     *validators.ValidatorSet
+	myValidatorInfo  info
 	tssServer        tssclient.TssSign
 	poolUpdateLocker *sync.RWMutex
 	msgSendCache     []tssPoolMsg
 	lastTwoPools     []*bcommon.PoolInfo
-	pendingOutbounds *sync.Map
 	OutboundReqChan  chan *OutBoundReq
 	TransferChan     []*<-chan ctypes.ResultEvent
 	RetryOutboundReq chan *OutBoundReq // if a tx fail to process, we need to put in this channel and wait for retry
@@ -87,37 +81,12 @@ type outboundTx struct {
 	fee                sdk.Coin
 }
 
-// Verify checks whether the outbound tx has paid enough fee
-func (a *outboundTx) Verify() error {
-	if a.fee.Denom != config.OutBoundDenomFee {
-		return errors.New("invalid outbound fee denom")
-	}
-	amount, err := sdk.NewDecFromStr(config.OUTBoundFeeOut)
-	if err != nil {
-		return errors.New("invalid minimal inbound fee")
-	}
-	if a.fee.Amount.LT(sdk.NewIntFromBigInt(amount.BigInt())) {
-		return fmt.Errorf("the fee is not enough with %s<%s", a.fee.Amount, amount.String())
-	}
-	return nil
-}
-
 // OutBoundReq is the entity for the outbound tx
 type OutBoundReq struct {
 	outReceiverAddress common.Address
 	fromPoolAddr       common.Address
 	coin               sdk.Coin
 	blockHeight        int64
-}
-
-// GetOutBoundInfo return the outbound tx info
-func (o *OutBoundReq) GetOutBoundInfo() (common.Address, common.Address, *big.Int, int64) {
-	return o.outReceiverAddress, o.fromPoolAddr, o.coin.Amount.BigInt(), o.blockHeight
-}
-
-// SetItemHeight sets the block height of the tx
-func (o *OutBoundReq) SetItemHeight(blockHeight int64) {
-	o.blockHeight = blockHeight
 }
 
 func newAccountOutboundReq(address, fromPoolAddr common.Address, coin sdk.Coin, blockHeight int64) OutBoundReq {

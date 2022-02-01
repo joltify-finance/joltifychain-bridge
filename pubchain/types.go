@@ -11,11 +11,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/rs/zerolog"
+	"gitlab.com/joltify/joltifychain-bridge/generated"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
@@ -44,7 +45,7 @@ func (i *InboundReq) Hash() common.Hash {
 	return hash
 }
 
-func newAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coin sdk.Coin, txid []byte, blockHeight int64) InboundReq {
+func NewAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coin sdk.Coin, txid []byte, blockHeight int64) InboundReq {
 	return InboundReq{
 		address,
 		txid,
@@ -75,7 +76,7 @@ func (pi *PubChainInstance) PopItem() *InboundReq {
 		if max.Cmp(h) == -1 {
 			max = h
 		}
-		return false
+		return true
 	})
 	if max.Cmp(big.NewInt(0)) == 1 {
 		item, _ := pi.RetryInboundReq.LoadAndDelete(max)
@@ -88,25 +89,9 @@ func (pi *PubChainInstance) ShowItems() {
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
 		el := value.(*InboundReq)
 		pi.logger.Warn().Msgf("tx in the retry pool %v:%v\n", key, el.txID)
-		return false
+		return true
 	})
 	return
-}
-
-// PubChainInstance hold the joltify_bridge entity
-type PubChainInstance struct {
-	EthClient          *ethclient.Client
-	tokenAddr          string
-	tokenInstance      *Token
-	tokenAbi           *abi.ABI
-	logger             zerolog.Logger
-	pendingInbounds    *sync.Map
-	pendingInboundsBnB *sync.Map
-	lastTwoPools       []*bcommon.PoolInfo
-	poolLocker         *sync.RWMutex
-	tssServer          tssclient.TssSign
-	InboundReqChan     chan *InboundReq
-	RetryInboundReq    *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 }
 
 type inboundTx struct {
@@ -122,6 +107,22 @@ type inboundTxBnb struct {
 	fee         sdk.Coin
 }
 
+// PubChainInstance hold the joltify_bridge entity
+type PubChainInstance struct {
+	EthClient          *ethclient.Client
+	tokenAddr          string
+	tokenInstance      *generated.Token
+	tokenAbi           *abi.ABI
+	logger             zerolog.Logger
+	pendingInbounds    *sync.Map
+	pendingInboundsBnB *sync.Map
+	lastTwoPools       []*bcommon.PoolInfo
+	poolLocker         *sync.RWMutex
+	tssServer          tssclient.TssSign
+	InboundReqChan     chan *InboundReq
+	RetryInboundReq    *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
+}
+
 // NewChainInstance initialize the joltify_bridge entity
 func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssSign) (*PubChainInstance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
@@ -132,12 +133,12 @@ func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssSign) (*PubCh
 		return nil, errors.New("fail to dial the network")
 	}
 
-	tokenIns, err := NewToken(common.HexToAddress(tokenAddr), wsClient)
+	tokenIns, err := generated.NewToken(common.HexToAddress(tokenAddr), wsClient)
 	if err != nil {
 		return nil, errors.New("fail to get the new token")
 	}
 
-	tAbi, err := abi.JSON(strings.NewReader(TokenMetaData.ABI))
+	tAbi, err := abi.JSON(strings.NewReader(generated.TokenMetaData.ABI))
 	if err != nil {
 		return nil, fmt.Errorf("fail to get the tokenABI with err %v", err)
 	}

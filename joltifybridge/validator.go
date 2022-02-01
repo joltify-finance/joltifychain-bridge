@@ -91,7 +91,7 @@ func (jc *JoltifyChainBridge) CheckWhetherSigner() (bool, error) {
 		return found, errors.New("fail to query the signer")
 	}
 	lastPoolInfo := poolInfo[0]
-	creator, err := jc.keyring.Key("operator")
+	creator, err := jc.Keyring.Key("operator")
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to get the validator outReceiverAddress")
 		return found, err
@@ -147,21 +147,3 @@ func (jc *JoltifyChainBridge) doInitValidator(i info, blockHeight int64, values 
 	jc.validatorSet.SetupValidatorSet(localVals, blockHeight)
 	return nil
 }
-
-//func (ic *JoltifyChainBridge) UpdateValidators(updateValidators []*types.Validator, blockHeight int64) error {
-//	var cosUpdateValidators []*tmservice.Validator
-//
-//	for _, el := range updateValidators {
-//
-//		types2.NewAnyWithValue(el.PubKey)
-//		each := tmservice.Validator{
-//			JoltifyAddress:          el.JoltifyAddress.String(),
-//			PubKey:           el.PubKey,
-//			VotingPower:      el.VotingPower,
-//			ProposerPriority: el.ProposerPriority,
-//		}
-//		cosUpdateValidators = append(cosUpdateValidators, &each)
-//	}
-//	ic.validatorSet.UpdateValidatorSet(cosUpdateValidators, blockHeight)
-//	return nil
-//}

@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -47,12 +48,26 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	keyringPath := path.Join(config.HomeDir, config.KeyringAddress)
-	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.InvoiceChainConfig.GrpcAddress, keyringPath, "12345678", tssServer)
+	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.InvoiceChainConfig.GrpcAddress, config.InvoiceChainConfig.HttpAddress, tssServer)
 	if err != nil {
 		log.Fatalln("fail to create the invoice joltify_bridge", err)
 		return
 	}
+
+	keyringPath := path.Join(config.HomeDir, config.KeyringAddress)
+
+	dat, err := ioutil.ReadFile(keyringPath)
+	if err != nil {
+		log.Fatalln("error in read keyring file")
+		return
+	}
+
+	// fixme need to update the passcode
+	err = joltifyBridge.Keyring.ImportPrivKey("operator", string(dat), "12345678")
+	if err != nil {
+		return
+	}
+
 	defer func() {
 		err := joltifyBridge.TerminateBridge()
 		if err != nil {
@@ -158,7 +173,10 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 
 				currentPool := pi.GetPool()
 				if NeedUpdate(poolInfo, currentPool) {
-					pi.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
+					err := pi.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
+					if err != nil {
+						zlog.Log().Err(err).Msgf("fail to update the pool")
+					}
 					joltBridge.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
 					joltBridge.CreatePoolAccInfo(poolInfo[0].CreatePool.PoolAddr.String())
 					pools := pi.GetPool()

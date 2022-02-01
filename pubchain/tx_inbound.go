@@ -19,8 +19,8 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
-// ProcessInBound process the inbound contract token top-up
-func (pi *PubChainInstance) ProcessInBound(tx *ethTypes.Transaction, tokenAddr, transferTo common.Address, amount *big.Int, blockHeight uint64) error {
+// ProcessInBoundERC20 process the inbound contract token top-up
+func (pi *PubChainInstance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, transferTo common.Address, amount *big.Int, blockHeight uint64) error {
 	v, r, s := tx.RawSignatureValues()
 	signer := ethTypes.LatestSignerForChainID(tx.ChainId())
 	plainV := misc.RecoverRecID(tx.ChainId().Uint64(), v)
@@ -41,6 +41,7 @@ func (pi *PubChainInstance) ProcessInBound(tx *ethTypes.Transaction, tokenAddr, 
 	err = pi.processInboundTx(tx.Hash().Hex()[2:], blockHeight, transferFrom, transferTo, amount, tokenAddr)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
+		return err
 	}
 	return nil
 }
@@ -69,7 +70,6 @@ func (pi *PubChainInstance) updateInboundTx(txID string, amount *big.Int, blockN
 			fee:         sdk.NewCoin(config.InBoundDenomFee, sdk.NewIntFromBigInt(amount)),
 		}
 		pi.pendingInboundsBnB.Store(txID, &inBnB)
-		fmt.Printf(">>>>>>>>>>>>>>>>>we store the tx %v\n", txID)
 		return nil
 	}
 
@@ -129,7 +129,7 @@ func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, fr
 	}
 	err := tx.Verify()
 	if err != nil {
-		pi.pendingInbounds.Store(txID, tx)
+		pi.pendingInbounds.Store(txID, &tx)
 		pi.logger.Warn().Msgf("the account cannot be processed on joltify pub_chain this round with err %v\n", err)
 		return nil
 	}
@@ -138,7 +138,7 @@ func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, fr
 		pi.logger.Warn().Msgf("invalid tx ID %v\n", txIDBytes)
 		return nil
 	}
-	item := newAccountInboundReq(tx.address, to, tx.token, txIDBytes, int64(blockHeight))
+	item := NewAccountInboundReq(tx.address, to, tx.token, txIDBytes, int64(blockHeight))
 	pi.InboundReqChan <- &item
 	return nil
 }
@@ -186,7 +186,7 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 				pi.logger.Warn().Msg("the top up message is not to the bridge, ignored")
 				continue
 			}
-			err := pi.ProcessInBound(tx, *tx.To(), toAddr, amount, block.NumberU64())
+			err := pi.ProcessInBoundERC20(tx, *tx.To(), toAddr, amount, block.NumberU64())
 			if err != nil {
 				zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
 				continue
@@ -202,7 +202,7 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 			payTxID := tx.Data()
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
-				item := newAccountInboundReq(account.address, *tx.To(), account.token, payTxID, block.Number().Int64())
+				item := NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, block.Number().Int64())
 				pi.InboundReqChan <- &item
 			}
 		}
@@ -210,17 +210,17 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 }
 
 // UpdatePool update the tss pool address
-func (pi *PubChainInstance) UpdatePool(poolPubKey string) {
+func (pi *PubChainInstance) UpdatePool(poolPubKey string) error {
 	addr, err := misc.PoolPubKeyToJoltAddress(poolPubKey)
 	if err != nil {
-		fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
-		return
+		pi.logger.Error().Err(err).Msgf("fail to convert the jolt addres to eth address %v", poolPubKey)
+		return err
 	}
 
 	ethAddr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
 	if err != nil {
 		fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
-		return
+		return err
 	}
 
 	pi.poolLocker.Lock()
@@ -236,7 +236,7 @@ func (pi *PubChainInstance) UpdatePool(poolPubKey string) {
 		pi.lastTwoPools[0] = pi.lastTwoPools[1]
 	}
 	pi.lastTwoPools[1] = &p
-	return
+	return nil
 }
 
 // GetPool get the latest two pool address
@@ -268,7 +268,7 @@ func (pi *PubChainInstance) DeleteExpired(currentHeight uint64) {
 		if currentHeight-el.blockHeight > config.TxTimeout {
 			expiredTx = append(expiredTx, key.(string))
 		}
-		return false
+		return true
 	})
 
 	for _, el := range expiredTx {
@@ -281,11 +281,26 @@ func (pi *PubChainInstance) DeleteExpired(currentHeight uint64) {
 		if currentHeight-el.blockHeight > config.TxTimeout {
 			expiredTxBnb = append(expiredTxBnb, key.(string))
 		}
-		return false
+		return true
 	})
 
 	for _, el := range expiredTxBnb {
 		pi.logger.Warn().Msgf("we delete the expired tx %s in inbound bnb", el)
 		pi.pendingInboundsBnB.Delete(el)
 	}
+}
+
+// Verify is the function  to verify the correctness of the account on joltify_bridge
+func (a *inboundTx) Verify() error {
+	if a.fee.Denom != config.InBoundDenomFee {
+		return fmt.Errorf("invalid inbound fee denom with fee demo : %v and want %v", a.fee.Denom, config.InBoundDenom)
+	}
+	amount, err := sdk.NewDecFromStr(config.InBoundFeeMin)
+	if err != nil {
+		return errors.New("invalid minimal inbound fee")
+	}
+	if a.fee.Amount.LT(sdk.NewIntFromBigInt(amount.BigInt())) {
+		return errors.New("the fee is not enough")
+	}
+	return nil
 }

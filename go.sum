@@ -1588,8 +1588,8 @@ github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1
 github.com/zondax/hid v0.9.0 h1:eiT3P6vNxAEVxXMw66eZUAAnU2zD33JBkfG/EnfAKl8=
 github.com/zondax/hid v0.9.0/go.mod h1:l5wttcP0jwtdLjqjMMWFVEE7d1zO0jvSPA9OPZxWpEM=
 github.com/zondax/ledger-go v0.12.1/go.mod h1:KatxXrVDzgWwbssUWsF5+cOJHXPvzQ09YSlzGNuhOEo=
-gitlab.com/joltify/joltifychain v0.0.0-20220114010643-2d3dfce706a2 h1:zBt5/rkBT6N44ww/dX5Wx0MwKVXK12/wDph+BL6366U=
-gitlab.com/joltify/joltifychain v0.0.0-20220114010643-2d3dfce706a2/go.mod h1:GE9Jpc3FtRyUm+tcwTjRlp4SElnVaqFaWnWC8NK4URU=
+gitlab.com/joltify/joltifychain v0.0.0-20220124064213-68c5c92d850c h1:XWcdlaJkIGOX0eaSHfJ57xQKtbAiXhhaicCyTSrl9Zw=
+gitlab.com/joltify/joltifychain v0.0.0-20220124064213-68c5c92d850c/go.mod h1:GE9Jpc3FtRyUm+tcwTjRlp4SElnVaqFaWnWC8NK4URU=
 gitlab.com/thorchain/binance-sdk v1.2.3-0.20210117202539-d569b6b9ba5d/go.mod h1:SW01IZMpqlPNPdhHnn99qnJNvg8ll/agyyW7p85npwY=
 gitlab.com/thorchain/tss/tss-lib v0.0.0-20201118045712-70b2cb4bf916 h1:rM3TjCVZzn3cYQV1L8KuvwXOZ5yvMdB2C5YyExI/m9Y=
 gitlab.com/thorchain/tss/tss-lib v0.0.0-20201118045712-70b2cb4bf916/go.mod h1:i7bv+PuILDZmCiU3mtZXgOfgQkWLdLngByT2KDfyzpE=

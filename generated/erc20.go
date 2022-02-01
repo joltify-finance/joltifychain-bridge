@@ -1,7 +1,7 @@
 // Code generated - DO NOT EDIT.
 // This file is a generated binding and any manual changes will be lost.
 
-package pubchain
+package generated
 
 import (
 	"errors"
@@ -185,7 +185,6 @@ func (_Token *TokenTransactorRaw) Transact(opts *bind.TransactOpts, method strin
 func (_Token *TokenCaller) Allowance(opts *bind.CallOpts, owner common.Address, spender common.Address) (*big.Int, error) {
 	var out []interface{}
 	err := _Token.contract.Call(opts, &out, "allowance", owner, spender)
-
 	if err != nil {
 		return *new(*big.Int), err
 	}
@@ -193,7 +192,6 @@ func (_Token *TokenCaller) Allowance(opts *bind.CallOpts, owner common.Address, 
 	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
 
 	return out0, err
-
 }
 
 // Allowance is a free data retrieval call binding the contract method 0xdd62ed3e.
@@ -216,7 +214,6 @@ func (_Token *TokenCallerSession) Allowance(owner common.Address, spender common
 func (_Token *TokenCaller) BalanceOf(opts *bind.CallOpts, account common.Address) (*big.Int, error) {
 	var out []interface{}
 	err := _Token.contract.Call(opts, &out, "balanceOf", account)
-
 	if err != nil {
 		return *new(*big.Int), err
 	}
@@ -224,7 +221,6 @@ func (_Token *TokenCaller) BalanceOf(opts *bind.CallOpts, account common.Address
 	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
 
 	return out0, err
-
 }
 
 // BalanceOf is a free data retrieval call binding the contract method 0x70a08231.
@@ -247,7 +243,6 @@ func (_Token *TokenCallerSession) BalanceOf(account common.Address) (*big.Int, e
 func (_Token *TokenCaller) Cap(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
 	err := _Token.contract.Call(opts, &out, "cap")
-
 	if err != nil {
 		return *new(*big.Int), err
 	}
@@ -255,7 +250,6 @@ func (_Token *TokenCaller) Cap(opts *bind.CallOpts) (*big.Int, error) {
 	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
 
 	return out0, err
-
 }
 
 // Cap is a free data retrieval call binding the contract method 0x355274ea.
@@ -278,7 +272,6 @@ func (_Token *TokenCallerSession) Cap() (*big.Int, error) {
 func (_Token *TokenCaller) Decimals(opts *bind.CallOpts) (uint8, error) {
 	var out []interface{}
 	err := _Token.contract.Call(opts, &out, "decimals")
-
 	if err != nil {
 		return *new(uint8), err
 	}
@@ -286,7 +279,6 @@ func (_Token *TokenCaller) Decimals(opts *bind.CallOpts) (uint8, error) {
 	out0 := *abi.ConvertType(out[0], new(uint8)).(*uint8)
 
 	return out0, err
-
 }
 
 // Decimals is a free data retrieval call binding the contract method 0x313ce567.
@@ -309,7 +301,6 @@ func (_Token *TokenCallerSession) Decimals() (uint8, error) {
 func (_Token *TokenCaller) IsMinter(opts *bind.CallOpts, account common.Address) (bool, error) {
 	var out []interface{}
 	err := _Token.contract.Call(opts, &out, "isMinter", account)
-
 	if err != nil {
 		return *new(bool), err
 	}
@@ -317,7 +308,6 @@ func (_Token *TokenCaller) IsMinter(opts *bind.CallOpts, account common.Address)
 	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
 
 	return out0, err
-
 }
 
 // IsMinter is a free data retrieval call binding the contract method 0xaa271e1a.
@@ -340,7 +330,6 @@ func (_Token *TokenCallerSession) IsMinter(account common.Address) (bool, error)
 func (_Token *TokenCaller) IsPauser(opts *bind.CallOpts, account common.Address) (bool, error) {
 	var out []interface{}
 	err := _Token.contract.Call(opts, &out, "isPauser", account)
-
 	if err != nil {
 		return *new(bool), err
 	}
@@ -348,7 +337,6 @@ func (_Token *TokenCaller) IsPauser(opts *bind.CallOpts, account common.Address)
 	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
 
 	return out0, err
-
 }
 
 // IsPauser is a free data retrieval call binding the contract method 0x46fbf68e.
@@ -371,7 +359,6 @@ func (_Token *TokenCallerSession) IsPauser(account common.Address) (bool, error)
 func (_Token *TokenCaller) Name(opts *bind.CallOpts) (string, error) {
 	var out []interface{}
 	err := _Token.contract.Call(opts, &out, "name")
-
 	if err != nil {
 		return *new(string), err
 	}
@@ -379,7 +366,6 @@ func (_Token *TokenCaller) Name(opts *bind.CallOpts) (string, error) {
 	out0 := *abi.ConvertType(out[0], new(string)).(*string)
 
 	return out0, err
-
 }
 
 // Name is a free data retrieval call binding the contract method 0x06fdde03.
@@ -402,7 +388,6 @@ func (_Token *TokenCallerSession) Name() (string, error) {
 func (_Token *TokenCaller) Paused(opts *bind.CallOpts) (bool, error) {
 	var out []interface{}
 	err := _Token.contract.Call(opts, &out, "paused")
-
 	if err != nil {
 		return *new(bool), err
 	}
@@ -410,7 +395,6 @@ func (_Token *TokenCaller) Paused(opts *bind.CallOpts) (bool, error) {
 	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
 
 	return out0, err
-
 }
 
 // Paused is a free data retrieval call binding the contract method 0x5c975abb.
@@ -433,7 +417,6 @@ func (_Token *TokenCallerSession) Paused() (bool, error) {
 func (_Token *TokenCaller) Symbol(opts *bind.CallOpts) (string, error) {
 	var out []interface{}
 	err := _Token.contract.Call(opts, &out, "symbol")
-
 	if err != nil {
 		return *new(string), err
 	}
@@ -441,7 +424,6 @@ func (_Token *TokenCaller) Symbol(opts *bind.CallOpts) (string, error) {
 	out0 := *abi.ConvertType(out[0], new(string)).(*string)
 
 	return out0, err
-
 }
 
 // Symbol is a free data retrieval call binding the contract method 0x95d89b41.
@@ -464,7 +446,6 @@ func (_Token *TokenCallerSession) Symbol() (string, error) {
 func (_Token *TokenCaller) TotalSupply(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
 	err := _Token.contract.Call(opts, &out, "totalSupply")
-
 	if err != nil {
 		return *new(*big.Int), err
 	}
@@ -472,7 +453,6 @@ func (_Token *TokenCaller) TotalSupply(opts *bind.CallOpts) (*big.Int, error) {
 	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
 
 	return out0, err
-
 }
 
 // TotalSupply is a free data retrieval call binding the contract method 0x18160ddd.
@@ -1009,7 +989,6 @@ type TokenApproval struct {
 //
 // Solidity: event Approval(address indexed owner, address indexed spender, uint256 value)
 func (_Token *TokenFilterer) FilterApproval(opts *bind.FilterOpts, owner []common.Address, spender []common.Address) (*TokenApprovalIterator, error) {
-
 	var ownerRule []interface{}
 	for _, ownerItem := range owner {
 		ownerRule = append(ownerRule, ownerItem)
@@ -1030,7 +1009,6 @@ func (_Token *TokenFilterer) FilterApproval(opts *bind.FilterOpts, owner []commo
 //
 // Solidity: event Approval(address indexed owner, address indexed spender, uint256 value)
 func (_Token *TokenFilterer) WatchApproval(opts *bind.WatchOpts, sink chan<- *TokenApproval, owner []common.Address, spender []common.Address) (event.Subscription, error) {
-
 	var ownerRule []interface{}
 	for _, ownerItem := range owner {
 		ownerRule = append(ownerRule, ownerItem)
@@ -1161,7 +1139,6 @@ type TokenMinterAdded struct {
 //
 // Solidity: event MinterAdded(address indexed account)
 func (_Token *TokenFilterer) FilterMinterAdded(opts *bind.FilterOpts, account []common.Address) (*TokenMinterAddedIterator, error) {
-
 	var accountRule []interface{}
 	for _, accountItem := range account {
 		accountRule = append(accountRule, accountItem)
@@ -1178,7 +1155,6 @@ func (_Token *TokenFilterer) FilterMinterAdded(opts *bind.FilterOpts, account []
 //
 // Solidity: event MinterAdded(address indexed account)
 func (_Token *TokenFilterer) WatchMinterAdded(opts *bind.WatchOpts, sink chan<- *TokenMinterAdded, account []common.Address) (event.Subscription, error) {
-
 	var accountRule []interface{}
 	for _, accountItem := range account {
 		accountRule = append(accountRule, accountItem)
@@ -1305,7 +1281,6 @@ type TokenMinterRemoved struct {
 //
 // Solidity: event MinterRemoved(address indexed account)
 func (_Token *TokenFilterer) FilterMinterRemoved(opts *bind.FilterOpts, account []common.Address) (*TokenMinterRemovedIterator, error) {
-
 	var accountRule []interface{}
 	for _, accountItem := range account {
 		accountRule = append(accountRule, accountItem)
@@ -1322,7 +1297,6 @@ func (_Token *TokenFilterer) FilterMinterRemoved(opts *bind.FilterOpts, account 
 //
 // Solidity: event MinterRemoved(address indexed account)
 func (_Token *TokenFilterer) WatchMinterRemoved(opts *bind.WatchOpts, sink chan<- *TokenMinterRemoved, account []common.Address) (event.Subscription, error) {
-
 	var accountRule []interface{}
 	for _, accountItem := range account {
 		accountRule = append(accountRule, accountItem)
@@ -1449,7 +1423,6 @@ type TokenPaused struct {
 //
 // Solidity: event Paused(address account)
 func (_Token *TokenFilterer) FilterPaused(opts *bind.FilterOpts) (*TokenPausedIterator, error) {
-
 	logs, sub, err := _Token.contract.FilterLogs(opts, "Paused")
 	if err != nil {
 		return nil, err
@@ -1461,7 +1434,6 @@ func (_Token *TokenFilterer) FilterPaused(opts *bind.FilterOpts) (*TokenPausedIt
 //
 // Solidity: event Paused(address account)
 func (_Token *TokenFilterer) WatchPaused(opts *bind.WatchOpts, sink chan<- *TokenPaused) (event.Subscription, error) {
-
 	logs, sub, err := _Token.contract.WatchLogs(opts, "Paused")
 	if err != nil {
 		return nil, err
@@ -1583,7 +1555,6 @@ type TokenPauserAdded struct {
 //
 // Solidity: event PauserAdded(address indexed account)
 func (_Token *TokenFilterer) FilterPauserAdded(opts *bind.FilterOpts, account []common.Address) (*TokenPauserAddedIterator, error) {
-
 	var accountRule []interface{}
 	for _, accountItem := range account {
 		accountRule = append(accountRule, accountItem)
@@ -1600,7 +1571,6 @@ func (_Token *TokenFilterer) FilterPauserAdded(opts *bind.FilterOpts, account []
 //
 // Solidity: event PauserAdded(address indexed account)
 func (_Token *TokenFilterer) WatchPauserAdded(opts *bind.WatchOpts, sink chan<- *TokenPauserAdded, account []common.Address) (event.Subscription, error) {
-
 	var accountRule []interface{}
 	for _, accountItem := range account {
 		accountRule = append(accountRule, accountItem)
@@ -1727,7 +1697,6 @@ type TokenPauserRemoved struct {
 //
 // Solidity: event PauserRemoved(address indexed account)
 func (_Token *TokenFilterer) FilterPauserRemoved(opts *bind.FilterOpts, account []common.Address) (*TokenPauserRemovedIterator, error) {
-
 	var accountRule []interface{}
 	for _, accountItem := range account {
 		accountRule = append(accountRule, accountItem)
@@ -1744,7 +1713,6 @@ func (_Token *TokenFilterer) FilterPauserRemoved(opts *bind.FilterOpts, account 
 //
 // Solidity: event PauserRemoved(address indexed account)
 func (_Token *TokenFilterer) WatchPauserRemoved(opts *bind.WatchOpts, sink chan<- *TokenPauserRemoved, account []common.Address) (event.Subscription, error) {
-
 	var accountRule []interface{}
 	for _, accountItem := range account {
 		accountRule = append(accountRule, accountItem)
@@ -1873,7 +1841,6 @@ type TokenTransfer struct {
 //
 // Solidity: event Transfer(address indexed from, address indexed to, uint256 value)
 func (_Token *TokenFilterer) FilterTransfer(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*TokenTransferIterator, error) {
-
 	var fromRule []interface{}
 	for _, fromItem := range from {
 		fromRule = append(fromRule, fromItem)
@@ -1894,7 +1861,6 @@ func (_Token *TokenFilterer) FilterTransfer(opts *bind.FilterOpts, from []common
 //
 // Solidity: event Transfer(address indexed from, address indexed to, uint256 value)
 func (_Token *TokenFilterer) WatchTransfer(opts *bind.WatchOpts, sink chan<- *TokenTransfer, from []common.Address, to []common.Address) (event.Subscription, error) {
-
 	var fromRule []interface{}
 	for _, fromItem := range from {
 		fromRule = append(fromRule, fromItem)
@@ -2025,7 +1991,6 @@ type TokenUnpaused struct {
 //
 // Solidity: event Unpaused(address account)
 func (_Token *TokenFilterer) FilterUnpaused(opts *bind.FilterOpts) (*TokenUnpausedIterator, error) {
-
 	logs, sub, err := _Token.contract.FilterLogs(opts, "Unpaused")
 	if err != nil {
 		return nil, err
@@ -2037,7 +2002,6 @@ func (_Token *TokenFilterer) FilterUnpaused(opts *bind.FilterOpts) (*TokenUnpaus
 //
 // Solidity: event Unpaused(address account)
 func (_Token *TokenFilterer) WatchUnpaused(opts *bind.WatchOpts, sink chan<- *TokenUnpaused) (event.Subscription, error) {
-
 	logs, sub, err := _Token.contract.WatchLogs(opts, "Unpaused")
 	if err != nil {
 		return nil, err

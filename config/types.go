@@ -3,14 +3,16 @@ package config
 import "time"
 
 const (
-	InBoundDenomFee  = "BNB"
+	InBoundDenomFee = "BNB"
+
 	OutBoundDenomFee = "JOLT"
-	InBoundFeeMin    = "0.000000000000000001"
-	OUTBoundFeeOut   = "0.000000000000000001"
-	InBoundDenom     = "JUSD"
-	OutBoundDenom    = "JUSD"
-	TxTimeout        = 300
-	GASFEERATIO      = "1.2"
+
+	InBoundFeeMin  = "0.00000000000000001"
+	OUTBoundFeeOut = "0.00000000000000001"
+	InBoundDenom   = "JUSD"
+	OutBoundDenom  = "JUSD"
+	TxTimeout      = 300
+	GASFEERATIO    = "1.2"
 )
 
 const (
