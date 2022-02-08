@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"strconv"
 
-	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	"github.com/joltgeorge/tss/common"
@@ -18,6 +18,7 @@ import (
 
 const capacity = 10000
 
+// AddSubscribe add the subscirbe to the chain
 func (jc *JoltifyChainBridge) AddSubscribe(ctx context.Context, query string) (<-chan ctypes.ResultEvent, error) {
 	out, err := jc.wsClient.Subscribe(ctx, "joltifyBridge", query, capacity)
 	if err != nil {
@@ -48,7 +49,7 @@ func (jc *JoltifyChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes
 		}
 		ret := &key
 
-		pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, ret)
+		pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, ret) // nolint
 		if err != nil {
 			return err
 		}
@@ -79,7 +80,7 @@ func (jc *JoltifyChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes
 			return nil
 		}
 		// now we put the tss key on pub_chain
-		creator, err := jc.keyring.Key("operator")
+		creator, err := jc.Keyring.Key("operator")
 		if err != nil {
 			jc.logger.Error().Msgf("fail to get the operator key :%v", err)
 			return err

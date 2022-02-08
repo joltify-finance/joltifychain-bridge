@@ -5,12 +5,12 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
-	"google.golang.org/grpc"
 )
 
 // queryAccount get the current sender account info
-func queryAccount(addr string, grpcClient *grpc.ClientConn) (authtypes.AccountI, error) {
+func queryAccount(addr string, grpcClient grpc1.ClientConn) (authtypes.AccountI, error) {
 	accQuery := authtypes.NewQueryClient(grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
@@ -28,7 +28,7 @@ func queryAccount(addr string, grpcClient *grpc.ClientConn) (authtypes.AccountI,
 }
 
 // queryLastValidatorSet get the last two validator sets
-func queryLastValidatorSet(grpcClient *grpc.ClientConn) ([]*vaulttypes.PoolInfo, error) {
+func queryLastValidatorSet(grpcClient grpc1.ClientConn) ([]*vaulttypes.PoolInfo, error) {
 	ts := vaulttypes.NewQueryClient(grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
@@ -43,7 +43,7 @@ func queryLastValidatorSet(grpcClient *grpc.ClientConn) ([]*vaulttypes.PoolInfo,
 }
 
 // queryLastValidatorSet get the last two validator sets
-func queryGivenToeknIssueTx(grpcClient *grpc.ClientConn, index string) (*vaulttypes.IssueToken, error) {
+func queryGivenToeknIssueTx(grpcClient grpc1.ClientConn, index string) (*vaulttypes.IssueToken, error) {
 	ts := vaulttypes.NewQueryClient(grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
@@ -60,7 +60,7 @@ func queryGivenToeknIssueTx(grpcClient *grpc.ClientConn, index string) (*vaultty
 }
 
 // QueryTipValidator get the validator set of the tip of the current pub_chain
-func QueryTipValidator(grpcClient *grpc.ClientConn) (int64, []*tmservice.Validator, error) {
+func QueryTipValidator(grpcClient grpc1.ClientConn) (int64, []*tmservice.Validator, error) {
 	ts := tmservice.NewServiceClient(grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
@@ -74,7 +74,7 @@ func QueryTipValidator(grpcClient *grpc.ClientConn) (int64, []*tmservice.Validat
 }
 
 // GetLastBlockHeight get the last height of the joltify chain
-func GetLastBlockHeight(grpcClient *grpc.ClientConn) (int64, error) {
+func GetLastBlockHeight(grpcClient grpc1.ClientConn) (int64, error) {
 	ts := tmservice.NewServiceClient(grpcClient)
 
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)

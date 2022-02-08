@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/cosmos/cosmos-sdk v0.44.2
 	github.com/ethereum/go-ethereum v1.10.11
+	github.com/gogo/protobuf v1.3.3
 	github.com/gorilla/mux v1.8.0
 	github.com/ipfs/go-log v1.0.4
 	github.com/joltgeorge/tss v1.3.1-0.20220114060604-a1b6c3b40131
@@ -15,8 +16,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/btcd v0.1.1
 	github.com/tendermint/tendermint v0.34.14
-	gitlab.com/joltify/joltifychain v0.0.0-20220114010643-2d3dfce706a2
-	go.uber.org/atomic v1.7.0
+	gitlab.com/joltify/joltifychain v0.0.0-20220124064213-68c5c92d850c
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
 	google.golang.org/grpc v1.43.0
 )

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	zlog "github.com/rs/zerolog/log"
@@ -18,23 +19,12 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
-func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte, memo string) error {
+func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
-	_, ok := jc.pendingOutbounds.Load(txID)
-	if ok {
-		jc.logger.Error().Msgf("the tx already exist!!")
-		return errors.New("tx existed")
-	}
 
 	toAddress, err := types.AccAddressFromBech32(msg.ToAddress)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to parse the to outReceiverAddress")
-		return err
-	}
-
-	fromAddress, err := types.AccAddressFromBech32(msg.FromAddress)
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to parse the from outReceiverAddress")
 		return err
 	}
 
@@ -60,7 +50,7 @@ func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []types.AccA
 	// we check whether we are
 	if !(toAddress.Equals(address[0]) || toAddress.Equals(address[1])) {
 		jc.logger.Warn().Msg("not a top up message to the pool")
-		return nil
+		return errors.New("not a top up message to the pool")
 	}
 
 	// it means the sender pay the fee in one tx
@@ -84,68 +74,27 @@ func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []types.AccA
 			return errors.New("invalid fee pair")
 		}
 
-		jc.processDemon(txID, blockHeight, wrapFromEthAddr, msg.Amount[indexDemo].Amount)
-
-		item := jc.processFee(txID, msg.Amount[indexDemoFee].Amount)
+		item := jc.processDemonAndFee(txID, blockHeight, wrapFromEthAddr, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
 		// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 		if item != nil {
 			itemReq := newAccountOutboundReq(item.outReceiverAddress, curEthAddr, item.token, blockHeight)
 			jc.OutboundReqChan <- &itemReq
-		}
-		return nil
-	}
-
-	for _, el := range msg.Amount {
-		switch el.Denom {
-		case config.OutBoundDenom:
-			fmt.Printf("process %v\n", el.Denom)
-			amount := msg.Amount.AmountOf(config.OutBoundDenom)
-			jc.processDemon(txID, blockHeight, fromAddress, amount)
-		case config.OutBoundDenomFee:
-			fmt.Printf("process %v\n", el.Denom)
-			amount := msg.Amount.AmountOf(config.OutBoundDenomFee)
-			item := jc.processFee(memo, amount)
-			if item != nil {
-				itemReq := newAccountOutboundReq(item.outReceiverAddress, ethcommon.BytesToAddress(fromAddress.Bytes()), item.token, blockHeight)
-				jc.OutboundReqChan <- &itemReq
-			}
-		default:
-			jc.logger.Warn().Msg("unknown token")
 			return nil
-
 		}
+		return errors.New("not enough fee")
 	}
 
-	return nil
+	return errors.New("we only allow fee and top up in one tx now")
 }
 
-func (jc *JoltifyChainBridge) processFee(txID string, amount types.Int) *outboundTx {
-	data, ok := jc.pendingOutbounds.Load(strings.ToLower(txID))
-	if !ok {
-		jc.logger.Warn().Msgf("fail to get the stored tx from pool with %v\n", jc.pendingOutbounds)
-		return nil
-	}
-	thisAccount := data.(*outboundTx)
-	thisAccount.fee.Amount = thisAccount.fee.Amount.Add(amount)
-	err := thisAccount.Verify()
-	if err != nil {
-		jc.pendingOutbounds.Store(txID, thisAccount)
-		jc.logger.Warn().Err(err).Msgf("the account cannot be processed on joltify pub_chain this round")
-		return nil
-	}
-	// since this tx is processed,we do not need to store it any longer
-	jc.pendingOutbounds.Delete(txID)
-	return thisAccount
-}
-
-func (jc *JoltifyChainBridge) processDemon(txID string, blockHeight int64, fromAddress types.AccAddress, amount types.Int) {
+func (jc *JoltifyChainBridge) processDemonAndFee(txID string, blockHeight int64, fromAddress types.AccAddress, DemonAmount, feeAmount types.Int) *outboundTx {
 	token := types.Coin{
 		Denom:  config.OutBoundDenom,
-		Amount: amount,
+		Amount: DemonAmount,
 	}
 	fee := types.Coin{
 		Denom:  config.OutBoundDenomFee,
-		Amount: types.NewInt(0),
+		Amount: feeAmount,
 	}
 
 	tx := outboundTx{
@@ -155,7 +104,11 @@ func (jc *JoltifyChainBridge) processDemon(txID string, blockHeight int64, fromA
 		fee,
 	}
 	jc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.token.String())
-	jc.pendingOutbounds.Store(txID, &tx)
+	err := tx.Verify()
+	if err != nil {
+		return nil
+	}
+	return &tx
 }
 
 // GetPool get the latest two pool address
@@ -190,12 +143,11 @@ func (jc *JoltifyChainBridge) UpdatePool(poolPubKey string) {
 	out, err := jc.wsClient.Subscribe(context.Background(), p.JoltifyAddress.String(), query)
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
+		return
 	}
 
 	jc.poolUpdateLocker.Lock()
 	defer jc.poolUpdateLocker.Unlock()
-	// jc.transferChanUpdateLocker.Lock()
-	// defer jc.transferChanUpdateLocker.Unlock()
 	if jc.lastTwoPools[1] != nil {
 		if jc.lastTwoPools[0] != nil && jc.lastTwoPools[0].JoltifyAddress.String() != p.JoltifyAddress.String() {
 			delQuery := fmt.Sprintf("tm.event = 'Tx' AND transfer.recipient= '%s'", jc.lastTwoPools[0].JoltifyAddress.String())
@@ -209,4 +161,29 @@ func (jc *JoltifyChainBridge) UpdatePool(poolPubKey string) {
 	}
 	jc.lastTwoPools[1] = &p
 	jc.TransferChan[1] = &out
+}
+
+// GetOutBoundInfo return the outbound tx info
+func (o *OutBoundReq) GetOutBoundInfo() (ethcommon.Address, ethcommon.Address, *big.Int, int64) {
+	return o.outReceiverAddress, o.fromPoolAddr, o.coin.Amount.BigInt(), o.blockHeight
+}
+
+// Verify checks whether the outbound tx has paid enough fee
+func (a *outboundTx) Verify() error {
+	if a.fee.Denom != config.OutBoundDenomFee {
+		return errors.New("invalid outbound fee denom")
+	}
+	amount, err := types.NewDecFromStr(config.OUTBoundFeeOut)
+	if err != nil {
+		return errors.New("invalid minimal inbound fee")
+	}
+	if a.fee.Amount.LT(types.NewIntFromBigInt(amount.BigInt())) {
+		return fmt.Errorf("the fee is not enough with %s<%s", a.fee.Amount, amount.BigInt().String())
+	}
+	return nil
+}
+
+// SetItemHeight sets the block height of the tx
+func (o *OutBoundReq) SetItemHeight(blockHeight int64) {
+	o.blockHeight = blockHeight
 }

@@ -4,12 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"io/ioutil"
-	"log"
 	"strconv"
 	"sync"
 
-	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"gitlab.com/joltify/joltifychain-bridge/config"
@@ -40,7 +38,7 @@ import (
 )
 
 // NewJoltifyBridge new the instance for the joltify pub_chain
-func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer *tssclient.BridgeTssServer) (*JoltifyChainBridge, error) {
+func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssSign) (*JoltifyChainBridge, error) {
 	var joltifyBridge JoltifyChainBridge
 	var err error
 	joltifyBridge.logger = zlog.With().Str("module", "joltifyChain").Logger()
@@ -50,7 +48,7 @@ func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer *tssclie
 		return nil, err
 	}
 
-	client, err := tmclienthttp.New("tcp://localhost:26657", "/websocket")
+	client, err := tmclienthttp.New(httpAddr, "/websocket")
 	if err != nil {
 		return nil, err
 	}
@@ -61,17 +59,7 @@ func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer *tssclie
 
 	joltifyBridge.wsClient = client
 
-	joltifyBridge.keyring = keyring.NewInMemory()
-
-	dat, err := ioutil.ReadFile(keyringPath)
-	if err != nil {
-		log.Fatalln("error in read keyring file")
-		return nil, err
-	}
-	err = joltifyBridge.keyring.ImportPrivKey("operator", string(dat), passcode)
-	if err != nil {
-		return nil, err
-	}
+	joltifyBridge.Keyring = keyring.NewInMemory()
 
 	joltifyBridge.tssServer = tssServer
 
@@ -89,7 +77,6 @@ func NewJoltifyBridge(grpcAddr, keyringPath, passcode string, tssServer *tssclie
 	joltifyBridge.TransferChan = []*<-chan ctypes.ResultEvent{&out, &out}
 	encode := MakeEncodingConfig()
 	joltifyBridge.encoding = &encode
-	joltifyBridge.pendingOutbounds = new(sync.Map)
 	joltifyBridge.OutboundReqChan = make(chan *OutBoundReq, reqCacheSize)
 	joltifyBridge.RetryOutboundReq = make(chan *OutBoundReq, reqCacheSize)
 	joltifyBridge.poolAccLocker = &sync.Mutex{}
@@ -104,11 +91,6 @@ func (jc *JoltifyChainBridge) TerminateBridge() error {
 	err := jc.wsClient.Stop()
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to terminate the ws")
-		return err
-	}
-	err = jc.grpcClient.Close()
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to terminate the grpc")
 		return err
 	}
 	jc.tssServer.Stop()
@@ -133,7 +115,7 @@ func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum, gasWan
 	// txBuilder.SetMemo(...)
 	// txBuilder.SetTimeoutHeight(...)
 
-	key, err := jc.keyring.Key("operator")
+	key, err := jc.Keyring.Key("operator")
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to get the operator key")
 		return nil, err
@@ -151,7 +133,7 @@ func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum, gasWan
 		}
 	} else {
 		pk := tssSignMsg.Pk
-		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk)
+		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) // nolint
 		if err != nil {
 			jc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
 			return nil, err
@@ -205,7 +187,7 @@ func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.
 	var pk coscrypto.PubKey
 	if signMsg == nil {
 		// Sign those bytes by the node itself
-		signature, pk, err = jc.keyring.Sign("operator", signBytes)
+		signature, pk, err = jc.Keyring.Sign("operator", signBytes)
 		if err != nil {
 			return sigV2, err
 		}
@@ -232,7 +214,7 @@ func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.
 			return signing.SignatureV2{}, err
 		}
 
-		pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, signMsg.Pk)
+		pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, signMsg.Pk) // nolint
 		if err != nil {
 			jc.logger.Error().Err(err).Msgf("fail to get the pubkey")
 			return signing.SignatureV2{}, err
@@ -291,7 +273,7 @@ func (jc *JoltifyChainBridge) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tss
 	}
 	txBuilder.SetGasLimit(200000)
 
-	key, err := jc.keyring.Key("operator")
+	key, err := jc.Keyring.Key("operator")
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to get the operator key")
 		return 0, err
@@ -301,7 +283,7 @@ func (jc *JoltifyChainBridge) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tss
 		pubKey = key.GetPubKey()
 	} else {
 		pk := tssSignMsg.Pk
-		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk)
+		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) // nolint
 		if err != nil {
 			jc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
 			return 0, err
@@ -458,11 +440,16 @@ func (jc *JoltifyChainBridge) CheckAndUpdatePool(blockHeight int64) (bool, strin
 		ok, resp, err := jc.BroadcastTx(ctx, txBytes)
 		if err != nil || !ok {
 			jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
+
+			jc.poolUpdateLocker.Lock()
+			jc.msgSendCache = jc.msgSendCache[1:]
+			jc.poolUpdateLocker.Unlock()
 			return false, ""
 		}
+		jc.poolUpdateLocker.Lock()
 		jc.msgSendCache = jc.msgSendCache[1:]
+		jc.poolUpdateLocker.Unlock()
 		jc.logger.Info().Msgf("successfully broadcast the pool info")
-		cancel()
 		return true, el.poolPubKey
 	}
 	return false, ""
@@ -483,11 +470,10 @@ func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, rawTx tendertyp
 		return
 	}
 	txWithMemo := tx.(sdk.TxWithMemo)
-	memo := txWithMemo.GetMemo()
 	for _, msg := range txWithMemo.GetMsgs() {
 		switch eachMsg := msg.(type) {
 		case *banktypes.MsgSend:
-			err := jc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, rawTx.Hash(), memo)
+			err := jc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, rawTx.Hash())
 			if err != nil {
 				jc.logger.Error().Err(err).Msgf("fail to process the send message")
 			}
@@ -495,28 +481,4 @@ func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, rawTx tendertyp
 			continue
 		}
 	}
-}
-
-// DoTssSign test for keysign
-func (jc *JoltifyChainBridge) DoTssSign() (keysign.Response, error) {
-	poolInfo, err := jc.QueryLastPoolAddress()
-	if err != nil {
-		jc.logger.Error().Err(err).Msgf("error in get pool with error %v", err)
-		return keysign.Response{}, nil
-
-	}
-	if len(poolInfo) != 2 {
-		jc.logger.Info().Msgf("fail to query the pool with length %v", len(poolInfo))
-		return keysign.Response{}, nil
-	}
-	msgtosign := base64.StdEncoding.EncodeToString([]byte("hello"))
-	msg := tssclient.TssSignigMsg{
-		// fixme of the pool pubkey
-		Pk:          poolInfo[0].GetCreatePool().PoolPubKey,
-		Msgs:        []string{msgtosign},
-		BlockHeight: int64(100),
-		Version:     tssclient.TssVersion,
-	}
-	resp, err := jc.doTssSign(&msg)
-	return resp, err
 }
