@@ -172,6 +172,21 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 				currentPool := pi.GetPool()
+				// this means the pools has not been filled with two address
+				if currentPool[0] == nil {
+					for _, el := range poolInfo {
+						err := pi.UpdatePool(el.CreatePool.PoolPubKey)
+						if err != nil {
+							zlog.Log().Err(err).Msgf("fail to update the pool")
+						}
+						joltChain.UpdatePool(el.CreatePool.PoolPubKey)
+						err = joltChain.CreatePoolAccInfo(el.CreatePool.PoolAddr.String())
+						if err != nil {
+							zlog.Log().Err(err).Msgf("fail to require the pool account")
+						}
+					}
+				}
+
 				if NeedUpdate(poolInfo, currentPool) {
 					err := pi.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
 					if err != nil {
