@@ -19,7 +19,7 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
-func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte) error {
+func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 
 	toAddress, err := types.AccAddressFromBech32(msg.ToAddress)
@@ -77,7 +77,7 @@ func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []types.AccA
 		item := jc.processDemonAndFee(txID, blockHeight, wrapFromEthAddr, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
 		// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 		if item != nil {
-			itemReq := newAccountOutboundReq(item.outReceiverAddress, curEthAddr, item.token, blockHeight)
+			itemReq := newOutboundReq(txID, item.outReceiverAddress, curEthAddr, item.token, blockHeight)
 			jc.OutboundReqChan <- &itemReq
 			return nil
 		}
@@ -87,7 +87,7 @@ func (jc *JoltifyChainBridge) processMsg(blockHeight int64, address []types.AccA
 	return errors.New("we only allow fee and top up in one tx now")
 }
 
-func (jc *JoltifyChainBridge) processDemonAndFee(txID string, blockHeight int64, fromAddress types.AccAddress, DemonAmount, feeAmount types.Int) *outboundTx {
+func (jc *JoltifyChainInstance) processDemonAndFee(txID string, blockHeight int64, fromAddress types.AccAddress, DemonAmount, feeAmount types.Int) *outboundTx {
 	token := types.Coin{
 		Denom:  config.OutBoundDenom,
 		Amount: DemonAmount,
@@ -112,7 +112,7 @@ func (jc *JoltifyChainBridge) processDemonAndFee(txID string, blockHeight int64,
 }
 
 // GetPool get the latest two pool address
-func (jc *JoltifyChainBridge) GetPool() []*bcommon.PoolInfo {
+func (jc *JoltifyChainInstance) GetPool() []*bcommon.PoolInfo {
 	jc.poolUpdateLocker.RLock()
 	defer jc.poolUpdateLocker.RUnlock()
 	var ret []*bcommon.PoolInfo
@@ -121,7 +121,7 @@ func (jc *JoltifyChainBridge) GetPool() []*bcommon.PoolInfo {
 }
 
 // UpdatePool update the tss pool address
-func (jc *JoltifyChainBridge) UpdatePool(poolPubKey string) {
+func (jc *JoltifyChainInstance) UpdatePool(poolPubKey string) {
 	ethAddr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
 	if err != nil {
 		fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)

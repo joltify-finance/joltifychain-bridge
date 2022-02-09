@@ -116,7 +116,7 @@ func (v *ValidatorTestSuite) SetupSuite() {
 }
 
 func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
-	jc := new(JoltifyChainBridge)
+	jc := new(JoltifyChainInstance)
 	jc.grpcClient = v.network.Validators[0].ClientCtx
 	err := jc.InitValidators(v.network.Validators[0].APIAddress)
 	v.Require().Nil(err)
@@ -142,14 +142,14 @@ func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
 }
 
 func (v ValidatorTestSuite) TestQueryPool() {
-	jc := new(JoltifyChainBridge)
+	jc := new(JoltifyChainInstance)
 	jc.grpcClient = v.network.Validators[0].ClientCtx
 	_, err := jc.QueryLastPoolAddress()
 	v.Require().NoError(err)
 }
 
 func (v ValidatorTestSuite) TestCheckWhetherSigner() {
-	jc := new(JoltifyChainBridge)
+	jc := new(JoltifyChainInstance)
 	jc.grpcClient = v.network.Validators[0].ClientCtx
 	jc.Keyring = v.validatorky
 	blockHeight, err := GetLastBlockHeight(jc.grpcClient)
@@ -175,7 +175,7 @@ func TestInitValidator(t *testing.T) {
 }
 
 func (v ValidatorTestSuite) TestJoltifyChainBridge_CheckWhetherAlreadyExist() {
-	jc := new(JoltifyChainBridge)
+	jc := new(JoltifyChainInstance)
 	jc.grpcClient = v.network.Validators[0].ClientCtx
 	ret := jc.CheckWhetherAlreadyExist("testindex")
 	v.Require().True(ret)

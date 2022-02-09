@@ -38,8 +38,8 @@ import (
 )
 
 // NewJoltifyBridge new the instance for the joltify pub_chain
-func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssSign) (*JoltifyChainBridge, error) {
-	var joltifyBridge JoltifyChainBridge
+func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssSign) (*JoltifyChainInstance, error) {
+	var joltifyBridge JoltifyChainInstance
 	var err error
 	joltifyBridge.logger = zlog.With().Str("module", "joltifyChain").Logger()
 
@@ -78,16 +78,16 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssSign) (*
 	encode := MakeEncodingConfig()
 	joltifyBridge.encoding = &encode
 	joltifyBridge.OutboundReqChan = make(chan *OutBoundReq, reqCacheSize)
-	joltifyBridge.RetryOutboundReq = make(chan *OutBoundReq, reqCacheSize)
+	joltifyBridge.RetryOutboundReq = &sync.Map{}
 	joltifyBridge.poolAccLocker = &sync.Mutex{}
 	return &joltifyBridge, nil
 }
 
-func (jc *JoltifyChainBridge) GetTssNodeID() string {
+func (jc *JoltifyChainInstance) GetTssNodeID() string {
 	return jc.tssServer.GetTssNodeID()
 }
 
-func (jc *JoltifyChainBridge) TerminateBridge() error {
+func (jc *JoltifyChainInstance) TerminateBridge() error {
 	err := jc.wsClient.Stop()
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to terminate the ws")
@@ -97,7 +97,7 @@ func (jc *JoltifyChainBridge) TerminateBridge() error {
 	return nil
 }
 
-func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (client.TxBuilder, error) {
+func (jc *JoltifyChainInstance) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (client.TxBuilder, error) {
 	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
 	// following function.
 	encCfg := *jc.encoding
@@ -173,7 +173,7 @@ func (jc *JoltifyChainBridge) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum, gasWan
 	return txBuilder, nil
 }
 
-func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.TxBuilder, signerData xauthsigning.SignerData, signMsg *tssclient.TssSignigMsg) (signing.SignatureV2, error) {
+func (jc *JoltifyChainInstance) signTx(txConfig client.TxConfig, txBuilder client.TxBuilder, signerData xauthsigning.SignerData, signMsg *tssclient.TssSignigMsg) (signing.SignatureV2, error) {
 	var sigV2 signing.SignatureV2
 
 	signMode := txConfig.SignModeHandler().DefaultMode()
@@ -236,7 +236,7 @@ func (jc *JoltifyChainBridge) signTx(txConfig client.TxConfig, txBuilder client.
 	return sigV2, nil
 }
 
-func (jc *JoltifyChainBridge) doTssSign(msg *tssclient.TssSignigMsg) (keysign.Response, error) {
+func (jc *JoltifyChainInstance) doTssSign(msg *tssclient.TssSignigMsg) (keysign.Response, error) {
 	resp, err := jc.tssServer.KeySign(msg.Pk, msg.Msgs, msg.BlockHeight, msg.Signers, tssclient.TssVersion)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the tss signature")
@@ -246,7 +246,7 @@ func (jc *JoltifyChainBridge) doTssSign(msg *tssclient.TssSignigMsg) (keysign.Re
 }
 
 // SimBroadcastTx broadcast the tx to the joltifyChain to get gas estimation
-func (jc *JoltifyChainBridge) SimBroadcastTx(ctx context.Context, txbytes []byte) (uint64, error) {
+func (jc *JoltifyChainInstance) SimBroadcastTx(ctx context.Context, txbytes []byte) (uint64, error) {
 	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
 	// service.
 	txClient := cosTx.NewServiceClient(jc.grpcClient)
@@ -260,7 +260,7 @@ func (jc *JoltifyChainBridge) SimBroadcastTx(ctx context.Context, txbytes []byte
 }
 
 // GasEstimation this function get the estimation of the fee
-func (jc *JoltifyChainBridge) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssSignMsg *tssclient.TssSignigMsg) (uint64, error) {
+func (jc *JoltifyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssSignMsg *tssclient.TssSignigMsg) (uint64, error) {
 	encoding := MakeEncodingConfig()
 	encCfg := encoding
 	// Create a new TxBuilder.
@@ -325,7 +325,7 @@ func (jc *JoltifyChainBridge) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tss
 }
 
 // BroadcastTx broadcast the tx to the joltifyChain
-func (jc *JoltifyChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (bool, string, error) {
+func (jc *JoltifyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte) (bool, string, error) {
 	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
 	// service.
 	txClient := cosTx.NewServiceClient(jc.grpcClient)
@@ -349,7 +349,7 @@ func (jc *JoltifyChainBridge) BroadcastTx(ctx context.Context, txBytes []byte) (
 	return true, txHash, nil
 }
 
-func (jc *JoltifyChainBridge) CreatePoolAccInfo(accAddr string) error {
+func (jc *JoltifyChainInstance) CreatePoolAccInfo(accAddr string) error {
 	acc, err := queryAccount(accAddr, jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
@@ -365,7 +365,7 @@ func (jc *JoltifyChainBridge) CreatePoolAccInfo(accAddr string) error {
 	return nil
 }
 
-func (jc *JoltifyChainBridge) AcquirePoolAccountInfo() (uint64, uint64) {
+func (jc *JoltifyChainInstance) AcquirePoolAccountInfo() (uint64, uint64) {
 	jc.poolAccLocker.Lock()
 	defer jc.poolAccLocker.Unlock()
 	accSeq := jc.poolAccInfo.accSeq
@@ -374,7 +374,7 @@ func (jc *JoltifyChainBridge) AcquirePoolAccountInfo() (uint64, uint64) {
 	return accNum, accSeq
 }
 
-func (jc *JoltifyChainBridge) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
+func (jc *JoltifyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
 	msg := types.NewMsgCreateCreatePool(creator, pubKey, height)
 
 	acc, err := queryAccount(creator.String(), jc.grpcClient)
@@ -403,13 +403,13 @@ func (jc *JoltifyChainBridge) prepareTssPool(creator sdk.AccAddress, pubKey, hei
 }
 
 // GetLastBlockHeight gets the current block height
-func (jc *JoltifyChainBridge) GetLastBlockHeight() (int64, error) {
+func (jc *JoltifyChainInstance) GetLastBlockHeight() (int64, error) {
 	b, err := GetLastBlockHeight(jc.grpcClient)
 	return b, err
 }
 
 // CheckAndUpdatePool send the tx to the joltify pub_chain, if the pool outReceiverAddress is updated, it returns true
-func (jc *JoltifyChainBridge) CheckAndUpdatePool(blockHeight int64) (bool, string) {
+func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, string) {
 	jc.poolUpdateLocker.Lock()
 	if len(jc.msgSendCache) < 1 {
 		jc.poolUpdateLocker.Unlock()
@@ -456,7 +456,7 @@ func (jc *JoltifyChainBridge) CheckAndUpdatePool(blockHeight int64) (bool, strin
 }
 
 // CheckOutBoundTx checks
-func (jc *JoltifyChainBridge) CheckOutBoundTx(blockHeight int64, rawTx tendertypes.Tx) {
+func (jc *JoltifyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertypes.Tx) {
 	pools := jc.GetPool()
 	if pools[0] == nil || pools[1] == nil {
 		return

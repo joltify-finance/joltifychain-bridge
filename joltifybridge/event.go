@@ -19,7 +19,7 @@ import (
 const capacity = 10000
 
 // AddSubscribe add the subscirbe to the chain
-func (jc *JoltifyChainBridge) AddSubscribe(ctx context.Context, query string) (<-chan ctypes.ResultEvent, error) {
+func (jc *JoltifyChainInstance) AddSubscribe(ctx context.Context, query string) (<-chan ctypes.ResultEvent, error) {
 	out, err := jc.wsClient.Subscribe(ctx, "joltifyBridge", query, capacity)
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("Failed to subscribe to query with error %v", err)
@@ -30,7 +30,7 @@ func (jc *JoltifyChainBridge) AddSubscribe(ctx context.Context, query string) (<
 }
 
 // HandleUpdateValidators check whether we need to generate the new tss pool message
-func (jc *JoltifyChainBridge) HandleUpdateValidators(validatorUpdates []*tmtypes.Validator, height int64) error {
+func (jc *JoltifyChainInstance) HandleUpdateValidators(validatorUpdates []*tmtypes.Validator, height int64) error {
 	err := jc.UpdateLatestValidator(validatorUpdates, height)
 	if err != nil {
 		jc.logger.Error().Msgf("fail to query the latest validator %v", err)

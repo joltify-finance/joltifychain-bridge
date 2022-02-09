@@ -23,7 +23,7 @@ func prepareIssueTokenRequest(item *pubchain.InboundReq, creatorAddr, index stri
 }
 
 // ProcessInBound mint the token in joltify chain
-func (jc *JoltifyChainBridge) ProcessInBound(item *pubchain.InboundReq) error {
+func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error {
 	var txBytes []byte
 	pool := jc.GetPool()
 	if pool[0] == nil {

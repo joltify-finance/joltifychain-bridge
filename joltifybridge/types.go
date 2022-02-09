@@ -1,9 +1,11 @@
 package joltifybridge
 
 import (
+	"math/big"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	grpc1 "github.com/gogo/protobuf/grpc"
 
 	"github.com/cosmos/cosmos-sdk/simapp/params"
@@ -35,8 +37,37 @@ type tssPoolMsg struct {
 	blockHeight int64
 }
 
-// JoltifyChainBridge defines the types for joltify pub_chain side
-type JoltifyChainBridge struct {
+func (pi *JoltifyChainInstance) AddItem(req *OutBoundReq) {
+	pi.RetryOutboundReq.Store(req.Hash().Big(), req)
+}
+
+func (pi *JoltifyChainInstance) PopItem() *OutBoundReq {
+	max := big.NewInt(0)
+	pi.RetryOutboundReq.Range(func(key, value interface{}) bool {
+		h := key.(*big.Int)
+		if max.Cmp(h) == -1 {
+			max = h
+		}
+		return true
+	})
+	if max.Cmp(big.NewInt(0)) == 1 {
+		item, _ := pi.RetryOutboundReq.LoadAndDelete(max)
+		return item.(*OutBoundReq)
+	}
+	return nil
+}
+
+func (pi *JoltifyChainInstance) ShowItems() {
+	pi.RetryOutboundReq.Range(func(key, value interface{}) bool {
+		el := value.(*OutBoundReq)
+		pi.logger.Warn().Msgf("tx in the retry pool %v:%v\n", key, el.txID)
+		return true
+	})
+	return
+}
+
+// JoltifyChainInstance defines the types for joltify pub_chain side
+type JoltifyChainInstance struct {
 	grpcClient       grpc1.ClientConn
 	wsClient         *tmclienthttp.HTTP
 	encoding         *params.EncodingConfig
@@ -50,7 +81,7 @@ type JoltifyChainBridge struct {
 	lastTwoPools     []*bcommon.PoolInfo
 	OutboundReqChan  chan *OutBoundReq
 	TransferChan     []*<-chan ctypes.ResultEvent
-	RetryOutboundReq chan *OutBoundReq // if a tx fail to process, we need to put in this channel and wait for retry
+	RetryOutboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	poolAccInfo      *poolAccInfo
 	poolAccLocker    *sync.Mutex
 }
@@ -81,16 +112,24 @@ type outboundTx struct {
 	fee                sdk.Coin
 }
 
+func (i *OutBoundReq) Hash() common.Hash {
+	blockHeight := new(big.Int).SetInt64(i.blockHeight)
+	hash := crypto.Keccak256Hash(i.outReceiverAddress.Bytes(), i.fromPoolAddr.Bytes(), []byte(i.txID), blockHeight.Bytes())
+	return hash
+}
+
 // OutBoundReq is the entity for the outbound tx
 type OutBoundReq struct {
+	txID               string
 	outReceiverAddress common.Address
 	fromPoolAddr       common.Address
 	coin               sdk.Coin
 	blockHeight        int64
 }
 
-func newAccountOutboundReq(address, fromPoolAddr common.Address, coin sdk.Coin, blockHeight int64) OutBoundReq {
+func newOutboundReq(txID string, address, fromPoolAddr common.Address, coin sdk.Coin, blockHeight int64) OutBoundReq {
 	return OutBoundReq{
+		txID,
 		address,
 		fromPoolAddr,
 		coin,

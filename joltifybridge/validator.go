@@ -21,7 +21,7 @@ import (
 )
 
 // InitValidators initialize the validators
-func (jc *JoltifyChainBridge) InitValidators(addr string) error {
+func (jc *JoltifyChainInstance) InitValidators(addr string) error {
 	ts := tmservice.NewServiceClient(jc.grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
@@ -63,18 +63,18 @@ func (jc *JoltifyChainBridge) InitValidators(addr string) error {
 }
 
 // UpdateLatestValidator update the validator set
-func (jc *JoltifyChainBridge) UpdateLatestValidator(validators []*tmtypes.Validator, blockHeight int64) error {
+func (jc *JoltifyChainInstance) UpdateLatestValidator(validators []*tmtypes.Validator, blockHeight int64) error {
 	return jc.validatorSet.UpdateValidatorSet(validators, blockHeight)
 }
 
 // GetLastValidator get the last validator set
-func (jc *JoltifyChainBridge) GetLastValidator() ([]*validators.Validator, int64) {
+func (jc *JoltifyChainInstance) GetLastValidator() ([]*validators.Validator, int64) {
 	validators, blockHeight := jc.validatorSet.GetActiveValidators()
 	return validators, blockHeight
 }
 
 // QueryLastPoolAddress returns the latest two pool outReceiverAddress
-func (jc *JoltifyChainBridge) QueryLastPoolAddress() ([]*vaulttypes.PoolInfo, error) {
+func (jc *JoltifyChainInstance) QueryLastPoolAddress() ([]*vaulttypes.PoolInfo, error) {
 	poolInfo, err := queryLastValidatorSet(jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to get the pool info")
@@ -84,7 +84,7 @@ func (jc *JoltifyChainBridge) QueryLastPoolAddress() ([]*vaulttypes.PoolInfo, er
 }
 
 // CheckWhetherSigner check whether the current signer is the
-func (jc *JoltifyChainBridge) CheckWhetherSigner() (bool, error) {
+func (jc *JoltifyChainInstance) CheckWhetherSigner() (bool, error) {
 	found := false
 	poolInfo, err := jc.QueryLastPoolAddress()
 	if err != nil || len(poolInfo) == 0 {
@@ -107,7 +107,7 @@ func (jc *JoltifyChainBridge) CheckWhetherSigner() (bool, error) {
 }
 
 // CheckWhetherAlreadyExist check whether it is already existed
-func (jc *JoltifyChainBridge) CheckWhetherAlreadyExist(index string) bool {
+func (jc *JoltifyChainInstance) CheckWhetherAlreadyExist(index string) bool {
 	ret, err := queryGivenToeknIssueTx(jc.grpcClient, index)
 	if err != nil {
 		jc.logger.Warn().Err(err).Msg("fail to query token with given index")
@@ -119,7 +119,7 @@ func (jc *JoltifyChainBridge) CheckWhetherAlreadyExist(index string) bool {
 	return false
 }
 
-func (jc *JoltifyChainBridge) doInitValidator(i info, blockHeight int64, values []*tmservice.Validator) error {
+func (jc *JoltifyChainInstance) doInitValidator(i info, blockHeight int64, values []*tmservice.Validator) error {
 	jc.myValidatorInfo = i
 	jc.validatorSet = validators.NewValidator()
 

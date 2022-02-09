@@ -108,20 +108,20 @@ func NewBridgeService(config config.Config) {
 	fmt.Printf("we quit gracefully\n")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybridge.JoltifyChainBridge, pi *pubchain.PubChainInstance) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.PubChainInstance) {
 	defer wg.Done()
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(ctx, time.Second*5)
 	defer cancelLocal()
 
-	validatorUpdateChan, err := joltBridge.AddSubscribe(ctxLocal, query)
+	validatorUpdateChan, err := joltChain.AddSubscribe(ctxLocal, query)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return
 	}
 
 	query = "tm.event = 'NewBlock'"
-	newBlockChan, err := joltBridge.AddSubscribe(ctxLocal, query)
+	newBlockChan, err := joltChain.AddSubscribe(ctxLocal, query)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return
@@ -143,12 +143,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				return
 				// process the update of the validators
 			case vals := <-validatorUpdateChan:
-				height, err := joltBridge.GetLastBlockHeight()
+				height, err := joltChain.GetLastBlockHeight()
 				if err != nil {
 					continue
 				}
 				validatorUpdates := vals.Data.(tmtypes.EventDataValidatorSetUpdates).ValidatorUpdates
-				err = joltBridge.HandleUpdateValidators(validatorUpdates, height)
+				err = joltChain.HandleUpdateValidators(validatorUpdates, height)
 				if err != nil {
 					fmt.Printf("error in handle update validator")
 					continue
@@ -157,11 +157,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				// process the new joltify block, validator may need to submit the pool address
 			case block := <-newBlockChan:
 				blockHeight := block.Data.(tmtypes.EventDataNewBlock).Block.Height
-				joltBridge.CheckAndUpdatePool(blockHeight)
+				joltChain.CheckAndUpdatePool(blockHeight)
 
 				// now we check whether we need to update the pool
 				// we query the pool from the chain directly.
-				poolInfo, err := joltBridge.QueryLastPoolAddress()
+				poolInfo, err := joltChain.QueryLastPoolAddress()
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msgf("error in get pool with error %v", err)
 					continue
@@ -177,8 +177,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					if err != nil {
 						zlog.Log().Err(err).Msgf("fail to update the pool")
 					}
-					joltBridge.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
-					joltBridge.CreatePoolAccInfo(poolInfo[0].CreatePool.PoolAddr.String())
+					joltChain.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
+					err = joltChain.CreatePoolAccInfo(poolInfo[0].CreatePool.PoolAddr.String())
+					if err != nil {
+						zlog.Log().Err(err).Msgf("fail to require the pool account")
+					}
 					pools := pi.GetPool()
 					var poolsInfo []string
 					for _, el := range pools {
@@ -189,22 +192,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					zlog.Logger.Info().Msgf("the current pools are %v \n", poolsInfo)
 				}
 
-				select {
-				case item := <-joltBridge.RetryOutboundReq:
-					height := block.Data.(tmtypes.EventDataNewBlock).Block.Height
-					item.SetItemHeight(height)
-					joltBridge.OutboundReqChan <- item
-				default:
-				}
-
-			case r := <-*joltBridge.TransferChan[0]:
+			case r := <-*joltChain.TransferChan[0]:
 				blockHeight := r.Data.(tmtypes.EventDataTx).Height
 				tx := r.Data.(tmtypes.EventDataTx).Tx
-				joltBridge.CheckOutBoundTx(blockHeight, tx)
-			case r := <-*joltBridge.TransferChan[1]:
+				joltChain.CheckOutBoundTx(blockHeight, tx)
+			case r := <-*joltChain.TransferChan[1]:
 				blockHeight := r.Data.(tmtypes.EventDataTx).Height
 				tx := r.Data.(tmtypes.EventDataTx).Tx
-				joltBridge.CheckOutBoundTx(blockHeight, tx)
+				joltChain.CheckOutBoundTx(blockHeight, tx)
 
 				// process the public chain new block event
 			case head := <-pubNewBlockChan:
@@ -217,22 +212,29 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 				// now we need to put the failed inbound request to the process channel, for each new joltify block
 				// we process one failure
 				pi.ShowItems()
-				item := pi.PopItem()
-				if item != nil {
-					pi.InboundReqChan <- item
+				itemInbound := pi.PopItem()
+				if itemInbound != nil {
+					itemInbound.SetItemHeight(int64(head.Number.Uint64()))
+					pi.InboundReqChan <- itemInbound
+				}
+				// now we need to put the failed outbound request to the process channel
+				itemOutBound := joltChain.PopItem()
+				if itemOutBound != nil {
+					itemOutBound.SetItemHeight(int64(head.Number.Uint64()))
+					joltChain.OutboundReqChan <- itemOutBound
 				}
 
 			// process the in-bound top up event which will mint coin for users
 			case item := <-pi.InboundReqChan:
 				// first we check whether this tx has already been submitted by others
-				found, err := joltBridge.CheckWhetherSigner()
+				found, err := joltChain.CheckWhetherSigner()
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
 					continue
 				}
 				if found {
 					go func() {
-						err := joltBridge.ProcessInBound(item)
+						err := joltChain.ProcessInBound(item)
 						if err != nil {
 							pi.AddItem(item)
 							zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
@@ -240,21 +242,22 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltBridge *joltifybr
 					}()
 				}
 
-			case item := <-joltBridge.OutboundReqChan:
-				found, err := joltBridge.CheckWhetherSigner()
+			case item := <-joltChain.OutboundReqChan:
+				found, err := joltChain.CheckWhetherSigner()
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
 					continue
 				}
 				if found {
-					toAddr, fromAddr, amount, blockHeight := item.GetOutBoundInfo()
-					txHash, err := pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight)
-					if err != nil {
-						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
-						joltBridge.RetryOutboundReq <- item
-						continue
-					}
-					zlog.Logger.Info().Msgf(">>we have send outbound tx(%v) from %v to %v (%v)", txHash, fromAddr, toAddr, amount.String())
+					go func() {
+						toAddr, fromAddr, amount, blockHeight := item.GetOutBoundInfo()
+						txHash, err := pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight)
+						if err != nil {
+							zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
+							joltChain.AddItem(item)
+						}
+						zlog.Logger.Info().Msgf(">>we have send outbound tx(%v) from %v to %v (%v)", txHash, fromAddr, toAddr, amount.String())
+					}()
 				}
 
 			}

@@ -189,7 +189,7 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 func (o OutBoundTestSuite) TestOutBoundReq() {
 	accs, err := generateRandomPrivKey(2)
 	o.Require().NoError(err)
-	boundReq := newAccountOutboundReq(accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("testcoing", sdk.NewInt(1)), 10)
+	boundReq := newOutboundReq(accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("testcoing", sdk.NewInt(1)), 10)
 	boundReq.SetItemHeight(100)
 	a, b, _, h := boundReq.GetOutBoundInfo()
 	o.Require().Equal(a.String(), accs[0].commAddr.String())
