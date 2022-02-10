@@ -12,7 +12,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/ethereum/go-ethereum/common"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	"gitlab.com/joltify/joltifychain-bridge/validators"
@@ -80,7 +79,6 @@ type JoltifyChainInstance struct {
 	msgSendCache     []tssPoolMsg
 	lastTwoPools     []*bcommon.PoolInfo
 	OutboundReqChan  chan *OutBoundReq
-	TransferChan     []*<-chan ctypes.ResultEvent
 	RetryOutboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	poolAccInfo      *poolAccInfo
 	poolAccLocker    *sync.Mutex

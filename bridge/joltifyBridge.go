@@ -127,6 +127,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 		return
 	}
 
+	query = "tm.event = 'Tx'"
+
+	newJoltifyTxChan, err := joltChain.AddSubscribe(ctxLocal, query)
+	if err != nil {
+		fmt.Printf("fail to start the subscription")
+		return
+	}
+
 	wg.Add(1)
 
 	// pubNewBlockChan is the channel for the new blocks for the public chain
@@ -207,11 +215,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					zlog.Logger.Info().Msgf("the current pools are %v \n", poolsInfo)
 				}
 
-			case r := <-*joltChain.TransferChan[0]:
-				blockHeight := r.Data.(tmtypes.EventDataTx).Height
-				tx := r.Data.(tmtypes.EventDataTx).Tx
-				joltChain.CheckOutBoundTx(blockHeight, tx)
-			case r := <-*joltChain.TransferChan[1]:
+			case r := <-newJoltifyTxChan:
 				blockHeight := r.Data.(tmtypes.EventDataTx).Height
 				tx := r.Data.(tmtypes.EventDataTx).Tx
 				joltChain.CheckOutBoundTx(blockHeight, tx)

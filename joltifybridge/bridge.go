@@ -9,7 +9,6 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"gitlab.com/joltify/joltifychain-bridge/config"
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
@@ -68,13 +67,14 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssSign) (*
 	joltifyBridge.poolUpdateLocker = &sync.RWMutex{}
 
 	// we put the dummy query here to avoid the panic
-	query := "tm.event = 'Tx' AND transfer.sender = 'jolt1x'"
-	out, err := client.Subscribe(context.Background(), "query", query)
-	if err != nil {
-		zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
-	}
-	joltifyBridge.TransferChan = make([]*<-chan ctypes.ResultEvent, 2)
-	joltifyBridge.TransferChan = []*<-chan ctypes.ResultEvent{&out, &out}
+	//query := "tm.event = 'Tx' AND transfer.sender = 'jolt1x'"
+	//out, err := client.Subscribe(context.Background(), "query", query)
+	//if err != nil {
+	//	zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
+	//}
+	//joltifyBridge.TransferChan = make([]*<-chan ctypes.ResultEvent, 2)
+	//joltifyBridge.TransferChan = []*<-chan ctypes.ResultEvent{&out, &out}
+
 	encode := MakeEncodingConfig()
 	joltifyBridge.encoding = &encode
 	joltifyBridge.OutboundReqChan = make(chan *OutBoundReq, reqCacheSize)
@@ -469,13 +469,19 @@ func (jc *JoltifyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendert
 		jc.logger.Info().Msgf("fail to decode the data and skip this tx")
 		return
 	}
-	txWithMemo := tx.(sdk.TxWithMemo)
+
+	txWithMemo, ok := tx.(sdk.TxWithMemo)
+	if !ok {
+		return
+	}
 	for _, msg := range txWithMemo.GetMsgs() {
 		switch eachMsg := msg.(type) {
 		case *banktypes.MsgSend:
 			err := jc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, rawTx.Hash())
 			if err != nil {
-				jc.logger.Error().Err(err).Msgf("fail to process the send message")
+				if err.Error() != "not a top up message to the pool" {
+					jc.logger.Error().Err(err).Msgf("fail to process the message, it may")
+				}
 			}
 		default:
 			continue

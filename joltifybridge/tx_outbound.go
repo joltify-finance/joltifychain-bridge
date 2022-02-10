@@ -1,7 +1,6 @@
 package joltifybridge
 
 import (
-	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -45,7 +44,7 @@ func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.Ac
 		return err
 	}
 
-	// we check whether we are
+	// we check whether it is the message to the pool
 	if !(toAddress.Equals(address[0]) || toAddress.Equals(address[1])) {
 		jc.logger.Warn().Msg("not a top up message to the pool")
 		return errors.New("not a top up message to the pool")
@@ -138,16 +137,12 @@ func (jc *JoltifyChainInstance) UpdatePool(poolPubKey string) {
 		EthAddress:     ethAddr,
 	}
 
-	jc.poolUpdateLocker.Lock()
-	unsubscribePool := jc.lastTwoPools[0]
-	jc.poolUpdateLocker.Unlock()
-
-	query := fmt.Sprintf("tm.event = 'Tx' AND transfer.recipient= '%s'", p.JoltifyAddress.String())
-	out, err := jc.wsClient.Subscribe(context.Background(), p.JoltifyAddress.String(), query)
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
-		return
-	}
+	//query := fmt.Sprintf("tm.event = 'Tx' AND transfer.recipient= '%s'", p.JoltifyAddress.String())
+	//out, err := jc.wsClient.Subscribe(context.Background(), p.JoltifyAddress.String(), query)
+	//if err != nil {
+	//	jc.logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
+	//	return
+	//}
 
 	jc.poolUpdateLocker.Lock()
 	if jc.lastTwoPools[1] != nil {
@@ -159,19 +154,17 @@ func (jc *JoltifyChainInstance) UpdatePool(poolPubKey string) {
 		//	}
 		//}
 		jc.lastTwoPools[0] = jc.lastTwoPools[1]
-		jc.TransferChan[0] = jc.TransferChan[1]
 	}
 	jc.lastTwoPools[1] = &p
-	jc.TransferChan[1] = &out
 	jc.poolUpdateLocker.Unlock()
 
-	if unsubscribePool != nil {
-		delQuery := fmt.Sprintf("tm.event = 'Tx' AND transfer.recipient= '%s'", unsubscribePool.JoltifyAddress.String())
-		err := jc.wsClient.Unsubscribe(context.Background(), "quitQuery", delQuery)
-		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to unsubscribe the address %v", err)
-		}
-	}
+	//if unsubscribePool != nil {
+	//	delQuery := fmt.Sprintf("tm.event = 'Tx' AND transfer.recipient= '%s'", unsubscribePool.JoltifyAddress.String())
+	//	err := jc.wsClient.Unsubscribe(context.Background(), "quitQuery", delQuery)
+	//	if err != nil {
+	//		jc.logger.Error().Err(err).Msgf("fail to unsubscribe the address %v", err)
+	//	}
+	//}
 }
 
 // GetOutBoundInfo return the outbound tx info
