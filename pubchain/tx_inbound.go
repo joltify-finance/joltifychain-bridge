@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -210,7 +211,8 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 }
 
 // UpdatePool update the tss pool address
-func (pi *PubChainInstance) UpdatePool(poolPubKey string) error {
+func (pi *PubChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) error {
+	poolPubKey := pool.CreatePool.PoolPubKey
 	addr, err := misc.PoolPubKeyToJoltAddress(poolPubKey)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to convert the jolt addres to eth address %v", poolPubKey)
@@ -230,6 +232,7 @@ func (pi *PubChainInstance) UpdatePool(poolPubKey string) error {
 		Pk:             poolPubKey,
 		JoltifyAddress: addr,
 		EthAddress:     ethAddr,
+		PoolInfo:       pool,
 	}
 
 	if pi.lastTwoPools[1] != nil {

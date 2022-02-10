@@ -183,11 +183,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				// this means the pools has not been filled with two address
 				if currentPool[0] == nil {
 					for _, el := range poolInfo {
-						err := pi.UpdatePool(el.CreatePool.PoolPubKey)
+						err := pi.UpdatePool(el)
 						if err != nil {
 							zlog.Log().Err(err).Msgf("fail to update the pool")
 						}
-						joltChain.UpdatePool(el.CreatePool.PoolPubKey)
+						joltChain.UpdatePool(el)
 						err = joltChain.CreatePoolAccInfo(el.CreatePool.PoolAddr.String())
 						if err != nil {
 							zlog.Log().Err(err).Msgf("fail to require the pool account")
@@ -196,21 +196,26 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 				if NeedUpdate(poolInfo, currentPool) {
-					err := pi.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
+					err := pi.UpdatePool(poolInfo[0])
 					if err != nil {
 						zlog.Log().Err(err).Msgf("fail to update the pool")
 					}
-					previousPool := joltChain.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
+					previousPool := joltChain.UpdatePool(poolInfo[0])
 					joltChain.AddMoveFundItem(previousPool, blockHeight)
-
-					pools := pi.GetPool()
-					var poolsInfo []string
-					for _, el := range pools {
-						if el != nil {
-							poolsInfo = append(poolsInfo, el.EthAddress.String())
-						}
+					err = joltChain.CreatePoolAccInfo(poolInfo[0].CreatePool.PoolAddr.String())
+					if err != nil {
+						zlog.Log().Err(err).Msgf("fail to require the pool account")
 					}
-					zlog.Logger.Info().Msgf("the current pools are %v \n", poolsInfo)
+
+					//disable the debug here
+					//pools := pi.GetPool()
+					//var poolsInfo []string
+					//for _, el := range pools {
+					//	if el != nil {
+					//		poolsInfo = append(poolsInfo, el.EthAddress.String())
+					//	}
+					//}
+					//zlog.Logger.Info().Msgf("the current pools are %v \n", poolsInfo)
 				}
 
 				// we move fund if some pool retired
@@ -221,14 +226,18 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 					// we get the latest pool address and move funds to the latest pool
 					currentPool := pi.GetPool()
-					err := joltChain.MoveFunds(previousPool, currentPool[1].JoltifyAddress, blockHeight)
+					isSigner, err := joltChain.CheckWhetherSigner(previousPool.PoolInfo)
+					if err != nil {
+						zlog.Logger.Warn().Msg("fail in check whether we are signer in moving fund")
+						return
+					}
+					if !isSigner {
+						return
+					}
+					err = joltChain.MoveFunds(previousPool, currentPool[1].JoltifyAddress, blockHeight)
 					if err != nil {
 						zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.JoltifyAddress.String(), poolInfo[1].CreatePool.PoolAddr.String())
 						joltChain.AddMoveFundItem(previousPool, h)
-					}
-					err = joltChain.CreatePoolAccInfo(currentPool[1].JoltifyAddress.String())
-					if err != nil {
-						zlog.Log().Err(err).Msgf("fail to require the pool account")
 					}
 				}()
 
@@ -263,7 +272,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 			// process the in-bound top up event which will mint coin for users
 			case item := <-pi.InboundReqChan:
 				// first we check whether this tx has already been submitted by others
-				found, err := joltChain.CheckWhetherSigner()
+				pools := joltChain.GetPool()
+				found, err := joltChain.CheckWhetherSigner(pools[1].PoolInfo)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
 					continue
@@ -279,7 +289,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 			case item := <-joltChain.OutboundReqChan:
-				found, err := joltChain.CheckWhetherSigner()
+				pools := joltChain.GetPool()
+				found, err := joltChain.CheckWhetherSigner(pools[1].PoolInfo)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
 					continue

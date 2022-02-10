@@ -88,7 +88,7 @@ func (pi *PubChainInstance) PopItem() *InboundReq {
 func (pi *PubChainInstance) ShowItems() {
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
 		el := value.(*InboundReq)
-		pi.logger.Warn().Msgf("tx in the retry pool %v:%v\n", key, el.txID)
+		pi.logger.Warn().Msgf("##########tx in the retry pool %v:%v\n", key, el.txID)
 		return true
 	})
 	return

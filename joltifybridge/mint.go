@@ -43,7 +43,7 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error 
 		return nil
 	}
 
-	jc.logger.Info().Msgf("we are about the prepare the tx with other nodes with index %v", index)
+	jc.logger.Info().Msgf("we are about to prepare the tx with other nodes with index %v", index)
 	issueReq, err := prepareIssueTokenRequest(item, joltCreatorAddr.String(), index)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to prepare the issuing of the token")

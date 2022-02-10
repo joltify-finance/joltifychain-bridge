@@ -3,7 +3,6 @@ package joltifybridge
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -84,13 +83,13 @@ func (jc *JoltifyChainInstance) QueryLastPoolAddress() ([]*vaulttypes.PoolInfo, 
 }
 
 // CheckWhetherSigner check whether the current signer is the
-func (jc *JoltifyChainInstance) CheckWhetherSigner() (bool, error) {
+func (jc *JoltifyChainInstance) CheckWhetherSigner(lastPoolInfo *vaulttypes.PoolInfo) (bool, error) {
 	found := false
-	poolInfo, err := jc.QueryLastPoolAddress()
-	if err != nil || len(poolInfo) == 0 {
-		return found, errors.New("fail to query the signer")
-	}
-	lastPoolInfo := poolInfo[0]
+	//poolInfo, err := jc.QueryLastPoolAddress()
+	//if err != nil || len(poolInfo) == 0 {
+	//	return found, errors.New("fail to query the signer")
+	//}
+	//lastPoolInfo := poolInfo[0]
 	creator, err := jc.Keyring.Key("operator")
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to get the validator outReceiverAddress")

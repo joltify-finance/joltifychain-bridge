@@ -10,6 +10,7 @@ import (
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
+	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -120,7 +121,8 @@ func (jc *JoltifyChainInstance) GetPool() []*bcommon.PoolInfo {
 }
 
 // UpdatePool update the tss pool address
-func (jc *JoltifyChainInstance) UpdatePool(poolPubKey string) *bcommon.PoolInfo {
+func (jc *JoltifyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.PoolInfo {
+	poolPubKey := pool.CreatePool.PoolPubKey
 	ethAddr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
 	if err != nil {
 		fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
@@ -137,6 +139,7 @@ func (jc *JoltifyChainInstance) UpdatePool(poolPubKey string) *bcommon.PoolInfo 
 		Pk:             poolPubKey,
 		JoltifyAddress: addr,
 		EthAddress:     ethAddr,
+		PoolInfo:       pool,
 	}
 
 	jc.poolUpdateLocker.Lock()
