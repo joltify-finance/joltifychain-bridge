@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"html"
 	"math/big"
 	"sync"
 
@@ -36,7 +37,8 @@ func (pi *PubChainInstance) SendToken(sender, receiver common.Address, amount *b
 		pi.logger.Error().Err(err).Msgf("fail to send the token to the address %v", receiver)
 		return "", err
 	}
-	pi.logger.Info().Msgf("we have done the outbound tx %v", ret.Hash().Hex())
+	tick := html.UnescapeString("&#" + "128228" + ";")
+	pi.logger.Info().Msgf("%v we have done the outbound tx %v", tick, ret.Hash().Hex())
 	return ret.Hash().Hex(), nil
 }
 

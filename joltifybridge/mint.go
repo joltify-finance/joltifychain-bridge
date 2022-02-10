@@ -1,11 +1,9 @@
 package joltifybridge
 
 import (
-	"context"
 	"errors"
 	"html"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
@@ -24,7 +22,6 @@ func prepareIssueTokenRequest(item *pubchain.InboundReq, creatorAddr, index stri
 
 // ProcessInBound mint the token in joltify chain
 func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error {
-	var txBytes []byte
 	pool := jc.GetPool()
 	if pool[0] == nil {
 		jc.logger.Info().Msgf("fail to query the pool with length 1")
@@ -62,32 +59,12 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error 
 		Version:     tssclient.TssVersion,
 	}
 
-	gasWanted, err := jc.GasEstimation([]sdk.Msg{issueReq}, accSeq, &signMsg)
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("Fail to get the gas estimation")
-		return err
-	}
-	txBuilder, err := jc.genSendTx([]sdk.Msg{issueReq}, accSeq, accNum, gasWanted, &signMsg)
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to generate the tx")
-		return err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-	defer cancel()
-
-	txBytes, err = jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to encode the tx")
-		return err
-	}
-
-	ok, resp, err := jc.BroadcastTx(ctx, txBytes)
+	ok, resp, err := jc.composeAndSend(issueReq, accSeq, accNum, &signMsg)
 	if err != nil || !ok {
 		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
 		return errors.New("fail to process the inbound tx")
 	}
-	tick := html.UnescapeString("&#" + "9989" + ";")
+	tick := html.UnescapeString("&#" + "128229" + ";")
 	jc.logger.Info().Msgf("%v txid(%v) have successfully top up %s with %v", tick, resp, issueReq.Receiver.String(), issueReq.Coin.String())
 	return nil
 }

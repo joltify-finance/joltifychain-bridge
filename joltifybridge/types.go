@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	grpc1 "github.com/gogo/protobuf/grpc"
 
@@ -34,6 +35,26 @@ type tssPoolMsg struct {
 	acc         authtypes.AccountI
 	poolPubKey  string
 	blockHeight int64
+}
+
+func (pi *JoltifyChainInstance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64) {
+	pi.moveFundReq.Store(height, pool)
+}
+
+func (pi *JoltifyChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
+	min := int64(math.MaxInt64)
+	pi.moveFundReq.Range(func(key, value interface{}) bool {
+		h := key.(int64)
+		if h <= min {
+			min = h
+		}
+		return true
+	})
+	if min < math.MaxInt64 {
+		item, _ := pi.moveFundReq.LoadAndDelete(min)
+		return item.(*bcommon.PoolInfo), min
+	}
+	return nil, 0
 }
 
 func (pi *JoltifyChainInstance) AddItem(req *OutBoundReq) {
@@ -82,6 +103,7 @@ type JoltifyChainInstance struct {
 	RetryOutboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	poolAccInfo      *poolAccInfo
 	poolAccLocker    *sync.Mutex
+	moveFundReq      *sync.Map
 }
 
 type poolAccInfo struct {

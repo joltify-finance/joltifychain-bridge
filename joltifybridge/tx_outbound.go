@@ -4,10 +4,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"html"
 	"math/big"
 	"strings"
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -118,17 +120,17 @@ func (jc *JoltifyChainInstance) GetPool() []*bcommon.PoolInfo {
 }
 
 // UpdatePool update the tss pool address
-func (jc *JoltifyChainInstance) UpdatePool(poolPubKey string) {
+func (jc *JoltifyChainInstance) UpdatePool(poolPubKey string) *bcommon.PoolInfo {
 	ethAddr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
 	if err != nil {
 		fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
-		return
+		return nil
 	}
 
 	addr, err := misc.PoolPubKeyToJoltAddress(poolPubKey)
 	if err != nil {
 		fmt.Printf("fail to convert the jolt address to jolt address %v", poolPubKey)
-		return
+		return nil
 	}
 
 	p := bcommon.PoolInfo{
@@ -137,34 +139,50 @@ func (jc *JoltifyChainInstance) UpdatePool(poolPubKey string) {
 		EthAddress:     ethAddr,
 	}
 
-	//query := fmt.Sprintf("tm.event = 'Tx' AND transfer.recipient= '%s'", p.JoltifyAddress.String())
-	//out, err := jc.wsClient.Subscribe(context.Background(), p.JoltifyAddress.String(), query)
-	//if err != nil {
-	//	jc.logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
-	//	return
-	//}
-
 	jc.poolUpdateLocker.Lock()
+	previousPool := jc.lastTwoPools[0]
+
 	if jc.lastTwoPools[1] != nil {
-		//if jc.lastTwoPools[0] != nil && jc.lastTwoPools[0].JoltifyAddress.String() != p.JoltifyAddress.String() {
-		//	delQuery := fmt.Sprintf("tm.event = 'Tx' AND transfer.recipient= '%s'", jc.lastTwoPools[0].JoltifyAddress.String())
-		//	err := jc.wsClient.Unsubscribe(context.Background(), "quitQuery", delQuery)
-		//	if err != nil {
-		//		jc.logger.Error().Err(err).Msgf("fail to unsubscribe the address %v", err)
-		//	}
-		//}
 		jc.lastTwoPools[0] = jc.lastTwoPools[1]
 	}
 	jc.lastTwoPools[1] = &p
 	jc.poolUpdateLocker.Unlock()
+	return previousPool
+}
 
-	//if unsubscribePool != nil {
-	//	delQuery := fmt.Sprintf("tm.event = 'Tx' AND transfer.recipient= '%s'", unsubscribePool.JoltifyAddress.String())
-	//	err := jc.wsClient.Unsubscribe(context.Background(), "quitQuery", delQuery)
-	//	if err != nil {
-	//		jc.logger.Error().Err(err).Msgf("fail to unsubscribe the address %v", err)
-	//	}
-	//}
+func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) error {
+	from := fromPool.JoltifyAddress
+	acc, err := queryAccount(from.String(), jc.grpcClient)
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
+		return err
+	}
+	coins, err := queryBalance(from.String(), jc.grpcClient)
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("Fail to query the balance")
+		return err
+	}
+	if len(coins) == 0 {
+		jc.logger.Warn().Msg("we do not have any balance skip send")
+		return nil
+	}
+	msg := banktypes.NewMsgSend(from, to, coins)
+
+	signMsg := tssclient.TssSignigMsg{
+		Pk:          fromPool.Pk,
+		Signers:     nil,
+		BlockHeight: height,
+		Version:     tssclient.TssVersion,
+	}
+
+	ok, resp, err := jc.composeAndSend(msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg)
+	if err != nil || !ok {
+		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
+		return errors.New("fail to process the inbound tx")
+	}
+	tick := html.UnescapeString("&#" + "127974" + ";")
+	jc.logger.Info().Msgf("%v txid(%v) have successfully move funds from %v to %v", tick, resp, from.String(), to.String())
+	return nil
 }
 
 // GetOutBoundInfo return the outbound tx info

@@ -200,11 +200,9 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					if err != nil {
 						zlog.Log().Err(err).Msgf("fail to update the pool")
 					}
-					joltChain.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
-					err = joltChain.CreatePoolAccInfo(poolInfo[0].CreatePool.PoolAddr.String())
-					if err != nil {
-						zlog.Log().Err(err).Msgf("fail to require the pool account")
-					}
+					previousPool := joltChain.UpdatePool(poolInfo[0].CreatePool.PoolPubKey)
+					joltChain.AddMoveFundItem(previousPool, blockHeight)
+
 					pools := pi.GetPool()
 					var poolsInfo []string
 					for _, el := range pools {
@@ -214,6 +212,25 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 					zlog.Logger.Info().Msgf("the current pools are %v \n", poolsInfo)
 				}
+
+				// we move fund if some pool retired
+				go func() {
+					previousPool, h := joltChain.PopMoveFundItem()
+					if previousPool == nil {
+						return
+					}
+					// we get the latest pool address and move funds to the latest pool
+					currentPool := pi.GetPool()
+					err := joltChain.MoveFunds(previousPool, currentPool[1].JoltifyAddress, blockHeight)
+					if err != nil {
+						zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.JoltifyAddress.String(), poolInfo[1].CreatePool.PoolAddr.String())
+						joltChain.AddMoveFundItem(previousPool, h)
+					}
+					err = joltChain.CreatePoolAccInfo(currentPool[1].JoltifyAddress.String())
+					if err != nil {
+						zlog.Log().Err(err).Msgf("fail to require the pool account")
+					}
+				}()
 
 			case r := <-newJoltifyTxChan:
 				blockHeight := r.Data.(tmtypes.EventDataTx).Height

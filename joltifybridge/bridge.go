@@ -79,6 +79,7 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssSign) (*
 	joltifyBridge.encoding = &encode
 	joltifyBridge.OutboundReqChan = make(chan *OutBoundReq, reqCacheSize)
 	joltifyBridge.RetryOutboundReq = &sync.Map{}
+	joltifyBridge.moveFundReq = &sync.Map{}
 	joltifyBridge.poolAccLocker = &sync.Mutex{}
 	return &joltifyBridge, nil
 }
