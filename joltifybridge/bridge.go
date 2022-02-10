@@ -66,21 +66,11 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssSign) (*
 	joltifyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
 	joltifyBridge.poolUpdateLocker = &sync.RWMutex{}
 
-	// we put the dummy query here to avoid the panic
-	//query := "tm.event = 'Tx' AND transfer.sender = 'jolt1x'"
-	//out, err := client.Subscribe(context.Background(), "query", query)
-	//if err != nil {
-	//	zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
-	//}
-	//joltifyBridge.TransferChan = make([]*<-chan ctypes.ResultEvent, 2)
-	//joltifyBridge.TransferChan = []*<-chan ctypes.ResultEvent{&out, &out}
-
 	encode := MakeEncodingConfig()
 	joltifyBridge.encoding = &encode
 	joltifyBridge.OutboundReqChan = make(chan *OutBoundReq, reqCacheSize)
 	joltifyBridge.RetryOutboundReq = &sync.Map{}
 	joltifyBridge.moveFundReq = &sync.Map{}
-	joltifyBridge.poolAccLocker = &sync.Mutex{}
 	return &joltifyBridge, nil
 }
 
@@ -348,31 +338,6 @@ func (jc *JoltifyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte)
 	}
 	txHash := grpcRes.GetTxResponse().TxHash
 	return true, txHash, nil
-}
-
-func (jc *JoltifyChainInstance) CreatePoolAccInfo(accAddr string) error {
-	acc, err := queryAccount(accAddr, jc.grpcClient)
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
-		return err
-	}
-	accInfo := poolAccInfo{
-		acc.GetAccountNumber(),
-		acc.GetSequence(),
-	}
-	jc.poolAccLocker.Lock()
-	jc.poolAccInfo = &accInfo
-	jc.poolAccLocker.Unlock()
-	return nil
-}
-
-func (jc *JoltifyChainInstance) AcquirePoolAccountInfo() (uint64, uint64) {
-	jc.poolAccLocker.Lock()
-	defer jc.poolAccLocker.Unlock()
-	accSeq := jc.poolAccInfo.accSeq
-	jc.poolAccInfo.accSeq += 1
-	accNum := jc.poolAccInfo.accountNum
-	return accNum, accSeq
 }
 
 func (jc *JoltifyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {

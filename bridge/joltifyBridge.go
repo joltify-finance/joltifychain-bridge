@@ -188,10 +188,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 							zlog.Log().Err(err).Msgf("fail to update the pool")
 						}
 						joltChain.UpdatePool(el)
-						err = joltChain.CreatePoolAccInfo(el.CreatePool.PoolAddr.String())
-						if err != nil {
-							zlog.Log().Err(err).Msgf("fail to require the pool account")
-						}
 					}
 				}
 
@@ -202,10 +198,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 					previousPool := joltChain.UpdatePool(poolInfo[0])
 					joltChain.AddMoveFundItem(previousPool, blockHeight)
-					err = joltChain.CreatePoolAccInfo(poolInfo[0].CreatePool.PoolAddr.String())
-					if err != nil {
-						zlog.Log().Err(err).Msgf("fail to require the pool account")
-					}
 
 					//disable the debug here
 					//pools := pi.GetPool()
