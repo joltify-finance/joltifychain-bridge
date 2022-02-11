@@ -364,9 +364,6 @@ func (jc *JoltifyChainInstance) CreatePoolAccInfo(accAddr string) error {
 		return err
 	}
 	seq := acc.GetSequence()
-	if acc.GetSequence() == 0 {
-		seq = 1
-	}
 	accInfo := poolAccInfo{
 		acc.GetAccountNumber(),
 		seq,
@@ -479,6 +476,15 @@ func (jc *JoltifyChainInstance) BroadcastMsg(currentBlockHeight int64, pi *pubch
 	if err != nil {
 		return err
 	}
+	seq := acc.GetSequence()
+	accInfo := poolAccInfo{
+		acc.GetAccountNumber(),
+		seq,
+	}
+	jc.poolAccLocker.Lock()
+	jc.poolAccInfo = &accInfo
+	jc.poolAccLocker.Unlock()
+
 	jc.logger.Warn().Msgf("####the accSeq %v and accNum %v\n", acc.GetSequence(), acc.GetAccountNumber())
 
 	jc.broadcastChannel.Range(func(key, value interface{}) bool {
