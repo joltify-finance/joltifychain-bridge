@@ -104,6 +104,7 @@ type JoltifyChainInstance struct {
 	poolAccInfo      *poolAccInfo
 	poolAccLocker    *sync.Mutex
 	moveFundReq      *sync.Map
+	broadcastChannel *sync.Map
 }
 
 type poolAccInfo struct {

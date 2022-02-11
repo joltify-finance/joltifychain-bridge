@@ -114,14 +114,14 @@ func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum u
 		return false, "", err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-	defer cancel()
-
 	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to encode the tx")
 		return false, "", err
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
 
 	ok, resp, err := jc.BroadcastTx(ctx, txBytes)
 	return ok, resp, err
