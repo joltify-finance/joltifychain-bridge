@@ -179,7 +179,7 @@ func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.A
 		Version:     tssclient.TssVersion,
 	}
 	fmt.Printf(">>>>>>>move at %v\n", acc.GetSequence())
-	txBytes, err := jc.composeAndSend(msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg)
+	txBytes, err := jc.composeAndSend(msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, "")
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to compose the tx")
 		return errors.New("fail to process the inbound tx")

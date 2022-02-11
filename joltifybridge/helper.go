@@ -102,9 +102,16 @@ func GetLastBlockHeight(grpcClient grpc1.ClientConn) (int64, error) {
 	return resp.Block.Header.Height, nil
 }
 
-func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg) ([]byte, error) {
+func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddr string) ([]byte, error) {
 	gasWanted, err := jc.GasEstimation([]sdk.Msg{sendMsg}, accSeq, signMsg)
 	if err != nil {
+		// we update the account sequence for the inbound tx, if poolAddr is nil, it means it is move fund
+		if poolAddr != "" {
+			err := jc.CreatePoolAccInfo(poolAddr)
+			if err != nil {
+				jc.logger.Error().Err(err).Msg("fail qu ery the pool account")
+			}
+		}
 		jc.logger.Error().Err(err).Msg("Fail to get the gas estimation")
 		return nil, err
 	}

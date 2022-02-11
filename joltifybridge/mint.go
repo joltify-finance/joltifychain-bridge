@@ -67,7 +67,7 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error 
 	//}
 	//accNum, accSeq := acc.GetAccountNumber(), acc.GetSequence()
 
-	txByte, err := jc.composeAndSend(issueReq, accSeq, accNum, &signMsg)
+	txByte, err := jc.composeAndSend(issueReq, accSeq, accNum, &signMsg, pool[1].JoltifyAddress.String())
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to compose the send tx")
 		return errors.New("fail to process the inbound tx")
