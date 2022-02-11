@@ -33,47 +33,40 @@ const (
 
 // InboundReq is the account that top up account info to joltify pub_chain
 type InboundReq struct {
-	address        sdk.AccAddress
-	txID           []byte // this indicates the identical inbound req
-	toPoolAddr     common.Address
-	coin           sdk.Coin
-	blockHeight    int64
-	newBlockHeight int64
+	address     sdk.AccAddress
+	txID        []byte // this indicates the identical inbound req
+	toPoolAddr  common.Address
+	coin        sdk.Coin
+	blockHeight uint64
 }
 
 func (i *InboundReq) Hash() common.Hash {
-	blockheightb := new(big.Int).SetInt64(i.blockHeight)
-	hash := crypto.Keccak256Hash(i.address.Bytes(), i.toPoolAddr.Bytes(), i.txID, blockheightb.Bytes())
+	hash := crypto.Keccak256Hash(i.address.Bytes(), i.txID)
 	return hash
 }
 
-func (i *InboundReq) ApplyNewBlockHeight() {
-	i.blockHeight = i.newBlockHeight
-}
-
-func NewAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coin sdk.Coin, txid []byte, blockHeight int64) InboundReq {
+func NewAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coin sdk.Coin, txid []byte, blockHeight uint64) InboundReq {
 	return InboundReq{
 		address,
 		txid,
 		toPoolAddr,
 		coin,
 		blockHeight,
-		blockHeight,
 	}
 }
 
 // GetInboundReqInfo returns the info of the inbound transaction
-func (acq *InboundReq) GetInboundReqInfo() (sdk.AccAddress, common.Address, sdk.Coin, int64) {
+func (acq *InboundReq) GetInboundReqInfo() (sdk.AccAddress, common.Address, sdk.Coin, uint64) {
 	return acq.address, acq.toPoolAddr, acq.coin, acq.blockHeight
 }
 
 // SetItemNewHeight sets the block height of the tx
-func (acq *InboundReq) SetItemNewHeight(blockHeight int64) {
-	acq.newBlockHeight = blockHeight
+func (acq *InboundReq) SetItemNewHeight(blockHeight uint64) {
+	acq.blockHeight = blockHeight
 }
 
 // GetItemHeight gets the block height of the tx
-func (acq *InboundReq) GetItemHeight() int64 {
+func (acq *InboundReq) GetItemHeight() uint64 {
 	return acq.blockHeight
 }
 

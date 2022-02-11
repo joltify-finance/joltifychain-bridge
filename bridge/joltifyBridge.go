@@ -228,11 +228,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 				}()
 
-				// we check whether we have tx to be broadcast
-				go func() {
-					joltChain.BroadcastMsg(blockHeight, pi)
-				}()
-
 			case r := <-newJoltifyTxChan:
 				blockHeight := r.Data.(tmtypes.EventDataTx).Height
 				tx := r.Data.(tmtypes.EventDataTx).Tx
@@ -251,9 +246,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				pi.ShowItems()
 				itemInbound := pi.PopItem()
 				if itemInbound != nil {
-					itemInbound.SetItemNewHeight(int64(head.Number.Uint64()))
+					itemInbound.SetItemNewHeight(head.Number.Uint64())
 					pi.InboundReqChan <- itemInbound
 				}
+				// we check whether we have tx to be broadcast
+				go func() {
+					joltChain.BroadcastMsg(head.Number.Uint64(), pi)
+				}()
+
 				// now we need to put the failed outbound request to the process channel
 				itemOutBound := joltChain.PopItem()
 				if itemOutBound != nil {

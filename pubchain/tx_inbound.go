@@ -139,7 +139,7 @@ func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, fr
 		pi.logger.Warn().Msgf("invalid tx ID %v\n", txIDBytes)
 		return nil
 	}
-	item := NewAccountInboundReq(tx.address, to, tx.token, txIDBytes, int64(blockHeight))
+	item := NewAccountInboundReq(tx.address, to, tx.token, txIDBytes, blockHeight)
 	pi.InboundReqChan <- &item
 	return nil
 }
@@ -203,7 +203,7 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 			payTxID := tx.Data()
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
-				item := NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, block.Number().Int64())
+				item := NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, block.Number().Uint64())
 				pi.InboundReqChan <- &item
 			}
 		}

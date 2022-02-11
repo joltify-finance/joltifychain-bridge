@@ -34,15 +34,13 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error 
 		return errors.New("invalid address")
 	}
 
-	// we need to check against the previous account sequence
-	oldIndex := item.Hash().Hex()
-	if jc.CheckWhetherAlreadyExist(oldIndex) {
+	// we need to check whether the tx already exist
+	index := item.Hash().Hex()
+	if jc.CheckWhetherAlreadyExist(index) {
 		jc.logger.Warn().Msg("#################already submitted by others")
 		return nil
 	}
-	// now we set the req with the new height
-	item.ApplyNewBlockHeight()
-	index := item.Hash().Hex()
+
 	jc.logger.Info().Msgf("we are about to prepare the tx with other nodes with index %v at height %v", index, item.GetItemHeight())
 	issueReq, err := prepareIssueTokenRequest(item, joltCreatorAddr.String(), index)
 	if err != nil {
@@ -51,11 +49,10 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error 
 	}
 
 	_, _, _, height := item.GetInboundReqInfo()
-	jc.logger.Info().Msgf("we do the top up for %v at height %v", issueReq.Receiver.String(), height)
 	signMsg := tssclient.TssSignigMsg{
 		Pk:          pool[1].Pk,
 		Signers:     nil,
-		BlockHeight: height,
+		BlockHeight: int64(height),
 		Version:     tssclient.TssVersion,
 	}
 
@@ -67,6 +64,7 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error 
 	//}
 	//accNum, accSeq := acc.GetAccountNumber(), acc.GetSequence()
 
+	jc.logger.Info().Msgf("we do the top up for %v at height: %v with seq:%v", issueReq.Receiver.String(), height, accSeq)
 	txByte, err := jc.composeAndSend(issueReq, accSeq, accNum, &signMsg, pool[1].JoltifyAddress.String())
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to compose the send tx")

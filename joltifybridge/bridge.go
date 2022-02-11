@@ -304,7 +304,7 @@ func (jc *JoltifyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, t
 			SignMode:  encCfg.TxConfig.SignModeHandler().DefaultMode(),
 			Signature: nil,
 		},
-		Sequence: accSeq,
+		// Sequence: accSeq,
 	}
 
 	err = txBuilder.SetSignatures(sigV2)
@@ -469,25 +469,30 @@ func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, str
 	return false, ""
 }
 
-func (jc *JoltifyChainInstance) BroadcastMsg(currentBlockHeight int64, pi *pubchain.PubChainInstance) error {
+func (jc *JoltifyChainInstance) BroadcastMsg(currentBlockHeight uint64, pi *pubchain.PubChainInstance) error {
 	// now we query the token
 	pool := jc.GetPool()
-	acc, err := queryAccount(pool[1].JoltifyAddress.String(), jc.grpcClient)
-	if err != nil {
-		return err
+	if pool[1] == nil {
+		return nil
 	}
-	seq := acc.GetSequence()
-	accInfo := poolAccInfo{
-		acc.GetAccountNumber(),
-		seq,
-	}
-	jc.poolAccLocker.Lock()
-	jc.poolAccInfo = &accInfo
-	jc.poolAccLocker.Unlock()
 
-	jc.logger.Warn().Msgf("####the accSeq %v and accNum %v\n", acc.GetSequence(), acc.GetAccountNumber())
+	//seq := acc.GetSequence()
+	//accInfo := poolAccInfo{
+	//	acc.GetAccountNumber(),
+	//	seq,
+	//}
+	//jc.poolAccLocker.Lock()
+	//jc.poolAccInfo = &accInfo
+	//jc.poolAccLocker.Unlock()
 
 	jc.broadcastChannel.Range(func(key, value interface{}) bool {
+		acc, err := queryAccount(pool[1].JoltifyAddress.String(), jc.grpcClient)
+		if err != nil {
+			jc.logger.Warn().Msgf("fail to quert the account")
+			return false
+		}
+		jc.logger.Warn().Msgf("####the accSeq %v and accNum %v\n", acc.GetSequence(), acc.GetAccountNumber())
+
 		accNum := key.(uint64)
 		jc.logger.Warn().Msgf("####111the accNum %v==currentNum %v\n", accNum, acc.GetAccountNumber())
 		if accNum != acc.GetAccountNumber() {
@@ -510,11 +515,21 @@ func (jc *JoltifyChainInstance) BroadcastMsg(currentBlockHeight int64, pi *pubch
 					ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 					defer cancel()
 					ok, resp, err := jc.BroadcastTx(ctx, broadcastMsg.data)
+					//if (err == nil && ok) || errors.Is(err, coserr.ErrTxInMempoolCache) {
+					//}
 					if err != nil || !ok {
 						pi.AddItem(broadcastMsg.item)
 						jc.logger.Error().Err(err).Msgf("fail to compose the tx -> %v", resp)
 						return true
 					}
+
+					jc.poolAccLocker.Lock()
+					acc := poolAccInfo{
+						accNum,
+						seq,
+					}
+					jc.poolAccInfo = &acc
+					jc.poolAccLocker.Unlock()
 					tick := html.UnescapeString("&#" + "128229" + ";")
 					jc.logger.Info().Msgf("%v  have successfully top up %v", tick, resp)
 					return true
