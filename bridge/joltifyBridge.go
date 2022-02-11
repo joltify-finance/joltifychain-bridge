@@ -189,6 +189,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						}
 						joltChain.UpdatePool(el)
 					}
+					continue
 				}
 
 				if NeedUpdate(poolInfo, currentPool) {

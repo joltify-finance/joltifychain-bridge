@@ -178,7 +178,7 @@ func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.A
 		BlockHeight: height,
 		Version:     tssclient.TssVersion,
 	}
-
+	fmt.Printf(">>>>>>>move at %v\n", acc.GetSequence())
 	txBytes, err := jc.composeAndSend(msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to compose the tx")
@@ -188,7 +188,14 @@ func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.A
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 
-	//we do not need to worry about move the funds in parallel
+	acc, err = queryAccount(from.String(), jc.grpcClient)
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
+		return err
+	}
+
+	fmt.Printf(">>>>>>>move after at %v\n", acc.GetSequence())
+	// we do not need to worry about move the funds in parallel
 	ok, resp, err := jc.BroadcastTx(ctx, txBytes)
 	if err != nil || !ok {
 		jc.logger.Error().Err(err).Msgf("fail to compose the tx -> %v", resp)
