@@ -1,6 +1,7 @@
 package joltifybridge
 
 import (
+	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 	"math/big"
 	"sync"
 	"time"
@@ -24,9 +25,10 @@ import (
 )
 
 const (
-	grpcTimeout  = time.Second * 10
-	chainID      = "joltifyChain"
-	reqCacheSize = 512
+	grpcTimeout   = time.Second * 10
+	chainID       = "joltifyChain"
+	reqCacheSize  = 512
+	broadcastWait = 10
 )
 
 // tssPoolMsg this is the pool pre-submit message for the given height
@@ -156,4 +158,9 @@ func newOutboundReq(txID string, address, fromPoolAddr common.Address, coin sdk.
 		coin,
 		blockHeight,
 	}
+}
+
+type broadcast struct {
+	item *pubchain.InboundReq
+	data []byte
 }

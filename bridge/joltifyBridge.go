@@ -202,20 +202,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 					previousPool := joltChain.UpdatePool(poolInfo[0])
 					joltChain.AddMoveFundItem(previousPool, blockHeight)
-					err = joltChain.CreatePoolAccInfo(poolInfo[0].CreatePool.PoolAddr.String())
-					if err != nil {
-						zlog.Log().Err(err).Msgf("fail to require the pool account")
-					}
-
-					//disable the debug here
-					//pools := pi.GetPool()
-					//var poolsInfo []string
-					//for _, el := range pools {
-					//	if el != nil {
-					//		poolsInfo = append(poolsInfo, el.EthAddress.String())
-					//	}
-					//}
-					//zlog.Logger.Info().Msgf("the current pools are %v \n", poolsInfo)
 				}
 
 				// we move fund if some pool retired
@@ -239,6 +225,15 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.JoltifyAddress.String(), poolInfo[1].CreatePool.PoolAddr.String())
 						joltChain.AddMoveFundItem(previousPool, h)
 					}
+					err = joltChain.CreatePoolAccInfo(poolInfo[0].CreatePool.PoolAddr.String())
+					if err != nil {
+						zlog.Log().Err(err).Msgf("fail to require the pool account")
+					}
+				}()
+
+				// we check whether we have tx to be broadcast
+				go func() {
+					joltChain.BroadcastMsg(blockHeight, pi)
 				}()
 
 			case r := <-newJoltifyTxChan:
@@ -282,8 +277,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					go func() {
 						err := joltChain.ProcessInBound(item)
 						if err != nil {
-							pi.AddItem(item)
 							zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
+							pi.AddItem(item)
 						}
 					}()
 				}

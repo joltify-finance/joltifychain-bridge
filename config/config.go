@@ -78,7 +78,7 @@ func DefaultConfig() Config {
 	flag.StringVar(&config.InvoiceChainConfig.RPCAddress, "rpc-port", "http://localhost:26657", "rpc address for joltify pub_chain")
 	flag.StringVar(&config.InvoiceChainConfig.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for joltify pub_chain")
 	flag.StringVar(&config.InvoiceChainConfig.HttpAddress, "http-endpoint", "tcp://localhost:26657", "endpoint for joltify http end point")
-	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://10.1.194.26:8456/", "endpoint for public pub_chain listener")
+	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://10.2.118.4:8456/", "endpoint for public pub_chain listener")
 	flag.StringVar(&config.PubChainConfig.TokenAddress, "pub-token-addr", "0x0cD80A18df1C5eAd4B5Fb549391d58B06EFfDBC4", "monitored token address")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
 	flag.StringVar(&config.HomeDir, "home", "/root/.joltifyChain/config", "home director for joltify_bridge")

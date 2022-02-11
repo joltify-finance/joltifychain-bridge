@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"gitlab.com/joltify/joltifychain-bridge/pubchain"
+	"html"
 	"strconv"
 	"sync"
 
@@ -80,6 +83,7 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssSign) (*
 	joltifyBridge.OutboundReqChan = make(chan *OutBoundReq, reqCacheSize)
 	joltifyBridge.RetryOutboundReq = &sync.Map{}
 	joltifyBridge.moveFundReq = &sync.Map{}
+	joltifyBridge.broadcastChannel = &sync.Map{}
 	joltifyBridge.poolAccLocker = &sync.Mutex{}
 	return &joltifyBridge, nil
 }
@@ -343,6 +347,8 @@ func (jc *JoltifyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte)
 	}
 
 	if grpcRes.GetTxResponse().Code != 0 {
+		jc.logger.Error().Err(err).Msgf("error string is %v", grpcRes.TxResponse.RawLog)
+		jc.logger.Error().Err(err).Msgf("error string is %v", grpcRes.String())
 		jc.logger.Error().Err(err).Msgf("fail to broadcast with response %v", grpcRes.TxResponse)
 		return false, "", nil
 	}
@@ -370,9 +376,15 @@ func (jc *JoltifyChainInstance) AcquirePoolAccountInfo() (uint64, uint64) {
 	jc.poolAccLocker.Lock()
 	defer jc.poolAccLocker.Unlock()
 	accSeq := jc.poolAccInfo.accSeq
-	jc.poolAccInfo.accSeq += 1
+
 	accNum := jc.poolAccInfo.accountNum
 	return accNum, accSeq
+}
+
+func (jc *JoltifyChainInstance) IncreaseAccountSeq() {
+	jc.poolAccLocker.Lock()
+	defer jc.poolAccLocker.Unlock()
+	jc.poolAccInfo.accSeq += 1
 }
 
 func (jc *JoltifyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
@@ -419,7 +431,7 @@ func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, str
 	el := jc.msgSendCache[0]
 	jc.poolUpdateLocker.Unlock()
 	if el.blockHeight == blockHeight {
-		jc.logger.Info().Msgf("we are submit the block at height>>>>>>>>%v\n", el.blockHeight)
+		jc.logger.Info().Msgf("we are submitting the block at height>>>>>>>>%v\n", el.blockHeight)
 		ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 		defer cancel()
 
@@ -454,6 +466,91 @@ func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, str
 		return true, el.poolPubKey
 	}
 	return false, ""
+}
+
+func (jc *JoltifyChainInstance) BroadcastMsg(currentBlockHeight int64, pi *pubchain.PubChainInstance) error {
+	// now we query the token
+	pool := jc.GetPool()
+	acc, err := queryAccount(pool[1].JoltifyAddress.String(), jc.grpcClient)
+	if err != nil {
+		return err
+	}
+	jc.logger.Warn().Msgf("####the accSeq %v and accNum %v\n", acc.GetSequence(), acc.GetAccountNumber())
+
+	jc.broadcastChannel.Range(func(key, value interface{}) bool {
+		accNum := key.(uint64)
+		jc.logger.Warn().Msgf("####111the accNum %v==currentNum %v\n", accNum, acc.GetAccountNumber())
+		if accNum != acc.GetAccountNumber() {
+			//we need to put all the request back to the retry pool
+			items := value.(*sync.Map)
+			items.Range(func(_, value interface{}) bool {
+				broadcastMsg := value.(*broadcast)
+				pi.AddItem(broadcastMsg.item)
+				return true
+			})
+			jc.broadcastChannel.Delete(accNum)
+		} else {
+			items := value.(*sync.Map)
+			items.Range(func(key, value interface{}) bool {
+				seq := key.(uint64)
+				jc.logger.Warn().Msgf("####2222the accseq %v =tearget %v\n", seq, acc.GetSequence())
+				if seq == acc.GetSequence() {
+					items.Delete(seq)
+					broadcastMsg := value.(*broadcast)
+					ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+					defer cancel()
+					ok, resp, err := jc.BroadcastTx(ctx, broadcastMsg.data)
+					if err != nil || !ok {
+						pi.AddItem(broadcastMsg.item)
+						jc.logger.Error().Err(err).Msgf("fail to compose the tx -> %v", resp)
+						return true
+					}
+					tick := html.UnescapeString("&#" + "128229" + ";")
+					jc.logger.Info().Msgf("%v  have successfully top up %v", tick, resp)
+					return true
+				}
+				// we add it directly to the retry pool
+				if seq < acc.GetSequence() {
+					items.Delete(seq)
+					jc.logger.Warn().Msgf("we add the old tx to the retry pool directly")
+					broadcastMsg := value.(*broadcast)
+					pi.AddItem(broadcastMsg.item)
+					return true
+				}
+				// now we handle the acc larger than the current one, we need to wait
+				broadcastMsg := value.(*broadcast)
+				if currentBlockHeight-broadcastMsg.item.GetItemHeight() >= broadcastWait {
+					items.Delete(seq)
+					broadcastMsg := value.(*broadcast)
+					ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+					defer cancel()
+					ok, resp, err := jc.BroadcastTx(ctx, broadcastMsg.data)
+					if err != nil || !ok {
+						pi.AddItem(broadcastMsg.item)
+						jc.logger.Error().Err(err).Msgf("fail to compose the tx -> %v", resp)
+						return true
+					}
+					tick := html.UnescapeString("&#" + "128229" + ";")
+					jc.logger.Info().Msgf("%v  have successfully top up %v", tick, resp)
+					return true
+				}
+				// 1.if the acc is quite yong, we do not touch it
+				fmt.Printf("WWWWWWWWWWWWWWWWWWWWWW skip>>>%v==target %v\n", seq, acc.GetSequence())
+				return true
+			})
+			//2. if the current accNum has empty map,we delete it
+			empty := true
+			items.Range(func(key, value interface{}) bool {
+				empty = false
+				return false
+			})
+			if empty {
+				jc.broadcastChannel.Delete(accNum)
+			}
+		}
+		return true
+	})
+	return nil
 }
 
 // CheckOutBoundTx checks

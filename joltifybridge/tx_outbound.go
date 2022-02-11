@@ -1,6 +1,7 @@
 package joltifybridge
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -178,11 +179,22 @@ func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.A
 		Version:     tssclient.TssVersion,
 	}
 
-	ok, resp, err := jc.composeAndSend(msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg)
-	if err != nil || !ok {
-		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
+	txBytes, err := jc.composeAndSend(msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg)
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to compose the tx")
 		return errors.New("fail to process the inbound tx")
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
+
+	//we do not need to worry about move the funds in parallel
+	ok, resp, err := jc.BroadcastTx(ctx, txBytes)
+	if err != nil || !ok {
+		jc.logger.Error().Err(err).Msgf("fail to compose the tx -> %v", resp)
+		return errors.New("fail to process the inbound tx")
+	}
+
 	tick := html.UnescapeString("&#" + "127974" + ";")
 	jc.logger.Info().Msgf("%v txid(%v) have successfully move funds from %v to %v", tick, resp, from.String(), to.String())
 	return nil

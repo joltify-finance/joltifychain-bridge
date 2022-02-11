@@ -28,6 +28,7 @@ const (
 	chainQueryTimeout = time.Second * 5
 	GasLimit          = 2100000
 	GasPrice          = "0.00000001"
+	BROADCASTWAIT     = 10
 )
 
 // InboundReq is the account that top up account info to joltify pub_chain
@@ -63,6 +64,11 @@ func (acq *InboundReq) GetInboundReqInfo() (sdk.AccAddress, common.Address, sdk.
 // SetItemHeight sets the block height of the tx
 func (acq *InboundReq) SetItemHeight(blockHeight int64) {
 	acq.blockHeight = blockHeight
+}
+
+// GetItemHeight gets the block height of the tx
+func (acq *InboundReq) GetItemHeight() int64 {
+	return acq.blockHeight
 }
 
 func (pi *PubChainInstance) AddItem(req *InboundReq) {

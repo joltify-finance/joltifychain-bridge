@@ -1,6 +1,7 @@
 package joltifybridge
 
 import (
+	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 	"strconv"
 	"testing"
 	"time"
@@ -200,7 +201,7 @@ func (o OutBoundTestSuite) TestOutBoundReq() {
 func (o OutBoundTestSuite) TestOutTx() {
 	accs, err := generateRandomPrivKey(2)
 	o.Require().NoError(err)
-	tx := outboundTx{
+	tx := pubchain.outboundTx{
 		accs[0].commAddr,
 		100,
 		sdk.NewCoin("test", sdk.NewInt(1)),

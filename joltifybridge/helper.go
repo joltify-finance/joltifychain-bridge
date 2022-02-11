@@ -102,27 +102,23 @@ func GetLastBlockHeight(grpcClient grpc1.ClientConn) (int64, error) {
 	return resp.Block.Header.Height, nil
 }
 
-func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg) (bool, string, error) {
+func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg) ([]byte, error) {
 	gasWanted, err := jc.GasEstimation([]sdk.Msg{sendMsg}, accSeq, signMsg)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("Fail to get the gas estimation")
-		return false, "", err
+		return nil, err
 	}
 	txBuilder, err := jc.genSendTx([]sdk.Msg{sendMsg}, accSeq, accNum, gasWanted, signMsg)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the tx")
-		return false, "", err
+		return nil, err
 	}
 
 	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to encode the tx")
-		return false, "", err
+		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-	defer cancel()
-
-	ok, resp, err := jc.BroadcastTx(ctx, txBytes)
-	return ok, resp, err
+	return txBytes, nil
 }

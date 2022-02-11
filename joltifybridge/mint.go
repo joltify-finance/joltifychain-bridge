@@ -2,7 +2,8 @@ package joltifybridge
 
 import (
 	"errors"
-	"html"
+	"fmt"
+	"sync"
 
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 	"gitlab.com/joltify/joltifychain-bridge/pubchain"
@@ -34,8 +35,6 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error 
 		return errors.New("invalid address")
 	}
 
-	// we always increase the account seq regardless the tx successful or not
-	accNum, accSeq := jc.AcquirePoolAccountInfo()
 	// we need to check against the previous account sequence
 	index := item.Hash().Hex()
 	if jc.CheckWhetherAlreadyExist(index) {
@@ -59,12 +58,34 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error 
 		Version:     tssclient.TssVersion,
 	}
 
-	ok, resp, err := jc.composeAndSend(issueReq, accSeq, accNum, &signMsg)
-	if err != nil || !ok {
-		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
+	// we always increase the account seq regardless the tx successful or not
+	accNum, accSeq := jc.AcquirePoolAccountInfo()
+	fmt.Printf("wwwwwyyyyyyyyyyyyyyyyy>seq:%v\n", accSeq)
+	//acc, err := queryAccount(pool[1].JoltifyAddress.String(), jc.grpcClient)
+	//if err != nil {
+	//	return errors.New("fail to query the account ")
+	//}
+	//accNum, accSeq := acc.GetAccountNumber(), acc.GetSequence()
+
+	txByte, err := jc.composeAndSend(issueReq, accSeq, accNum, &signMsg)
+	if err != nil {
+		jc.logger.Error().Err(err).Msgf("fail to compose the send tx")
 		return errors.New("fail to process the inbound tx")
 	}
-	tick := html.UnescapeString("&#" + "128229" + ";")
-	jc.logger.Info().Msgf("%v txid(%v) have successfully top up %s with %v", tick, resp, issueReq.Receiver.String(), issueReq.Coin.String())
+	bItem := broadcast{
+		item,
+		txByte,
+	}
+	data, exist := jc.broadcastChannel.Load(accNum)
+	if exist == false {
+		storage := sync.Map{}
+		storage.Store(accSeq, &bItem)
+		jc.broadcastChannel.Store(accNum, &storage)
+	} else {
+		storage := data.(*sync.Map)
+		storage.Store(accSeq, &bItem)
+		jc.broadcastChannel.Store(accNum, storage)
+	}
+	jc.IncreaseAccountSeq()
 	return nil
 }
