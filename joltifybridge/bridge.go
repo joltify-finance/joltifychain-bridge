@@ -505,6 +505,7 @@ func (jc *JoltifyChainInstance) BroadcastMsg(currentBlockHeight int64, pi *pubch
 				seq := key.(uint64)
 				jc.logger.Warn().Msgf("####2222the accseq %v =tearget %v\n", seq, acc.GetSequence())
 				if seq == acc.GetSequence() {
+					items.Delete(seq)
 					broadcastMsg := value.(*broadcast)
 					ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 					defer cancel()
@@ -514,7 +515,6 @@ func (jc *JoltifyChainInstance) BroadcastMsg(currentBlockHeight int64, pi *pubch
 						jc.logger.Error().Err(err).Msgf("fail to compose the tx -> %v", resp)
 						return true
 					}
-					items.Delete(seq)
 					tick := html.UnescapeString("&#" + "128229" + ";")
 					jc.logger.Info().Msgf("%v  have successfully top up %v", tick, resp)
 					return true

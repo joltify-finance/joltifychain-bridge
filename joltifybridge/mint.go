@@ -2,7 +2,6 @@ package joltifybridge
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"gitlab.com/joltify/joltifychain-bridge/misc"
@@ -36,13 +35,15 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error 
 	}
 
 	// we need to check against the previous account sequence
-	index := item.Hash().Hex()
-	if jc.CheckWhetherAlreadyExist(index) {
-		jc.logger.Warn().Msg("already submitted by others")
+	oldIndex := item.Hash().Hex()
+	if jc.CheckWhetherAlreadyExist(oldIndex) {
+		jc.logger.Warn().Msg("#################already submitted by others")
 		return nil
 	}
-
-	jc.logger.Info().Msgf("we are about to prepare the tx with other nodes with index %v", index)
+	// now we set the req with the new height
+	item.ApplyNewBlockHeight()
+	index := item.Hash().Hex()
+	jc.logger.Info().Msgf("we are about to prepare the tx with other nodes with index %v at height %v", index, item.GetItemHeight())
 	issueReq, err := prepareIssueTokenRequest(item, joltCreatorAddr.String(), index)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to prepare the issuing of the token")
@@ -60,7 +61,6 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error 
 
 	// we always increase the account seq regardless the tx successful or not
 	accNum, accSeq := jc.AcquirePoolAccountInfo()
-	fmt.Printf("wwwwwyyyyyyyyyyyyyyyyy>seq:%v\n", accSeq)
 	//acc, err := queryAccount(pool[1].JoltifyAddress.String(), jc.grpcClient)
 	//if err != nil {
 	//	return errors.New("fail to query the account ")

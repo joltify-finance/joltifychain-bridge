@@ -251,7 +251,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				pi.ShowItems()
 				itemInbound := pi.PopItem()
 				if itemInbound != nil {
-					itemInbound.SetItemHeight(int64(head.Number.Uint64()))
+					itemInbound.SetItemNewHeight(int64(head.Number.Uint64()))
 					pi.InboundReqChan <- itemInbound
 				}
 				// now we need to put the failed outbound request to the process channel

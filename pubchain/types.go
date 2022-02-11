@@ -33,17 +33,22 @@ const (
 
 // InboundReq is the account that top up account info to joltify pub_chain
 type InboundReq struct {
-	address     sdk.AccAddress
-	txID        []byte // this indicates the identical inbound req
-	toPoolAddr  common.Address
-	coin        sdk.Coin
-	blockHeight int64
+	address        sdk.AccAddress
+	txID           []byte // this indicates the identical inbound req
+	toPoolAddr     common.Address
+	coin           sdk.Coin
+	blockHeight    int64
+	newBlockHeight int64
 }
 
 func (i *InboundReq) Hash() common.Hash {
 	blockheightb := new(big.Int).SetInt64(i.blockHeight)
 	hash := crypto.Keccak256Hash(i.address.Bytes(), i.toPoolAddr.Bytes(), i.txID, blockheightb.Bytes())
 	return hash
+}
+
+func (i *InboundReq) ApplyNewBlockHeight() {
+	i.blockHeight = i.newBlockHeight
 }
 
 func NewAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coin sdk.Coin, txid []byte, blockHeight int64) InboundReq {
@@ -53,6 +58,7 @@ func NewAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coi
 		toPoolAddr,
 		coin,
 		blockHeight,
+		blockHeight,
 	}
 }
 
@@ -61,9 +67,9 @@ func (acq *InboundReq) GetInboundReqInfo() (sdk.AccAddress, common.Address, sdk.
 	return acq.address, acq.toPoolAddr, acq.coin, acq.blockHeight
 }
 
-// SetItemHeight sets the block height of the tx
-func (acq *InboundReq) SetItemHeight(blockHeight int64) {
-	acq.blockHeight = blockHeight
+// SetItemNewHeight sets the block height of the tx
+func (acq *InboundReq) SetItemNewHeight(blockHeight int64) {
+	acq.newBlockHeight = blockHeight
 }
 
 // GetItemHeight gets the block height of the tx
