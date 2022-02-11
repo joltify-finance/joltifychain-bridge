@@ -5,10 +5,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 	"html"
 	"strconv"
 	"sync"
+
+	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
@@ -362,9 +363,13 @@ func (jc *JoltifyChainInstance) CreatePoolAccInfo(accAddr string) error {
 		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
 		return err
 	}
+	seq := acc.GetSequence()
+	if acc.GetSequence() == 0 {
+		seq = 1
+	}
 	accInfo := poolAccInfo{
 		acc.GetAccountNumber(),
-		acc.GetSequence(),
+		seq,
 	}
 	jc.poolAccLocker.Lock()
 	jc.poolAccInfo = &accInfo
@@ -376,7 +381,6 @@ func (jc *JoltifyChainInstance) AcquirePoolAccountInfo() (uint64, uint64) {
 	jc.poolAccLocker.Lock()
 	defer jc.poolAccLocker.Unlock()
 	accSeq := jc.poolAccInfo.accSeq
-
 	accNum := jc.poolAccInfo.accountNum
 	return accNum, accSeq
 }
@@ -481,7 +485,7 @@ func (jc *JoltifyChainInstance) BroadcastMsg(currentBlockHeight int64, pi *pubch
 		accNum := key.(uint64)
 		jc.logger.Warn().Msgf("####111the accNum %v==currentNum %v\n", accNum, acc.GetAccountNumber())
 		if accNum != acc.GetAccountNumber() {
-			//we need to put all the request back to the retry pool
+			// we need to put all the request back to the retry pool
 			items := value.(*sync.Map)
 			items.Range(func(_, value interface{}) bool {
 				broadcastMsg := value.(*broadcast)
@@ -538,7 +542,7 @@ func (jc *JoltifyChainInstance) BroadcastMsg(currentBlockHeight int64, pi *pubch
 				fmt.Printf("WWWWWWWWWWWWWWWWWWWWWW skip>>>%v==target %v\n", seq, acc.GetSequence())
 				return true
 			})
-			//2. if the current accNum has empty map,we delete it
+			// 2. if the current accNum has empty map,we delete it
 			empty := true
 			items.Range(func(key, value interface{}) bool {
 				empty = false

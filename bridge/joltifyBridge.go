@@ -188,10 +188,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 							zlog.Log().Err(err).Msgf("fail to update the pool")
 						}
 						joltChain.UpdatePool(el)
-						err = joltChain.CreatePoolAccInfo(el.CreatePool.PoolAddr.String())
-						if err != nil {
-							zlog.Log().Err(err).Msgf("fail to require the pool account")
-						}
 					}
 				}
 
