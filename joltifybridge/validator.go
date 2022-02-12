@@ -109,7 +109,6 @@ func (jc *JoltifyChainInstance) CheckWhetherSigner(lastPoolInfo *vaulttypes.Pool
 func (jc *JoltifyChainInstance) CheckWhetherAlreadyExist(index string) bool {
 	ret, err := queryGivenToeknIssueTx(jc.grpcClient, index)
 	if err != nil {
-		jc.logger.Warn().Err(err).Msg("fail to query token with given index")
 		return false
 	}
 	if ret != nil {

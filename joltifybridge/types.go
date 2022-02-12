@@ -101,14 +101,7 @@ type JoltifyChainInstance struct {
 	lastTwoPools     []*bcommon.PoolInfo
 	OutboundReqChan  chan *OutBoundReq
 	RetryOutboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
-	poolAccInfo      *poolAccInfo
-	poolAccLocker    *sync.Mutex
 	moveFundReq      *sync.Map
-}
-
-type poolAccInfo struct {
-	accountNum uint64
-	accSeq     uint64
 }
 
 // info the import structure of the cosmos validator info

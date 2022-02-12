@@ -35,7 +35,12 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) error 
 	}
 
 	// we always increase the account seq regardless the tx successful or not
-	accNum, accSeq := jc.AcquirePoolAccountInfo()
+	acc, err := queryAccount(pool[1].JoltifyAddress.String(), jc.grpcClient)
+	if err != nil {
+		jc.logger.Error().Err(err).Msgf("fail to query the account")
+		return errors.New("invalid account query")
+	}
+	accSeq, accNum := acc.GetSequence(), acc.GetAccountNumber()
 	// we need to check against the previous account sequence
 	index := item.Hash().Hex()
 	if jc.CheckWhetherAlreadyExist(index) {

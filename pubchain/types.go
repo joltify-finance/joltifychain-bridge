@@ -40,8 +40,7 @@ type InboundReq struct {
 }
 
 func (i *InboundReq) Hash() common.Hash {
-	blockheightb := new(big.Int).SetInt64(i.blockHeight)
-	hash := crypto.Keccak256Hash(i.address.Bytes(), i.toPoolAddr.Bytes(), i.txID, blockheightb.Bytes())
+	hash := crypto.Keccak256Hash(i.address.Bytes(), i.txID)
 	return hash
 }
 
@@ -88,17 +87,17 @@ func (pi *PubChainInstance) PopItem() *InboundReq {
 func (pi *PubChainInstance) ShowItems() {
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
 		el := value.(*InboundReq)
-		pi.logger.Warn().Msgf("##########tx in the retry pool %v:%v\n", key, el.txID)
+		pi.logger.Warn().Msgf("tx in the prepare pool %v:%v\n", key, el.txID)
 		return true
 	})
 	return
 }
 
 type inboundTx struct {
-	address     sdk.AccAddress
-	blockHeight uint64
-	token       sdk.Coin
-	fee         sdk.Coin
+	address        sdk.AccAddress
+	pubBlockHeight uint64 //this variable is used to delete the expired tx
+	token          sdk.Coin
+	fee            sdk.Coin
 }
 
 type inboundTxBnb struct {

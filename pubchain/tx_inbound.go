@@ -203,8 +203,9 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 			payTxID := tx.Data()
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
-				item := NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, block.Number().Int64())
-				pi.InboundReqChan <- &item
+				item := NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, 0)
+				//we add to the retry pool to  sort the tx
+				pi.AddItem(&item)
 			}
 		}
 	}
@@ -268,7 +269,7 @@ func (pi *PubChainInstance) DeleteExpired(currentHeight uint64) {
 	var expiredTxBnb []string
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
 		el := value.(*inboundTx)
-		if currentHeight-el.blockHeight > config.TxTimeout {
+		if currentHeight-el.pubBlockHeight > config.TxTimeout {
 			expiredTx = append(expiredTx, key.(string))
 		}
 		return true

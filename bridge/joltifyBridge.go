@@ -188,11 +188,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 							zlog.Log().Err(err).Msgf("fail to update the pool")
 						}
 						joltChain.UpdatePool(el)
-						err = joltChain.CreatePoolAccInfo(el.CreatePool.PoolAddr.String())
-						if err != nil {
-							zlog.Log().Err(err).Msgf("fail to require the pool account")
-						}
 					}
+					continue
 				}
 
 				if NeedUpdate(poolInfo, currentPool) {
@@ -202,20 +199,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 					previousPool := joltChain.UpdatePool(poolInfo[0])
 					joltChain.AddMoveFundItem(previousPool, blockHeight)
-					err = joltChain.CreatePoolAccInfo(poolInfo[0].CreatePool.PoolAddr.String())
-					if err != nil {
-						zlog.Log().Err(err).Msgf("fail to require the pool account")
-					}
-
-					//disable the debug here
-					//pools := pi.GetPool()
-					//var poolsInfo []string
-					//for _, el := range pools {
-					//	if el != nil {
-					//		poolsInfo = append(poolsInfo, el.EthAddress.String())
-					//	}
-					//}
-					//zlog.Logger.Info().Msgf("the current pools are %v \n", poolsInfo)
 				}
 
 				// we move fund if some pool retired
@@ -241,6 +224,15 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 				}()
 
+				// now we need to put the failed inbound request to the process channel, for each new joltify block
+				// we process one failure
+				pi.ShowItems()
+				itemInbound := pi.PopItem()
+				if itemInbound != nil {
+					itemInbound.SetItemHeight(blockHeight)
+					pi.InboundReqChan <- itemInbound
+				}
+
 			case r := <-newJoltifyTxChan:
 				blockHeight := r.Data.(tmtypes.EventDataTx).Height
 				tx := r.Data.(tmtypes.EventDataTx).Tx
@@ -254,14 +246,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 				// we delete the expired tx
 				pi.DeleteExpired(head.Number.Uint64())
-				// now we need to put the failed inbound request to the process channel, for each new joltify block
-				// we process one failure
-				pi.ShowItems()
-				itemInbound := pi.PopItem()
-				if itemInbound != nil {
-					itemInbound.SetItemHeight(int64(head.Number.Uint64()))
-					pi.InboundReqChan <- itemInbound
-				}
+
 				// now we need to put the failed outbound request to the process channel
 				itemOutBound := joltChain.PopItem()
 				if itemOutBound != nil {
@@ -279,13 +264,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					continue
 				}
 				if found {
-					go func() {
-						err := joltChain.ProcessInBound(item)
-						if err != nil {
-							pi.AddItem(item)
-							zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
-						}
-					}()
+					err := joltChain.ProcessInBound(item)
+					if err != nil {
+						pi.AddItem(item)
+						zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
+					}
+
 				}
 
 			case item := <-joltChain.OutboundReqChan:
