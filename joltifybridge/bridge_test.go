@@ -155,10 +155,10 @@ func (b BridgeTestSuite) TestBridgeTx() {
 		PoolPubKey:  accs[1].pk,
 		BlockHeight: "5",
 	}
-	err = jc.CreatePoolAccInfo(b.network.Validators[0].Address.String())
+	acc, err := queryAccount(b.network.Validators[0].Address.String(), jc.grpcClient)
 	b.Require().NoError(err)
-	num, seq := jc.AcquirePoolAccountInfo()
 
+	num, seq := acc.GetAccountNumber(), acc.GetSequence()
 	_, err = b.network.WaitForHeightWithTimeout(5, time.Minute*5)
 	b.Require().NoError(err)
 	gas, err := jc.GasEstimation([]sdk.Msg{&tmsg}, seq, nil)

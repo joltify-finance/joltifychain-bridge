@@ -199,6 +199,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 					previousPool := joltChain.UpdatePool(poolInfo[0])
 					joltChain.AddMoveFundItem(previousPool, blockHeight)
+					pi.addMoveFundItem(previousPool.EthAddress, blockHeight)
 				}
 
 				// we move fund if some pool retired
@@ -280,15 +281,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					continue
 				}
 				if found {
-					go func() {
-						toAddr, fromAddr, amount, blockHeight := item.GetOutBoundInfo()
-						txHash, err := pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight)
-						if err != nil {
-							zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
-							joltChain.AddItem(item)
-						}
-						zlog.Logger.Info().Msgf(">>we have send outbound tx(%v) from %v to %v (%v)", txHash, fromAddr, toAddr, amount.String())
-					}()
+					toAddr, fromAddr, amount, blockHeight := item.GetOutBoundInfo()
+					txHash, err := pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight)
+					if err != nil {
+						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
+						joltChain.AddItem(item)
+					}
+					zlog.Logger.Info().Msgf(">>we have send outbound tx(%v) from %v to %v (%v)", txHash, fromAddr, toAddr, amount.String())
 				}
 
 			}
