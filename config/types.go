@@ -13,6 +13,7 @@ const (
 	OutBoundDenom  = "JUSD"
 	TxTimeout      = 300
 	GASFEERATIO    = "1.2"
+	MOVEFUNDFEE    = "0.001"
 )
 
 const (

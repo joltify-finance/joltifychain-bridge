@@ -95,7 +95,7 @@ func (pi *PubChainInstance) ShowItems() {
 
 type inboundTx struct {
 	address        sdk.AccAddress
-	pubBlockHeight uint64 //this variable is used to delete the expired tx
+	pubBlockHeight uint64 // this variable is used to delete the expired tx
 	token          sdk.Coin
 	fee            sdk.Coin
 }
@@ -120,6 +120,7 @@ type PubChainInstance struct {
 	tssServer          tssclient.TssSign
 	InboundReqChan     chan *InboundReq
 	RetryInboundReq    *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
+	moveFundReq        *sync.Map
 }
 
 // NewChainInstance initialize the joltify_bridge entity
@@ -155,5 +156,6 @@ func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssSign) (*PubCh
 		lastTwoPools:       make([]*bcommon.PoolInfo, 2),
 		InboundReqChan:     make(chan *InboundReq, reqCacheSize),
 		RetryInboundReq:    &sync.Map{},
+		moveFundReq:        &sync.Map{},
 	}, nil
 }

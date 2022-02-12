@@ -5,8 +5,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/crypto"
 	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
@@ -204,7 +206,7 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
 				item := NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, 0)
-				//we add to the retry pool to  sort the tx
+				// we add to the retry pool to  sort the tx
 				pi.AddItem(&item)
 			}
 		}
@@ -307,4 +309,56 @@ func (a *inboundTx) Verify() error {
 		return errors.New("the fee is not enough")
 	}
 	return nil
+}
+
+func (pi *PubChainInstance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64) {
+	pi.moveFundReq.Store(height, pool)
+}
+
+func (pi *PubChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
+	min := int64(math.MaxInt64)
+	pi.moveFundReq.Range(func(key, value interface{}) bool {
+		h := key.(int64)
+		if h <= min {
+			min = h
+		}
+		return true
+	})
+	if min < math.MaxInt64 {
+		item, _ := pi.moveFundReq.LoadAndDelete(min)
+		return item.(*bcommon.PoolInfo), min
+	}
+	return nil, 0
+}
+
+func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, address common.Address, i int64) (string, error) {
+	tokenInstance := pi.tokenInstance
+	balance, err := tokenInstance.BalanceOf(&bind.CallOpts{}, previousPool.EthAddress)
+	if err != nil {
+		return "", err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
+	defer cancel()
+	balanceBnB, err := pi.EthClient.BalanceAt(ctx, previousPool.EthAddress, nil)
+	if err != nil {
+		return "", err
+	}
+
+	if balance.Cmp(big.NewInt(0)) == 0 && balanceBnB.Cmp(big.NewInt(0)) == 0 {
+		pi.logger.Warn().Msg("0 balance do not need to move")
+		return "", nil
+	}
+
+	txHash, err := pi.SendToken(previousPool.EthAddress, address, balance, balanceBnB, i)
+	if err != nil {
+		if err.Error() == "already known" {
+			pi.logger.Warn().Msgf("the tx has been submitted by others")
+			return txHash, nil
+		}
+		pi.logger.Error().Err(err).Msgf("fail to send the token with err %v", err)
+		return "", err
+	}
+
+	return txHash, nil
 }
