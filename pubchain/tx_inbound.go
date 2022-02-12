@@ -5,12 +5,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
-
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/crypto"
 	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"html"
+	"math"
+	"math/big"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -204,7 +207,7 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
 				item := NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, 0)
-				//we add to the retry pool to  sort the tx
+				// we add to the retry pool to  sort the tx
 				pi.AddItem(&item)
 			}
 		}
@@ -307,4 +310,192 @@ func (a *inboundTx) Verify() error {
 		return errors.New("the fee is not enough")
 	}
 	return nil
+}
+
+func (pi *PubChainInstance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64) {
+	pi.moveFundReq.Store(height, pool)
+}
+
+func (pi *PubChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
+	min := int64(math.MaxInt64)
+	pi.moveFundReq.Range(func(key, value interface{}) bool {
+		h := key.(int64)
+		if h <= min {
+			min = h
+		}
+		return true
+	})
+	if min < math.MaxInt64 {
+		item, _ := pi.moveFundReq.LoadAndDelete(min)
+		return item.(*bcommon.PoolInfo), min
+	}
+	return nil, 0
+}
+
+//PopMoveFundItemAfterBlock pop up the item after the given block duration
+func (pi *PubChainInstance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
+	min := int64(math.MaxInt64)
+	pi.moveFundReq.Range(func(key, value interface{}) bool {
+		h := key.(int64)
+		if h <= min {
+			min = h
+		}
+		return true
+	})
+	if min < math.MaxInt64 && (currentBlockHeight-min > config.MINCHECKBLOCKGAP) {
+		item, _ := pi.moveFundReq.LoadAndDelete(min)
+		return item.(*bcommon.PoolInfo), min
+	}
+	return nil, 0
+}
+
+func (pi *PubChainInstance) moveBnb(senderPk string, receiver common.Address, amount *big.Int, nonce uint64, blockHeight int64) (string, error) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
+	defer cancel()
+	chainID, err := pi.EthClient.NetworkID(ctx)
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to get the chain ID")
+		return "", err
+	}
+
+	gasPrice, err := pi.EthClient.SuggestGasPrice(context.Background())
+	if err != nil {
+		return "", err
+	}
+
+	gasLimit, err := pi.EthClient.EstimateGas(context.Background(), ethereum.CallMsg{
+		To:   &receiver,
+		Data: nil,
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	totalBnb := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(gasLimit))
+
+	totalBnbDec := sdk.NewDecFromBigIntWithPrec(totalBnb, sdk.Precision)
+	totalBnbDec = totalBnbDec.Mul(sdk.MustNewDecFromStr("1.2"))
+
+	moveFund := amount.Sub(amount, totalBnbDec.BigInt())
+	moveFundS := sdk.NewDecFromBigIntWithPrec(moveFund, sdk.Precision)
+	pi.logger.Info().Msgf("we need to move %v bnb", moveFundS.String())
+
+	dustBnb, err := sdk.NewDecFromStr(config.DUSTBNB)
+	if err != nil {
+		panic("invalid parameter")
+	}
+
+	if moveFund.Cmp(dustBnb.BigInt()) != 1 {
+		return "", nil
+	}
+	baseTx := ethTypes.LegacyTx{
+		Nonce:    nonce,
+		GasPrice: gasPrice,
+		Gas:      gasLimit,
+		To:       &receiver,
+		Data:     nil,
+		Value:    moveFund,
+	}
+
+	rawTx := ethTypes.NewTx(&baseTx)
+
+	signer := ethTypes.LatestSignerForChainID(chainID)
+	msg := signer.Hash(rawTx).Bytes()
+	signature, err := pi.tssSign(msg, senderPk, blockHeight)
+	if err != nil || len(signature) != 65 {
+		return "", errors.New("fail to get the valid signature")
+	}
+	bTx, err := rawTx.WithSignature(signer, signature)
+	if err != nil {
+		return "", err
+	}
+
+	err = pi.EthClient.SendTransaction(ctx, bTx)
+	if err != nil {
+		if err.Error() == "already known" || err.Error() == "replacement transaction underpriced" {
+			pi.logger.Warn().Msgf("the tx has been submitted by others")
+			return rawTx.Hash().Hex(), nil
+		} else {
+			return "", err
+		}
+	}
+
+	return rawTx.Hash().Hex(), nil
+}
+
+func (pi *PubChainInstance) moveERC20Token(senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64) (string, error) {
+
+	txHash, err := pi.SendToken(senderPk, sender, receiver, balance, blockheight)
+	if err != nil {
+		if err.Error() == "already known" {
+			pi.logger.Warn().Msgf("the tx has been submitted by others")
+			return txHash.Hex(), nil
+		}
+		pi.logger.Error().Err(err).Msgf("fail to send the token with err %v for amount %v ", err, balance)
+		return "", err
+	}
+
+	return txHash.Hex(), nil
+}
+
+func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, error) {
+	tokenInstance := pi.tokenInstance
+	balance, err := tokenInstance.BalanceOf(&bind.CallOpts{}, previousPool.EthAddress)
+	if err != nil {
+		return false, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
+	defer cancel()
+	balanceBnB, err := pi.EthClient.BalanceAt(ctx, previousPool.EthAddress, nil)
+	if err != nil {
+		return false, err
+	}
+
+	dustBnb, err := sdk.NewDecFromStr(config.DUSTBNB)
+	if err != nil {
+		panic("invalid parameter")
+	}
+
+	tick := html.UnescapeString("&#" + "9193" + ";")
+	pi.logger.Info().Msgf(" %v we move fund from %v to %v\n", tick, previousPool.EthAddress.String(), receiver.String())
+
+	if balance.Cmp(big.NewInt(0)) == 0 && balanceBnB.Cmp(dustBnb.BigInt()) != 1 {
+		return true, nil
+	}
+
+	var erc20TxHash, bnbTxHash string
+	if balance.Cmp(big.NewInt(0)) == 1 {
+		erc20TxHash, err = pi.moveERC20Token(previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight)
+		//if we fail erc20 token transfer, we should not transfer the bnb otherwise,we do not have enough fee to pay retry
+		if err != nil {
+			return false, errors.New("fail to transfer erc20 token")
+		} else {
+			//next round, we will handle bnb transfer
+			return false, nil
+		}
+	} else {
+		pi.logger.Warn().Msg("0 ERC20 balance do not need to move as")
+	}
+
+	//now we move the bnb
+
+	if balanceBnB.Cmp(big.NewInt(0)) == 1 {
+		//we move the bnb
+		nonce, err := pi.EthClient.NonceAt(context.Background(), previousPool.EthAddress, nil)
+		if err != nil {
+			return false, err
+		}
+		bnbTxHash, err = pi.moveBnb(previousPool.Pk, receiver, balanceBnB, nonce, blockHeight)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	tick = html.UnescapeString("&#" + "127974" + ";")
+	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain with tx (ERC20): %v, (BNB): %v", tick, erc20TxHash, bnbTxHash)
+
+	return false, nil
 }

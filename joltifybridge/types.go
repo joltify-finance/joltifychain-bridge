@@ -1,6 +1,7 @@
 package joltifybridge
 
 import (
+	"gitlab.com/joltify/joltifychain-bridge/config"
 	"math/big"
 	"sync"
 	"time"
@@ -39,6 +40,24 @@ type tssPoolMsg struct {
 
 func (pi *JoltifyChainInstance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64) {
 	pi.moveFundReq.Store(height, pool)
+}
+
+//PopMoveFundItemAfterBlock pop a move fund item after give block duration
+func (pi *JoltifyChainInstance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
+	min := int64(math.MaxInt64)
+	pi.moveFundReq.Range(func(key, value interface{}) bool {
+		h := key.(int64)
+		if h <= min {
+			min = h
+		}
+		return true
+	})
+
+	if min < math.MaxInt64 && (currentBlockHeight-min > config.MINCHECKBLOCKGAP) {
+		item, _ := pi.moveFundReq.LoadAndDelete(min)
+		return item.(*bcommon.PoolInfo), min
+	}
+	return nil, 0
 }
 
 func (pi *JoltifyChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
@@ -102,6 +121,7 @@ type JoltifyChainInstance struct {
 	OutboundReqChan  chan *OutBoundReq
 	RetryOutboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq      *sync.Map
+	CurrentHeight    int64
 }
 
 // info the import structure of the cosmos validator info

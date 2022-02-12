@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"html"
 	"math/big"
 	"strings"
 
@@ -153,22 +152,23 @@ func (jc *JoltifyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.P
 	return previousPool
 }
 
-func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) error {
+func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) (bool, error) {
 	from := fromPool.JoltifyAddress
 	acc, err := queryAccount(from.String(), jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
-		return err
+		return false, err
 	}
 	coins, err := queryBalance(from.String(), jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("Fail to query the balance")
-		return err
+		return false, err
 	}
 	if len(coins) == 0 {
 		jc.logger.Warn().Msg("we do not have any balance skip send")
-		return nil
+		return true, nil
 	}
+
 	msg := banktypes.NewMsgSend(from, to, coins)
 
 	signMsg := tssclient.TssSignigMsg{
@@ -181,11 +181,9 @@ func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.A
 	ok, resp, err := jc.composeAndSend(msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg)
 	if err != nil || !ok {
 		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
-		return errors.New("fail to process the inbound tx")
+		return false, errors.New("fail to process the inbound tx")
 	}
-	tick := html.UnescapeString("&#" + "127974" + ";")
-	jc.logger.Info().Msgf("%v txid(%v) have successfully move funds from %v to %v", tick, resp, from.String(), to.String())
-	return nil
+	return false, nil
 }
 
 // GetOutBoundInfo return the outbound tx info
