@@ -350,7 +350,7 @@ func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, address co
 		return "", nil
 	}
 
-	txHash, err := pi.SendToken(previousPool.EthAddress, address, balance, i)
+	txHash, err := pi.SendToken(previousPool.Pk, previousPool.EthAddress, address, balance, i)
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")
