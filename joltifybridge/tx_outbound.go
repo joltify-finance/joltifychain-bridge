@@ -169,6 +169,7 @@ func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.A
 		jc.logger.Warn().Msg("we do not have any balance skip send")
 		return nil
 	}
+
 	msg := banktypes.NewMsgSend(from, to, coins)
 
 	signMsg := tssclient.TssSignigMsg{

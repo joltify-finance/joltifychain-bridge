@@ -180,6 +180,15 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					continue
 				}
 
+				// now we need to put the failed inbound request to the process channel, for each new joltify block
+				// we process one failure
+				pi.ShowItems()
+				itemInbound := pi.PopItem()
+				if itemInbound != nil {
+					itemInbound.SetItemHeight(blockHeight)
+					pi.InboundReqChan <- itemInbound
+				}
+
 				currentPool := pi.GetPool()
 				// this means the pools has not been filled with two address
 				if currentPool[0] == nil {
@@ -194,45 +203,36 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 				if NeedUpdate(poolInfo, currentPool) {
+					fmt.Printf("####we need to update\n")
 					err := pi.UpdatePool(poolInfo[0])
 					if err != nil {
 						zlog.Log().Err(err).Msgf("fail to update the pool")
 					}
 					previousPool := joltChain.UpdatePool(poolInfo[0])
-					joltChain.AddMoveFundItem(previousPool, blockHeight)
-					pi.AddMoveFundItem(previousPool, blockHeight)
+					if previousPool.Pk != poolInfo[0].CreatePool.PoolPubKey {
+						joltChain.AddMoveFundItem(previousPool, blockHeight)
+						pi.AddMoveFundItem(previousPool, blockHeight)
+					}
 				}
 
 				// we move fund if some pool retired
-				go func() {
-					previousPool, h := joltChain.PopMoveFundItem()
-					if previousPool == nil {
-						return
-					}
-					// we get the latest pool address and move funds to the latest pool
-					currentPool := pi.GetPool()
-					isSigner, err := joltChain.CheckWhetherSigner(previousPool.PoolInfo)
-					if err != nil {
-						zlog.Logger.Warn().Msg("fail in check whether we are signer in moving fund")
-						return
-					}
-					if !isSigner {
-						return
-					}
-					err = joltChain.MoveFunds(previousPool, currentPool[1].JoltifyAddress, blockHeight)
-					if err != nil {
-						zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.JoltifyAddress.String(), poolInfo[1].CreatePool.PoolAddr.String())
-						joltChain.AddMoveFundItem(previousPool, h)
-					}
-				}()
-
-				// now we need to put the failed inbound request to the process channel, for each new joltify block
-				// we process one failure
-				pi.ShowItems()
-				itemInbound := pi.PopItem()
-				if itemInbound != nil {
-					itemInbound.SetItemHeight(blockHeight)
-					pi.InboundReqChan <- itemInbound
+				previousPool, h := joltChain.PopMoveFundItem()
+				if previousPool == nil {
+					continue
+				}
+				// we get the latest pool address and move funds to the latest pool
+				isSigner, err := joltChain.CheckWhetherSigner(previousPool.PoolInfo)
+				if err != nil {
+					zlog.Logger.Warn().Msg("fail in check whether we are signer in moving fund")
+					continue
+				}
+				if !isSigner {
+					continue
+				}
+				err = joltChain.MoveFunds(previousPool, currentPool[1].JoltifyAddress, blockHeight)
+				if err != nil {
+					zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.JoltifyAddress.String(), poolInfo[1].CreatePool.PoolAddr.String())
+					joltChain.AddMoveFundItem(previousPool, h)
 				}
 
 			case r := <-newJoltifyTxChan:
@@ -257,30 +257,29 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 				// we move fund in the public chain
-				go func() {
-					previousPool, h := pi.PopMoveFundItem()
-					if previousPool == nil {
-						return
-					}
-					// we get the latest pool address and move funds to the latest pool
-					currentPool := pi.GetPool()
-					isSigner, err := joltChain.CheckWhetherSigner(previousPool.PoolInfo)
-					if err != nil {
-						zlog.Logger.Warn().Msg("fail in check whether we are signer in moving fund")
-						return
-					}
-					if !isSigner {
-						return
-					}
-					txHash, err := pi.MoveFunds(previousPool, currentPool[1].EthAddress, head.Number.Int64())
-					if err != nil {
-						zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
-						pi.AddMoveFundItem(previousPool, h)
-					}
+				previousPool, h := pi.PopMoveFundItem()
+				if previousPool == nil {
+					continue
+				}
+				// we get the latest pool address and move funds to the latest pool
+				currentPool := pi.GetPool()
+				isSigner, err := joltChain.CheckWhetherSigner(previousPool.PoolInfo)
+				if err != nil {
+					zlog.Logger.Warn().Msg("fail in check whether we are signer in moving fund")
+					continue
+				}
+				if !isSigner {
+					continue
+				}
+				txHash, err := pi.MoveFunds(previousPool, currentPool[1].EthAddress, head.Number.Int64())
+				if err != nil {
+					zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
+					pi.AddMoveFundItem(previousPool, h)
+					continue
+				}
 
-					tick := html.UnescapeString("&#" + "127974" + ";")
-					zlog.Logger.Info().Msgf(" %v we have moved the fund in the pubchain with tx: %v", tick, txHash)
-				}()
+				tick := html.UnescapeString("&#" + "127974" + ";")
+				zlog.Logger.Info().Msgf(" %v we have moved the fund in the pubchain with tx: %v", tick, txHash)
 
 			// process the in-bound top up event which will mint coin for users
 			case item := <-pi.InboundReqChan:

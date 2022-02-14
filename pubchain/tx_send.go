@@ -14,12 +14,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	common3 "github.com/joltgeorge/tss/common"
-	"gitlab.com/joltify/joltifychain-bridge/config"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 // SendToken sends the token to the public chain
-func (pi *PubChainInstance) SendToken(sender, receiver common.Address, amount, amountBnB *big.Int, blockHeight int64) (string, error) {
+func (pi *PubChainInstance) SendToken(sender, receiver common.Address, amount *big.Int, blockHeight int64) (string, error) {
 	tokenInstance := pi.tokenInstance
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
@@ -32,15 +31,6 @@ func (pi *PubChainInstance) SendToken(sender, receiver common.Address, amount, a
 	if err != nil {
 		return "", err
 	}
-
-	moveFundFee, err := sdk.NewDecFromStr(config.MOVEFUNDFEE)
-	if err != nil {
-		panic("invalid parameter")
-	}
-
-	txo.Value = new(big.Int).Sub(amountBnB, moveFundFee.BigInt())
-	moneyToMove := sdk.NewDecFromBigIntWithPrec(txo.Value, sdk.Precision)
-	pi.logger.Info().Msgf("we need to move %v", moneyToMove.String())
 
 	ret, err := tokenInstance.Transfer(txo, receiver, amount)
 	if err != nil {
@@ -55,7 +45,7 @@ func (pi *PubChainInstance) SendToken(sender, receiver common.Address, amount, a
 // ProcessOutBound send the money to public chain
 func (pi *PubChainInstance) ProcessOutBound(toAddr, fromAddr common.Address, amount *big.Int, blockHeight int64) (string, error) {
 	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18))
-	txHash, err := pi.SendToken(fromAddr, toAddr, amount, big.NewInt(0), blockHeight)
+	txHash, err := pi.SendToken(fromAddr, toAddr, amount, blockHeight)
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")

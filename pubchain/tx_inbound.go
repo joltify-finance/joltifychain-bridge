@@ -345,18 +345,18 @@ func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, address co
 		return "", err
 	}
 
-	if balance.Cmp(big.NewInt(0)) == 0 && balanceBnB.Cmp(big.NewInt(0)) == 0 {
+	if balance.Cmp(big.NewInt(0)) == 0 {
 		pi.logger.Warn().Msg("0 balance do not need to move")
 		return "", nil
 	}
 
-	txHash, err := pi.SendToken(previousPool.EthAddress, address, balance, balanceBnB, i)
+	txHash, err := pi.SendToken(previousPool.EthAddress, address, balance, i)
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")
 			return txHash, nil
 		}
-		pi.logger.Error().Err(err).Msgf("fail to send the token with err %v", err)
+		pi.logger.Error().Err(err).Msgf("fail to send the token with err %v for amount %v with bnb balance %v", err, balance, balanceBnB)
 		return "", err
 	}
 
