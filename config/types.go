@@ -13,13 +13,13 @@ const (
 	OutBoundDenom  = "JUSD"
 	TxTimeout      = 300
 	GASFEERATIO    = "1.2"
-	MOVEFUNDFEE    = "0.001"
+	DUSTBNB        = "0.0001"
 )
 
 const (
 	InBound = iota
 	OutBound
-	QueryTimeOut = time.Second * 3
+	QueryTimeOut = time.Second * 6
 )
 
 // direction is the direction of the joltify_bridge

@@ -119,7 +119,7 @@ func (pi *PubChainInstance) composeTx(signerPk string, sender common.Address, ch
 			}
 			msg := signer.Hash(tx).Bytes()
 			signature, err := pi.tssSign(msg, signerPk, blockHeight)
-			if err != nil {
+			if err != nil || len(signature) != 65 {
 				return nil, errors.New("fail to sign the tx")
 			}
 			return tx.WithSignature(signer, signature)

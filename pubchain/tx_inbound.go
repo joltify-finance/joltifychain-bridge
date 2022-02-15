@@ -335,14 +335,10 @@ func (pi *PubChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
 	return nil, 0
 }
 
-func checkPending() {
-
-}
-
 func (pi *PubChainInstance) moveBnb(senderPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64) (string, error) {
 	nonce, err := pi.EthClient.NonceAt(context.Background(), sender, nil)
 	if err != nil {
-		fmt.Printf(">>>>>>%v\n", err)
+		return "", err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
@@ -362,17 +358,35 @@ func (pi *PubChainInstance) moveBnb(senderPk string, sender, receiver common.Add
 		To:   &receiver,
 		Data: nil,
 	})
+
 	if err != nil {
 		return "", err
 	}
 
+	totalBnb := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(gasLimit))
+
+	totalBnbDec := sdk.NewDecFromBigIntWithPrec(totalBnb, sdk.Precision)
+	totalBnbDec = totalBnbDec.Mul(sdk.MustNewDecFromStr("1.2"))
+
+	moveFund := amount.Sub(amount, totalBnbDec.BigInt())
+	moveFundS := sdk.NewDecFromBigIntWithPrec(moveFund, sdk.Precision)
+	pi.logger.Info().Msgf("we need to move %v bnb", moveFundS.String())
+
+	dustBnb, err := sdk.NewDecFromStr(config.DUSTBNB)
+	if err != nil {
+		panic("invalid parameter")
+	}
+
+	if moveFund.Cmp(dustBnb.BigInt()) != 1 {
+		return "", nil
+	}
 	baseTx := ethTypes.LegacyTx{
 		Nonce:    nonce,
 		GasPrice: gasPrice,
 		Gas:      gasLimit,
 		To:       &receiver,
 		Data:     nil,
-		Value:    amount,
+		Value:    moveFund,
 	}
 
 	rawTx := ethTypes.NewTx(&baseTx)
@@ -380,21 +394,25 @@ func (pi *PubChainInstance) moveBnb(senderPk string, sender, receiver common.Add
 	signer := ethTypes.LatestSignerForChainID(chainID)
 	msg := signer.Hash(rawTx).Bytes()
 	signature, err := pi.tssSign(msg, senderPk, blockHeight)
-	if err != nil {
-		return "", err
+	if err != nil || len(signature) != 65 {
+		return "", errors.New("fail to get the valid signature")
 	}
 	bTx, err := rawTx.WithSignature(signer, signature)
 	if err != nil {
 		return "", err
 	}
 
-	err = pi.EthClient.SendTransaction(context.Background(), bTx)
+	err = pi.EthClient.SendTransaction(ctx, bTx)
 	if err != nil {
-		return "", err
+		if err.Error() == "already known" || err.Error() == "replacement transaction underpriced" {
+			pi.logger.Warn().Msgf("the tx has been submitted by others")
+		} else {
+			return "", err
+		}
 	}
 
 	op := func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*config.QueryTimeOut)
+		ctx, cancel := context.WithTimeout(ctx, time.Second*config.QueryTimeOut)
 		defer cancel()
 		_, ispending, err := pi.EthClient.TransactionByHash(ctx, rawTx.Hash())
 		if err != nil || ispending {
@@ -449,11 +467,30 @@ func (pi *PubChainInstance) moveERC20Token(senderPk string, sender, receiver com
 	return txHash.Hex(), nil
 }
 
-func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) error {
+func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, error) {
 	tokenInstance := pi.tokenInstance
 	balance, err := tokenInstance.BalanceOf(&bind.CallOpts{}, previousPool.EthAddress)
 	if err != nil {
-		return err
+		return false, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
+	defer cancel()
+	balanceBnB, err := pi.EthClient.BalanceAt(ctx, previousPool.EthAddress, nil)
+	if err != nil {
+		return false, err
+	}
+
+	dustBnb, err := sdk.NewDecFromStr(config.DUSTBNB)
+	if err != nil {
+		panic("invalid parameter")
+	}
+
+	tick := html.UnescapeString("&#" + "9193" + ";")
+	pi.logger.Info().Msgf(" %v we move fund from %v to %v\n", tick, previousPool.EthAddress.String(), receiver.String())
+
+	if balance.Cmp(big.NewInt(0)) == 0 && balanceBnB.Cmp(dustBnb.BigInt()) != 1 {
+		return true, nil
 	}
 
 	var erc20TxHash, bnbTxHash string
@@ -461,7 +498,7 @@ func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, receiver c
 		erc20TxHash, err = pi.moveERC20Token(previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight)
 		//if we fail erc20 token transfer, we should not transfer the bnb otherwise,we do not have enough fee to pay retry
 		if err != nil {
-			return errors.New("fail to transfer erc20 token")
+			return false, errors.New("fail to transfer erc20 token")
 		}
 	} else {
 		pi.logger.Warn().Msg("0 ERC20 balance do not need to move as")
@@ -469,23 +506,16 @@ func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, receiver c
 
 	//now we move the bnb
 
-	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
-	defer cancel()
-	balanceBnB, err := pi.EthClient.BalanceAt(ctx, receiver, nil)
-	if err != nil {
-		return err
-	}
 	if balanceBnB.Cmp(big.NewInt(0)) == 1 {
 		//we move the bnb
 		bnbTxHash, err = pi.moveBnb(previousPool.Pk, previousPool.EthAddress, receiver, balanceBnB, blockHeight)
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
-	pi.logger.Info().Msgf("successfully fund")
 
-	tick := html.UnescapeString("&#" + "127974" + ";")
+	tick = html.UnescapeString("&#" + "127974" + ";")
 	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain with tx (ERC20): %v, (BNB): %v", tick, erc20TxHash, bnbTxHash)
 
-	return nil
+	return false, nil
 }

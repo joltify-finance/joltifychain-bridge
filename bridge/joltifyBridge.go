@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"fmt"
+	"html"
 	"io/ioutil"
 	"log"
 	"os"
@@ -202,7 +203,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 				if NeedUpdate(poolInfo, currentPool) {
-					fmt.Printf("####we need to update\n")
 					err := pi.UpdatePool(poolInfo[0])
 					if err != nil {
 						zlog.Log().Err(err).Msgf("fail to update the pool")
@@ -270,12 +270,19 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				if !isSigner {
 					continue
 				}
-				err = pi.MoveFunds(previousPool, currentPool[1].EthAddress, head.Number.Int64())
+				emptyAccount, err := pi.MoveFunds(previousPool, currentPool[1].EthAddress, head.Number.Int64())
 				if err != nil {
 					zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
 					pi.AddMoveFundItem(previousPool, h)
 					continue
 				}
+				if emptyAccount {
+					tick := html.UnescapeString("&#" + "9989" + ";")
+					zlog.Logger.Info().Msgf("%v account %v is clear no need to move", tick, previousPool.EthAddress.String())
+					continue
+				}
+				//we add this account to "retry" to ensure it is the empty account in the next balance check
+				pi.AddMoveFundItem(previousPool, h)
 
 			// process the in-bound top up event which will mint coin for users
 			case item := <-pi.InboundReqChan:
