@@ -3,7 +3,6 @@ package bridge
 import (
 	"context"
 	"fmt"
-	"html"
 	"io/ioutil"
 	"log"
 	"os"
@@ -271,15 +270,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				if !isSigner {
 					continue
 				}
-				txHash, err := pi.MoveFunds(previousPool, currentPool[1].EthAddress, head.Number.Int64())
+				err = pi.MoveFunds(previousPool, currentPool[1].EthAddress, head.Number.Int64())
 				if err != nil {
 					zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
 					pi.AddMoveFundItem(previousPool, h)
 					continue
 				}
-
-				tick := html.UnescapeString("&#" + "127974" + ";")
-				zlog.Logger.Info().Msgf(" %v we have moved the fund in the pubchain with tx: %v", tick, txHash)
 
 			// process the in-bound top up event which will mint coin for users
 			case item := <-pi.InboundReqChan:

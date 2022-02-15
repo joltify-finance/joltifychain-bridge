@@ -5,8 +5,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/cenkalti/backoff"
+	"github.com/ethereum/go-ethereum"
+	"html"
 	"math"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -331,34 +335,157 @@ func (pi *PubChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
 	return nil, 0
 }
 
-func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, address common.Address, i int64) (string, error) {
-	tokenInstance := pi.tokenInstance
-	balance, err := tokenInstance.BalanceOf(&bind.CallOpts{}, previousPool.EthAddress)
+func checkPending() {
+
+}
+
+func (pi *PubChainInstance) moveBnb(senderPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64) (string, error) {
+	nonce, err := pi.EthClient.NonceAt(context.Background(), sender, nil)
 	if err != nil {
-		return "", err
+		fmt.Printf(">>>>>>%v\n", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel()
-	balanceBnB, err := pi.EthClient.BalanceAt(ctx, previousPool.EthAddress, nil)
+	chainID, err := pi.EthClient.NetworkID(ctx)
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to get the chain ID")
+		return "", err
+	}
+
+	gasPrice, err := pi.EthClient.SuggestGasPrice(context.Background())
 	if err != nil {
 		return "", err
 	}
 
-	if balance.Cmp(big.NewInt(0)) == 0 {
-		pi.logger.Warn().Msg("0 balance do not need to move")
-		return "", nil
+	gasLimit, err := pi.EthClient.EstimateGas(context.Background(), ethereum.CallMsg{
+		To:   &receiver,
+		Data: nil,
+	})
+	if err != nil {
+		return "", err
 	}
 
-	txHash, err := pi.SendToken(previousPool.Pk, previousPool.EthAddress, address, balance, i)
+	baseTx := ethTypes.LegacyTx{
+		Nonce:    nonce,
+		GasPrice: gasPrice,
+		Gas:      gasLimit,
+		To:       &receiver,
+		Data:     nil,
+		Value:    amount,
+	}
+
+	rawTx := ethTypes.NewTx(&baseTx)
+
+	signer := ethTypes.LatestSignerForChainID(chainID)
+	msg := signer.Hash(rawTx).Bytes()
+	signature, err := pi.tssSign(msg, senderPk, blockHeight)
+	if err != nil {
+		return "", err
+	}
+	bTx, err := rawTx.WithSignature(signer, signature)
+	if err != nil {
+		return "", err
+	}
+
+	err = pi.EthClient.SendTransaction(context.Background(), bTx)
+	if err != nil {
+		return "", err
+	}
+
+	op := func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*config.QueryTimeOut)
+		defer cancel()
+		_, ispending, err := pi.EthClient.TransactionByHash(ctx, rawTx.Hash())
+		if err != nil || ispending {
+			return err
+		}
+		return nil
+	}
+	bf := backoff.NewExponentialBackOff()
+	bf.InitialInterval = time.Second
+	bf.MaxInterval = time.Second * 6
+	bfRetry := backoff.WithMaxRetries(bf, 3)
+
+	err = backoff.Retry(op, bfRetry)
+	if err != nil {
+		fmt.Printf("fail to submit the tx")
+		return "", err
+	}
+	return rawTx.Hash().Hex(), nil
+}
+
+func (pi *PubChainInstance) moveERC20Token(senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64) (string, error) {
+
+	txHash, err := pi.SendToken(senderPk, sender, receiver, balance, blockheight)
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")
-			return txHash, nil
+			return txHash.Hex(), nil
 		}
-		pi.logger.Error().Err(err).Msgf("fail to send the token with err %v for amount %v with bnb balance %v", err, balance, balanceBnB)
+		pi.logger.Error().Err(err).Msgf("fail to send the token with err %v for amount %v ", err, balance)
 		return "", err
 	}
 
-	return txHash, nil
+	op := func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*config.QueryTimeOut)
+		defer cancel()
+		_, ispending, err := pi.EthClient.TransactionByHash(ctx, txHash)
+		if err != nil || ispending {
+			return err
+		}
+		return nil
+	}
+	bf := backoff.NewExponentialBackOff()
+	bf.InitialInterval = time.Second
+	bf.MaxInterval = time.Second * 6
+	bfRetry := backoff.WithMaxRetries(bf, 3)
+
+	err = backoff.Retry(op, bfRetry)
+	if err != nil {
+		fmt.Printf("fail to submit the tx")
+		return "", err
+	}
+	return txHash.Hex(), nil
+}
+
+func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) error {
+	tokenInstance := pi.tokenInstance
+	balance, err := tokenInstance.BalanceOf(&bind.CallOpts{}, previousPool.EthAddress)
+	if err != nil {
+		return err
+	}
+
+	var erc20TxHash, bnbTxHash string
+	if balance.Cmp(big.NewInt(0)) == 1 {
+		erc20TxHash, err = pi.moveERC20Token(previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight)
+		//if we fail erc20 token transfer, we should not transfer the bnb otherwise,we do not have enough fee to pay retry
+		if err != nil {
+			return errors.New("fail to transfer erc20 token")
+		}
+	} else {
+		pi.logger.Warn().Msg("0 ERC20 balance do not need to move as")
+	}
+
+	//now we move the bnb
+
+	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
+	defer cancel()
+	balanceBnB, err := pi.EthClient.BalanceAt(ctx, receiver, nil)
+	if err != nil {
+		return err
+	}
+	if balanceBnB.Cmp(big.NewInt(0)) == 1 {
+		//we move the bnb
+		bnbTxHash, err = pi.moveBnb(previousPool.Pk, previousPool.EthAddress, receiver, balanceBnB, blockHeight)
+		if err != nil {
+			return err
+		}
+	}
+	pi.logger.Info().Msgf("successfully fund")
+
+	tick := html.UnescapeString("&#" + "127974" + ";")
+	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain with tx (ERC20): %v, (BNB): %v", tick, erc20TxHash, bnbTxHash)
+
+	return nil
 }
