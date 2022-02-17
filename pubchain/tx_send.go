@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"gitlab.com/joltify/joltifychain-bridge/config"
+
 	"fmt"
+	"github.com/ethereum/go-ethereum"
 	"html"
 	"math/big"
 	"sync"
@@ -36,11 +39,36 @@ func (pi *PubChainInstance) SendToken(signerPk string, sender, receiver common.A
 		return common.Hash{}, err
 	}
 
+	data, err := pi.tokenAbi.Pack("transfer", receiver, amount)
+	if err != nil {
+		pi.logger.Error().Msgf("fail to pack the data")
+		return common.Hash{}, err
+	}
+
+	gasLimit, err := pi.EthClient.EstimateGas(context.Background(), ethereum.CallMsg{
+		To:   &receiver,
+		Data: data,
+	})
+
+	if err != nil {
+		return common.Hash{}, err
+	}
+
+	gasLimitd := new(big.Int).SetUint64(gasLimit)
+
+	gasLimitDec := sdk.NewDecFromBigIntWithPrec(gasLimitd, sdk.Precision)
+
+	gasLimitDec = gasLimitDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO))
+
+	txo.GasLimit = gasLimitDec.BigInt().Uint64()
+	fmt.Printf(">>>>>>>>>>>>------%v\n", txo.GasLimit)
+
 	ret, err := tokenInstance.Transfer(txo, receiver, amount)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to send the token to the address %v with amount %v", receiver, amount.String())
 		return common.Hash{}, err
 	}
+
 	return ret.Hash(), nil
 }
 

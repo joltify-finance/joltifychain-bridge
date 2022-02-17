@@ -368,7 +368,6 @@ func (pi *PubChainInstance) moveBnb(senderPk string, receiver common.Address, am
 		To:   &receiver,
 		Data: nil,
 	})
-
 	if err != nil {
 		return "", err
 	}
@@ -376,7 +375,7 @@ func (pi *PubChainInstance) moveBnb(senderPk string, receiver common.Address, am
 	totalBnb := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(gasLimit))
 
 	totalBnbDec := sdk.NewDecFromBigIntWithPrec(totalBnb, sdk.Precision)
-	totalBnbDec = totalBnbDec.Mul(sdk.MustNewDecFromStr("1.2"))
+	totalBnbDec = totalBnbDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO))
 
 	moveFund := amount.Sub(amount, totalBnbDec.BigInt())
 	moveFundS := sdk.NewDecFromBigIntWithPrec(moveFund, sdk.Precision)
@@ -400,7 +399,6 @@ func (pi *PubChainInstance) moveBnb(senderPk string, receiver common.Address, am
 	}
 
 	rawTx := ethTypes.NewTx(&baseTx)
-
 	signer := ethTypes.LatestSignerForChainID(chainID)
 	msg := signer.Hash(rawTx).Bytes()
 	signature, err := pi.tssSign(msg, senderPk, blockHeight)

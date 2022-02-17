@@ -12,7 +12,7 @@ const (
 	InBoundDenom     = "JUSD"
 	OutBoundDenom    = "JUSD"
 	TxTimeout        = 300
-	GASFEERATIO      = "1.2"
+	GASFEERATIO      = "1.5"
 	DUSTBNB          = "0.0001"
 	MINCHECKBLOCKGAP = 6
 )
