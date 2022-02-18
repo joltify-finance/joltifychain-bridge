@@ -152,7 +152,16 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 	o.Require().NoError(err)
 
 	cospk := legacybech32.MustMarshalPubKey(legacybech32.AccPK, key.GetPubKey()) // nolint
-	jc.UpdatePool(cospk)
+
+	poolInfo := vaulttypes.PoolInfo{
+		BlockHeight: "100",
+		CreatePool: &vaulttypes.PoolProposal{
+			PoolPubKey: cospk,
+			PoolAddr:   accs[0].joltAddr,
+		},
+	}
+
+	jc.UpdatePool(&poolInfo)
 	pubkeyStr := key.GetPubKey().Address().String()
 	pk, err := sdk.AccAddressFromHex(pubkeyStr)
 	o.Require().NoError(err)
@@ -162,7 +171,15 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 	o.Require().True(pk.Equals(addr2))
 	// now we add another pool
 	cospk = legacybech32.MustMarshalPubKey(legacybech32.AccPK, key2.GetPubKey()) // nolint
-	jc.UpdatePool(cospk)
+
+	poolInfo = vaulttypes.PoolInfo{
+		BlockHeight: "101",
+		CreatePool: &vaulttypes.PoolProposal{
+			PoolPubKey: cospk,
+			PoolAddr:   accs[0].joltAddr,
+		},
+	}
+	jc.UpdatePool(&poolInfo)
 	pools = jc.GetPool()
 	pubkeyStr = key2.GetPubKey().Address().String()
 	pk2, err := sdk.AccAddressFromHex(pubkeyStr)
@@ -175,7 +192,15 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 	// now we add another pool and pop out the firt one
 
 	cospk = legacybech32.MustMarshalPubKey(legacybech32.AccPK, key3.GetPubKey()) // nolint
-	jc.UpdatePool(cospk)
+
+	poolInfo = vaulttypes.PoolInfo{
+		BlockHeight: "102",
+		CreatePool: &vaulttypes.PoolProposal{
+			PoolPubKey: cospk,
+			PoolAddr:   accs[0].joltAddr,
+		},
+	}
+	jc.UpdatePool(&poolInfo)
 	pools = jc.GetPool()
 
 	pubkeyStr = key3.GetPubKey().Address().String()
@@ -189,7 +214,7 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 func (o OutBoundTestSuite) TestOutBoundReq() {
 	accs, err := generateRandomPrivKey(2)
 	o.Require().NoError(err)
-	boundReq := newOutboundReq(accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("testcoing", sdk.NewInt(1)), 10)
+	boundReq := newOutboundReq("testID", accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("testcoing", sdk.NewInt(1)), 101)
 	boundReq.SetItemHeight(100)
 	a, b, _, h := boundReq.GetOutBoundInfo()
 	o.Require().Equal(a.String(), accs[0].commAddr.String())

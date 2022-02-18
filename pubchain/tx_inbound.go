@@ -216,6 +216,9 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 
 // UpdatePool update the tss pool address
 func (pi *PubChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) error {
+	if pool == nil {
+		return errors.New("nil pool")
+	}
 	poolPubKey := pool.CreatePool.PoolPubKey
 	addr, err := misc.PoolPubKeyToJoltAddress(poolPubKey)
 	if err != nil {

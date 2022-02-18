@@ -61,7 +61,6 @@ func (pi *PubChainInstance) SendToken(signerPk string, sender, receiver common.A
 	gasLimitDec = gasLimitDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO))
 
 	txo.GasLimit = gasLimitDec.BigInt().Uint64()
-	fmt.Printf(">>>>>>>>>>>>------%v\n", txo.GasLimit)
 
 	ret, err := tokenInstance.Transfer(txo, receiver, amount)
 	if err != nil {

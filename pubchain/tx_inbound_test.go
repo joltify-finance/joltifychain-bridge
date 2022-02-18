@@ -3,6 +3,7 @@ package pubchain
 import (
 	"encoding/hex"
 	"fmt"
+	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 	"hash"
 	"math/big"
 	"strings"
@@ -40,22 +41,43 @@ func TestUpdatePoolAndGetPool(t *testing.T) {
 		lastTwoPools: make([]*common2.PoolInfo, 2),
 		poolLocker:   &sync.RWMutex{},
 	}
-	err = ci.UpdatePool(accs[0].pk + "3")
+	poolInfo := vaulttypes.PoolInfo{
+		BlockHeight: "100",
+		CreatePool: &vaulttypes.PoolProposal{
+			PoolPubKey: accs[0].pk,
+			PoolAddr:   accs[0].joltAddr,
+		},
+	}
+
+	poolInfo1 := vaulttypes.PoolInfo{
+		BlockHeight: "101",
+		CreatePool: &vaulttypes.PoolProposal{
+			PoolPubKey: accs[1].pk,
+			PoolAddr:   accs[1].joltAddr,
+		},
+	}
+	err = ci.UpdatePool(nil)
 	assert.NotNil(t, err)
-	err = ci.UpdatePool("")
-	assert.NotNil(t, err)
-	err = ci.UpdatePool(accs[0].pk)
+	err = ci.UpdatePool(&poolInfo)
 	require.Nil(t, err)
 	pools := ci.GetPool()
 	require.Equal(t, pools[1].Pk, accs[0].pk)
 
-	err = ci.UpdatePool(accs[1].pk)
+	err = ci.UpdatePool(&poolInfo1)
 	require.Nil(t, err)
 	pools = ci.GetPool()
 	require.Equal(t, pools[0].EthAddress.Hex(), accs[0].commAddr.Hex())
 	require.Equal(t, pools[1].EthAddress.Hex(), accs[1].commAddr.Hex())
 
-	err = ci.UpdatePool(accs[2].pk)
+	poolInfo2 := vaulttypes.PoolInfo{
+		BlockHeight: "102",
+		CreatePool: &vaulttypes.PoolProposal{
+			PoolPubKey: accs[2].pk,
+			PoolAddr:   accs[2].joltAddr,
+		},
+	}
+	//
+	err = ci.UpdatePool(&poolInfo2)
 	require.Nil(t, err)
 	pools = ci.GetPool()
 	require.Equal(t, pools[0].EthAddress.Hex(), accs[1].commAddr.Hex())
@@ -71,18 +93,41 @@ func TestCheckToBridge(t *testing.T) {
 		poolLocker:   &sync.RWMutex{},
 	}
 
-	err = ci.UpdatePool(accs[0].pk)
+	poolInfo := vaulttypes.PoolInfo{
+		BlockHeight: "100",
+		CreatePool: &vaulttypes.PoolProposal{
+			PoolPubKey: accs[0].pk,
+			PoolAddr:   accs[0].joltAddr,
+		},
+	}
+
+	poolInfo1 := vaulttypes.PoolInfo{
+		BlockHeight: "101",
+		CreatePool: &vaulttypes.PoolProposal{
+			PoolPubKey: accs[1].pk,
+			PoolAddr:   accs[1].joltAddr,
+		},
+	}
+
+	poolInfo2 := vaulttypes.PoolInfo{
+		BlockHeight: "102",
+		CreatePool: &vaulttypes.PoolProposal{
+			PoolPubKey: accs[2].pk,
+			PoolAddr:   accs[2].joltAddr,
+		},
+	}
+	err = ci.UpdatePool(&poolInfo)
 	require.Nil(t, err)
 
 	ret := ci.checkToBridge(accs[1].commAddr)
 	require.False(t, ret)
 
-	err = ci.UpdatePool(accs[1].pk)
+	err = ci.UpdatePool(&poolInfo1)
 	require.Nil(t, err)
 	ret = ci.checkToBridge(accs[1].commAddr)
 	require.True(t, ret)
 
-	err = ci.UpdatePool(accs[2].pk)
+	err = ci.UpdatePool(&poolInfo2)
 	require.Nil(t, err)
 
 	ret = ci.checkToBridge(accs[2].commAddr)
@@ -285,6 +330,7 @@ func TestProcessEachBlock(t *testing.T) {
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
 		tokenAbi:           &tAbi,
+		RetryInboundReq:    &sync.Map{},
 		InboundReqChan:     make(chan *InboundReq, 1),
 	}
 
@@ -306,7 +352,15 @@ func TestProcessEachBlock(t *testing.T) {
 	}
 	pi.pendingInbounds.Store(hex.EncodeToString([]byte("test1")), &btx)
 
-	err = pi.UpdatePool(accs[0].pk)
+	poolInfo := vaulttypes.PoolInfo{
+		BlockHeight: "100",
+		CreatePool: &vaulttypes.PoolProposal{
+			PoolPubKey: accs[0].pk,
+			PoolAddr:   accs[0].joltAddr,
+		},
+	}
+
+	err = pi.UpdatePool(&poolInfo)
 	require.Nil(t, err)
 	pi.processEachBlock(&tBlock)
 	ret, exist := pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
@@ -360,7 +414,7 @@ func TestProcessEachBlock(t *testing.T) {
 	//
 	tBlock3 = ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFee}, nil, nil, newHasher())
 	pi.processEachBlock(tBlock3)
-	ret, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
+	_, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	require.False(t, exist)
 
 	//
@@ -387,7 +441,16 @@ func TestProcessEachBlockErc20(t *testing.T) {
 		InboundReqChan:     make(chan *InboundReq, 1),
 		tokenAddr:          accs[1].commAddr.String(),
 	}
-	err = pi.UpdatePool(accs[0].pk)
+
+	poolInfo := vaulttypes.PoolInfo{
+		BlockHeight: "100",
+		CreatePool: &vaulttypes.PoolProposal{
+			PoolPubKey: accs[0].pk,
+			PoolAddr:   accs[0].joltAddr,
+		},
+	}
+
+	err = pi.UpdatePool(&poolInfo)
 	assert.Nil(t, err)
 
 	header := &ethTypes.Header{

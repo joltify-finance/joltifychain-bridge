@@ -1,6 +1,7 @@
 package joltifybridge
 
 import (
+	"context"
 	"strconv"
 	"testing"
 	"time"
@@ -138,18 +139,19 @@ func (m MintTestSuite) TestProcessInbound() {
 
 	// need to be called twice
 
-	err = jc.CreatePoolAccInfo(m.network.Validators[0].Address.String())
-	m.Require().NoError(err)
+	//err = jc.CreatePoolAccInfo(m.network.Validators[0].Address.String())
+	//m.Require().NoError(err)
 	send := banktypes.NewMsgSend(valAddr, accs[0].joltAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
-	_ = send
 
-	// txBuilder, err := jc.genSendTx([]sdk.Msg{send}, jc.poolAccInfo.accSeq, jc.poolAccInfo.accountNum, 200000, nil)
-	// m.Require().NoError(err)
-	// txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
-	// m.Require().NoError(err)
-	// ret, _, err := jc.BroadcastTx(context.Background(), txBytes)
-	// m.Require().NoError(err)
-	// fmt.Printf(">>>>111>>>>%v\n", ret)
+	acc, err := queryAccount(accs[0].joltAddr.String(), jc.grpcClient)
+	m.Require().NoError(err)
+	txBuilder, err := jc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, nil)
+	m.Require().NoError(err)
+	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	m.Require().NoError(err)
+	ret, _, err := jc.BroadcastTx(context.Background(), txBytes)
+	m.Require().NoError(err)
+	m.Require().True(ret)
 
 	pool := common.PoolInfo{
 		Pk:             accs[0].pk,

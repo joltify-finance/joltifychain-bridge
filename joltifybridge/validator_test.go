@@ -156,7 +156,11 @@ func (v ValidatorTestSuite) TestCheckWhetherSigner() {
 	v.Require().NoError(err)
 	v.Require().GreaterOrEqual(blockHeight, int64(1))
 
-	ret, err := jc.CheckWhetherSigner()
+	poolInfo, err := jc.QueryLastPoolAddress()
+	v.Require().NoError(err)
+	v.Require().False(len(poolInfo) == 0)
+	lastPoolInfo := poolInfo[0]
+	ret, err := jc.CheckWhetherSigner(lastPoolInfo)
 	v.Require().NoError(err)
 	v.Require().True(ret)
 
@@ -165,7 +169,7 @@ func (v ValidatorTestSuite) TestCheckWhetherSigner() {
 
 	_, _, err = jc.Keyring.NewMnemonic("operator", keyring.English, sdk.FullFundraiserPath, keyring.DefaultBIP39Passphrase, hd.Secp256k1)
 	v.Require().NoError(err)
-	ret, err = jc.CheckWhetherSigner()
+	ret, err = jc.CheckWhetherSigner(lastPoolInfo)
 	v.Require().NoError(err)
 	v.Require().False(ret)
 }
