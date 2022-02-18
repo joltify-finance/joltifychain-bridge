@@ -8,7 +8,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
-	"github.com/joltgeorge/tss/common"
+	"github.com/joltify-finance/tss/common"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 

@@ -2,7 +2,7 @@ package main
 
 import (
 	golog "github.com/ipfs/go-log"
-	"github.com/joltgeorge/tss/common"
+	"github.com/joltify-finance/tss/common"
 	"github.com/rs/zerolog"
 	"gitlab.com/joltify/joltifychain-bridge/bridge"
 	"gitlab.com/joltify/joltifychain-bridge/config"

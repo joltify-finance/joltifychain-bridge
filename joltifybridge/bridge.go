@@ -17,8 +17,8 @@ import (
 
 	coscrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	"github.com/joltgeorge/tss/common"
-	"github.com/joltgeorge/tss/keysign"
+	"github.com/joltify-finance/tss/common"
+	"github.com/joltify-finance/tss/keysign"
 	"github.com/tendermint/tendermint/crypto"
 	tmclienthttp "github.com/tendermint/tendermint/rpc/client/http"
 	"gitlab.com/joltify/joltifychain-bridge/misc"

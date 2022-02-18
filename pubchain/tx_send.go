@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	common3 "github.com/joltgeorge/tss/common"
+	common3 "github.com/joltify-finance/tss/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 

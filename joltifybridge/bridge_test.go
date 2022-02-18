@@ -15,7 +15,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/joltgeorge/tss/common"
+	"github.com/joltify-finance/tss/common"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"

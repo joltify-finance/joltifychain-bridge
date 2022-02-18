@@ -10,10 +10,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/joltgeorge/tss/blame"
-	"github.com/joltgeorge/tss/common"
-	"github.com/joltgeorge/tss/keygen"
-	"github.com/joltgeorge/tss/keysign"
+	"github.com/joltify-finance/tss/blame"
+	"github.com/joltify-finance/tss/common"
+	"github.com/joltify-finance/tss/keygen"
+	"github.com/joltify-finance/tss/keysign"
 )
 
 type TssMock struct {

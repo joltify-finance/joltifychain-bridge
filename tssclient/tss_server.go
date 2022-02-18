@@ -7,17 +7,17 @@ import (
 	"os"
 	"path"
 
-	"github.com/joltgeorge/tss/keysign"
+	"github.com/joltify-finance/tss/keysign"
 	"gitlab.com/joltify/joltifychain-bridge/config"
 
-	"github.com/joltgeorge/tss/keygen"
+	"github.com/joltify-finance/tss/keygen"
 
 	golog "github.com/ipfs/go-log"
 
-	"github.com/joltgeorge/tss/common"
+	"github.com/joltify-finance/tss/common"
 	"github.com/libp2p/go-libp2p-peerstore/addr"
 
-	tsslib "github.com/joltgeorge/tss/tss"
+	tsslib "github.com/joltify-finance/tss/tss"
 
 	"github.com/tendermint/tendermint/crypto/ed25519"
 )

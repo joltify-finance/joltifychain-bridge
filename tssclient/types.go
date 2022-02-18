@@ -1,8 +1,8 @@
 package tssclient
 
 import (
-	"github.com/joltgeorge/tss/keygen"
-	"github.com/joltgeorge/tss/keysign"
+	"github.com/joltify-finance/tss/keygen"
+	"github.com/joltify-finance/tss/keysign"
 )
 
 type CosPrivKey struct {
