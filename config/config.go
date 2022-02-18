@@ -10,10 +10,9 @@ import (
 
 type InvoiceChainConfig struct {
 	GrpcAddress string
-	HttpAddress string
 	WsAddress   string
 	WsEndpoint  string
-	RPCAddress  string
+	HTTPAddress string
 }
 
 type PubChainConfig struct {
@@ -75,9 +74,8 @@ func DefaultConfig() Config {
 	var config Config
 	flag.StringVar(&config.InvoiceChainConfig.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for joltify pub_chain")
 	flag.StringVar(&config.InvoiceChainConfig.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for joltify pub_chain")
-	flag.StringVar(&config.InvoiceChainConfig.RPCAddress, "rpc-port", "http://localhost:26657", "rpc address for joltify pub_chain")
+	flag.StringVar(&config.InvoiceChainConfig.HTTPAddress, "http-port", "http://localhost:26657", "ws address for joltify pub_chain")
 	flag.StringVar(&config.InvoiceChainConfig.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for joltify pub_chain")
-	flag.StringVar(&config.InvoiceChainConfig.HttpAddress, "http-endpoint", "tcp://localhost:26657", "endpoint for joltify http end point")
 	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://10.2.118.4:8456/", "endpoint for public pub_chain listener")
 	flag.StringVar(&config.PubChainConfig.TokenAddress, "pub-token-addr", "0x0cD80A18df1C5eAd4B5Fb549391d58B06EFfDBC4", "monitored token address")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
@@ -87,6 +85,7 @@ func DefaultConfig() Config {
 	// we setup the Tss parameter configuration
 	flag.DurationVar(&config.TssConfig.KeyGenTimeout, "gentimeout", 30*time.Second, "keygen timeout")
 	flag.DurationVar(&config.TssConfig.KeySignTimeout, "signtimeout", 30*time.Second, "keysign timeout")
+	flag.DurationVar(&config.TssConfig.PartyTimeout, "joinpartytimeout", 30*time.Second, "join party timeout")
 	flag.DurationVar(&config.TssConfig.PreParamTimeout, "preparamtimeout", 5*time.Minute, "pre-parameter generation timeout")
 	flag.BoolVar(&config.TssConfig.EnableMonitor, "enablemonitor", true, "enable the tss monitor")
 

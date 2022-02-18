@@ -1,10 +1,12 @@
 package joltifybridge
 
 import (
-	"gitlab.com/joltify/joltifychain-bridge/config"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
+
+	"gitlab.com/joltify/joltifychain-bridge/config"
 
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -42,7 +44,7 @@ func (pi *JoltifyChainInstance) AddMoveFundItem(pool *bcommon.PoolInfo, height i
 	pi.moveFundReq.Store(height, pool)
 }
 
-//PopMoveFundItemAfterBlock pop a move fund item after give block duration
+// PopMoveFundItemAfterBlock pop a move fund item after give block duration
 func (pi *JoltifyChainInstance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
 	min := int64(math.MaxInt64)
 	pi.moveFundReq.Range(func(key, value interface{}) bool {
@@ -91,6 +93,7 @@ func (pi *JoltifyChainInstance) PopItem() *OutBoundReq {
 	})
 	if max.Cmp(big.NewInt(0)) == 1 {
 		item, _ := pi.RetryOutboundReq.LoadAndDelete(max)
+		fmt.Printf("pop up one value %v \n", item.(*OutBoundReq).blockHeight)
 		return item.(*OutBoundReq)
 	}
 	return nil
@@ -102,7 +105,6 @@ func (pi *JoltifyChainInstance) ShowItems() {
 		pi.logger.Warn().Msgf("tx in the retry pool %v:%v\n", key, el.txID)
 		return true
 	})
-	return
 }
 
 // JoltifyChainInstance defines the types for joltify pub_chain side

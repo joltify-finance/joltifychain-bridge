@@ -49,7 +49,7 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.InvoiceChainConfig.GrpcAddress, config.InvoiceChainConfig.HttpAddress, tssServer)
+	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.InvoiceChainConfig.GrpcAddress, config.InvoiceChainConfig.WsAddress, tssServer)
 	if err != nil {
 		log.Fatalln("fail to create the invoice joltify_bridge", err)
 		return
@@ -76,7 +76,7 @@ func NewBridgeService(config config.Config) {
 		}
 	}()
 
-	err = joltifyBridge.InitValidators(config.InvoiceChainConfig.RPCAddress)
+	err = joltifyBridge.InitValidators(config.InvoiceChainConfig.HTTPAddress)
 	if err != nil {
 		fmt.Printf("error in init the validators %v", err)
 		cancel()
@@ -209,7 +209,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 					previousPool := joltChain.UpdatePool(poolInfo[0])
 					if previousPool.Pk != poolInfo[0].CreatePool.PoolPubKey {
-						//we force the first try of the tx to be run without blocking by the block wait
+						// we force the first try of the tx to be run without blocking by the block wait
 						joltChain.AddMoveFundItem(previousPool, currentBlockHeight-config.MINCHECKBLOCKGAP+5)
 						pi.AddMoveFundItem(previousPool, pi.CurrentHeight-config.MINCHECKBLOCKGAP+5)
 					}
@@ -256,7 +256,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				pi.DeleteExpired(head.Number.Uint64())
 
 				// now we need to put the failed outbound request to the process channel
-				//todo need to check after a given block gap
+				// todo need to check after a given block gap
 				itemOutBound := joltChain.PopItem()
 				if itemOutBound != nil {
 					itemOutBound.SetItemHeight(head.Number.Int64())
@@ -291,7 +291,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					continue
 				}
 
-				//we add this account to "retry" to ensure it is the empty account in the next balance check
+				// we add this account to "retry" to ensure it is the empty account in the next balance check
 				pi.AddMoveFundItem(previousPool, pi.CurrentHeight)
 
 			// process the in-bound top up event which will mint coin for users
@@ -324,9 +324,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					txHash, err := pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
+						fmt.Printf(">>>>>>>>>>>>add item to pool")
 						joltChain.AddItem(item)
+					} else {
+						zlog.Logger.Info().Msgf(">>we have send outbound tx(%v) from %v to %v (%v)", txHash, fromAddr, toAddr, amount.String())
 					}
-					zlog.Logger.Info().Msgf(">>we have send outbound tx(%v) from %v to %v (%v)", txHash, fromAddr, toAddr, amount.String())
 				}
 
 			}
