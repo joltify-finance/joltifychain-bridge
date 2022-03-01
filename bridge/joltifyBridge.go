@@ -304,11 +304,22 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					continue
 				}
 				if found {
-					err := joltChain.ProcessInBound(item)
+					txHash, index, err := joltChain.ProcessInBound(item)
 					if err != nil {
 						pi.AddItem(item)
 						zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
+						continue
 					}
+
+					go func() {
+						err := joltChain.CheckTxStatus(index)
+						if err != nil {
+							zlog.Logger.Error().Err(err).Msgf("the tx has not been sussfully submitted retry")
+							pi.AddItem(item)
+						}
+						tick := html.UnescapeString("&#" + "128229" + ";")
+						zlog.Logger.Info().Msgf("%v txid(%v) have successfully top up", tick, txHash)
+					}()
 
 				}
 
@@ -324,10 +335,24 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					txHash, err := pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
-						fmt.Printf(">>>>>>>>>>>>add item to pool")
 						joltChain.AddItem(item)
 					} else {
-						zlog.Logger.Info().Msgf(">>we have send outbound tx(%v) from %v to %v (%v)", txHash, fromAddr, toAddr, amount.String())
+						//though we submit the tx successful, we may still fail as tx may run out of gas,so we need to check
+						go func() {
+							err := pi.CheckTxStatus(txHash)
+							if err == nil {
+								tick := html.UnescapeString("&#" + "128229" + ";")
+								zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, fromAddr, toAddr, amount.String())
+								return
+							}
+							if err.Error() != "tx failed" {
+								zlog.Logger.Info().Msgf("fail to check the tx status")
+								return
+							}
+
+							zlog.Logger.Warn().Msgf("the tx is fail in submission, we need to resend")
+							joltChain.AddItem(item)
+						}()
 					}
 				}
 

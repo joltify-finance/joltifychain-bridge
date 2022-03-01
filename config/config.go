@@ -85,7 +85,8 @@ func DefaultConfig() Config {
 	// we setup the Tss parameter configuration
 	flag.DurationVar(&config.TssConfig.KeyGenTimeout, "gentimeout", 30*time.Second, "keygen timeout")
 	flag.DurationVar(&config.TssConfig.KeySignTimeout, "signtimeout", 30*time.Second, "keysign timeout")
-	flag.DurationVar(&config.TssConfig.PartyTimeout, "joinpartytimeout", 30*time.Second, "join party timeout")
+	flag.DurationVar(&config.TssConfig.PartyTimeout, "joinpartytimeout", time.Minute, "join party timeout")
+
 	flag.DurationVar(&config.TssConfig.PreParamTimeout, "preparamtimeout", 5*time.Minute, "pre-parameter generation timeout")
 	flag.BoolVar(&config.TssConfig.EnableMonitor, "enablemonitor", true, "enable the tss monitor")
 

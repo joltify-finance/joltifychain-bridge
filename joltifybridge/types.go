@@ -1,7 +1,6 @@
 package joltifybridge
 
 import (
-	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -93,7 +92,6 @@ func (pi *JoltifyChainInstance) PopItem() *OutBoundReq {
 	})
 	if max.Cmp(big.NewInt(0)) == 1 {
 		item, _ := pi.RetryOutboundReq.LoadAndDelete(max)
-		fmt.Printf("pop up one value %v \n", item.(*OutBoundReq).blockHeight)
 		return item.(*OutBoundReq)
 	}
 	return nil

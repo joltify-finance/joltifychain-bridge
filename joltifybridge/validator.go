@@ -3,7 +3,9 @@ package joltifybridge
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/cenkalti/backoff"
 	"time"
 
 	"gitlab.com/joltify/joltifychain-bridge/validators"
@@ -110,6 +112,25 @@ func (jc *JoltifyChainInstance) CheckWhetherAlreadyExist(index string) bool {
 		return true
 	}
 	return false
+}
+
+// CheckTxStatus check whether the tx has been done successfully
+func (jc *JoltifyChainInstance) CheckTxStatus(index string) error {
+	bf := backoff.NewExponentialBackOff()
+	bf.InitialInterval = time.Second
+	bf.MaxInterval = time.Second * 10
+	bf.MaxElapsedTime = time.Minute
+
+	op := func() error {
+		if jc.CheckWhetherAlreadyExist(index) {
+			return nil
+		}
+		return errors.New("fail to find the tx")
+	}
+
+	err := backoff.Retry(op, bf)
+	return err
+
 }
 
 func (jc *JoltifyChainInstance) doInitValidator(i info, blockHeight int64, values []*tmservice.Validator) error {

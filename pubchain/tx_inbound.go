@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/cenkalti/backoff"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -14,6 +15,7 @@ import (
 	"html"
 	"math"
 	"math/big"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -499,4 +501,38 @@ func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, receiver c
 	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain with tx (ERC20): %v, (BNB): %v", tick, erc20TxHash, bnbTxHash)
 
 	return false, nil
+}
+
+//CheckTxStatus check whether the tx is already in the chain
+func (pi *PubChainInstance) CheckTxStatus(hashStr string) error {
+
+	bf := backoff.NewExponentialBackOff()
+	bf.InitialInterval = time.Second
+	bf.MaxInterval = time.Second * 3
+	bf.MaxElapsedTime = time.Minute
+
+	var status uint64
+	op := func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
+		defer cancel()
+		txHash := common.HexToHash(hashStr)
+		receipt, err := pi.EthClient.TransactionReceipt(ctx, txHash)
+		if err != nil {
+			return err
+		}
+		status = receipt.Status
+		return nil
+	}
+
+	err := backoff.Retry(op, bf)
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("fail to find the tx %v", hashStr)
+		return err
+	}
+	if status != 1 {
+		pi.logger.Warn().Msgf("the tx is failed, we need to redo the tx")
+		return errors.New("tx failed")
+	}
+	pi.logger.Info().Msgf("we have successfully check the tx.")
+	return nil
 }

@@ -3,6 +3,7 @@ module gitlab.com/joltify/joltifychain-bridge
 go 1.17
 
 require (
+	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/cosmos/cosmos-sdk v0.44.2
 	github.com/ethereum/go-ethereum v1.10.11
 	github.com/gogo/protobuf v1.3.3
