@@ -241,6 +241,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				joltChain.AddMoveFundItem(previousPool, currentBlockHeight)
 
 			case r := <-newJoltifyTxChan:
+				result := r.Data.(tmtypes.EventDataTx).Result
+				if result.Code != 0 {
+					//this means this tx is not a successful tx
+					zlog.Warn().Msgf("not a valid top up message with error code %v (%v)", result.Code, result.Log)
+					continue
+				}
 				blockHeight := r.Data.(tmtypes.EventDataTx).Height
 				tx := r.Data.(tmtypes.EventDataTx).Tx
 				joltChain.CheckOutBoundTx(blockHeight, tx)

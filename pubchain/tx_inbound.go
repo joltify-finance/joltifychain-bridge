@@ -177,7 +177,11 @@ func (pi *PubChainInstance) checkErc20(data []byte) (common.Address, *big.Int, e
 // fixme we need to check timeout to remove the pending transactions
 func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 	for _, tx := range block.Transactions() {
-		if tx.To() == nil || tx.Value() == nil {
+		if tx.To() == nil {
+			continue
+		}
+		status, err := pi.checkEachTx(tx.Hash())
+		if err != nil || status != 1 {
 			continue
 		}
 
@@ -503,6 +507,16 @@ func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, receiver c
 	return false, nil
 }
 
+func (pi *PubChainInstance) checkEachTx(h common.Hash) (uint64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
+	defer cancel()
+	receipt, err := pi.EthClient.TransactionReceipt(ctx, h)
+	if err != nil {
+		return 0, err
+	}
+	return receipt.Status, nil
+}
+
 //CheckTxStatus check whether the tx is already in the chain
 func (pi *PubChainInstance) CheckTxStatus(hashStr string) error {
 
@@ -513,14 +527,12 @@ func (pi *PubChainInstance) CheckTxStatus(hashStr string) error {
 
 	var status uint64
 	op := func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
-		defer cancel()
 		txHash := common.HexToHash(hashStr)
-		receipt, err := pi.EthClient.TransactionReceipt(ctx, txHash)
+		ret, err := pi.checkEachTx(txHash)
 		if err != nil {
 			return err
 		}
-		status = receipt.Status
+		status = ret
 		return nil
 	}
 
