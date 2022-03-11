@@ -5,6 +5,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"html"
+	"math"
+	"math/big"
+	"time"
+
 	"github.com/cenkalti/backoff"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -12,10 +17,6 @@ import (
 	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
-	"html"
-	"math"
-	"math/big"
-	"time"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -53,7 +54,7 @@ func (pi *PubChainInstance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenA
 }
 
 // ProcessNewBlock process the blocks received from the public pub_chain
-func (pi *PubChainInstance) ProcessNewBlock(number *big.Int) error {
+func (pi *PubChainInstance) ProcessNewBlock(number *big.Int,joltifyBlockHeight int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
 	block, err := pi.EthClient.BlockByNumber(ctx, number)
@@ -61,7 +62,7 @@ func (pi *PubChainInstance) ProcessNewBlock(number *big.Int) error {
 		pi.logger.Error().Err(err).Msg("fail to retrieve the block")
 		return err
 	}
-	pi.processEachBlock(block)
+	pi.processEachBlock(block,joltifyBlockHeight)
 	return nil
 }
 
@@ -175,7 +176,7 @@ func (pi *PubChainInstance) checkErc20(data []byte) (common.Address, *big.Int, e
 }
 
 // fixme we need to check timeout to remove the pending transactions
-func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
+func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block,joltifyBlockHeight int64) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
 			continue
@@ -212,7 +213,7 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block) {
 			payTxID := tx.Data()
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
-				item := NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, 0)
+				item := NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, joltifyBlockHeight)
 				// we add to the retry pool to  sort the tx
 				pi.AddItem(&item)
 			}

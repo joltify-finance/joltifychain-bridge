@@ -94,13 +94,13 @@ func GetLastBlockHeight(grpcClient grpc1.ClientConn) (int64, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
-
 	resp, err := ts.GetLatestBlock(ctx, &tmservice.GetLatestBlockRequest{})
 	if err != nil {
 		return 0, err
 	}
 	return resp.Block.Header.Height, nil
 }
+
 
 func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg) (bool, string, error) {
 	gasWanted, err := jc.GasEstimation([]sdk.Msg{sendMsg}, accSeq, signMsg)

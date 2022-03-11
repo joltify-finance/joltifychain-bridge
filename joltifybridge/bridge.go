@@ -271,7 +271,7 @@ func (jc *JoltifyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, t
 		jc.logger.Error().Err(err).Msg("fail to query the gas price")
 		return 0, err
 	}
-	txBuilder.SetGasLimit(200000)
+	//txBuilder.SetGasLimit(0)
 
 	key, err := jc.Keyring.Key("operator")
 	if err != nil {
@@ -315,7 +315,7 @@ func (jc *JoltifyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, t
 	defer cancel()
 	gasUsed, err := jc.SimBroadcastTx(ctx, txBytes)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to estimate gas consumption")
+		jc.logger.Error().Err(err).Msg("fail to estimate gas consumption from simulation")
 		return 0, err
 	}
 
@@ -455,9 +455,10 @@ func (jc *JoltifyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendert
 			err := jc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, rawTx.Hash())
 			if err != nil {
 				if err.Error() != "not a top up message to the pool" {
-					jc.logger.Error().Err(err).Msgf("fail to process the message, it may")
+					jc.logger.Error().Err(err).Msgf("fail to process the message, it is not a top up message")
 				}
 			}
+
 		default:
 			continue
 		}
