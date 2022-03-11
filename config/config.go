@@ -77,7 +77,7 @@ func DefaultConfig() Config {
 	flag.StringVar(&config.InvoiceChainConfig.HTTPAddress, "http-port", "http://localhost:26657", "ws address for joltify pub_chain")
 	flag.StringVar(&config.InvoiceChainConfig.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for joltify pub_chain")
 	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://10.2.118.4:8456/", "endpoint for public pub_chain listener")
-	flag.StringVar(&config.PubChainConfig.TokenAddress, "pub-token-addr", "0x0cD80A18df1C5eAd4B5Fb549391d58B06EFfDBC4", "monitored token address")
+	flag.StringVar(&config.PubChainConfig.TokenAddress, "pub-token-addr", "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79", "monitored token address")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
 	flag.StringVar(&config.HomeDir, "home", "/root/.joltifyChain/config", "home director for joltify_bridge")
 	flag.StringVar(&config.TssConfig.HttpAddr, "tss-http-port", "0.0.0.0:8321", "tss http port for info only")

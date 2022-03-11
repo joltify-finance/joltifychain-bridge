@@ -146,8 +146,7 @@ type outboundTx struct {
 }
 
 func (i *OutBoundReq) Hash() common.Hash {
-	blockHeight := new(big.Int).SetInt64(i.blockHeight)
-	hash := crypto.Keccak256Hash(i.outReceiverAddress.Bytes(), i.fromPoolAddr.Bytes(), []byte(i.txID), blockHeight.Bytes())
+	hash := crypto.Keccak256Hash(i.outReceiverAddress.Bytes(), []byte(i.txID))
 	return hash
 }
 

@@ -243,7 +243,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 			case r := <-newJoltifyTxChan:
 				result := r.Data.(tmtypes.EventDataTx).Result
 				if result.Code != 0 {
-					//this means this tx is not a successful tx
+					// this means this tx is not a successful tx
 					zlog.Warn().Msgf("not a valid top up message with error code %v (%v)", result.Code, result.Log)
 					continue
 				}
@@ -253,7 +253,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 				// process the public chain new block event
 			case head := <-pubNewBlockChan:
-				err := pi.ProcessNewBlock(head.Number)
+				joltifyBlockHeight, errInner := joltChain.GetLastBlockHeight()
+				if errInner != nil {
+					zlog.Logger.Error().Err(err).Msg("fail to get the joltify chain block height for this round")
+					continue
+				}
+				err := pi.ProcessNewBlock(head.Number, joltifyBlockHeight)
 				pi.CurrentHeight = head.Number.Int64()
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
@@ -265,7 +270,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				// todo need to check after a given block gap
 				itemOutBound := joltChain.PopItem()
 				if itemOutBound != nil {
-					itemOutBound.SetItemHeight(head.Number.Int64())
+					// we set joltify chain height for both inbound/outbound tx
+					itemOutBound.SetItemHeight(joltifyBlockHeight)
 					joltChain.OutboundReqChan <- itemOutBound
 				}
 
@@ -330,6 +336,21 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 			case item := <-joltChain.OutboundReqChan:
+
+				submittedTx, err := joltChain.GetPubChainSubmittedTx(*item)
+				if err != nil {
+					zlog.Logger.Error().Err(err).Msg("fail to query the submitted tx record, we continue process this tx")
+				}
+
+				if submittedTx != "" {
+					zlog.Logger.Info().Msgf("we check whether someone has already submitted this tx %v", submittedTx)
+					err := pi.CheckTxStatus(submittedTx)
+					if err == nil {
+						zlog.Logger.Info().Msg("this tx has been submitted by others, we skip it")
+						continue
+					}
+				}
+
 				pools := joltChain.GetPool()
 				found, err := joltChain.CheckWhetherSigner(pools[1].PoolInfo)
 				if err != nil {
@@ -343,12 +364,17 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
 						joltChain.AddItem(item)
 					} else {
-						//though we submit the tx successful, we may still fail as tx may run out of gas,so we need to check
+						// though we submit the tx successful, we may still fail as tx may run out of gas,so we need to check
 						go func() {
 							err := pi.CheckTxStatus(txHash)
 							if err == nil {
-								tick := html.UnescapeString("&#" + "128229" + ";")
+								tick := html.UnescapeString("&#" + "128228" + ";")
 								zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, fromAddr, toAddr, amount.String())
+								// now we submit our public chain tx to joltifychain
+								errInner := joltChain.SubmitOutboundTx(*item, txHash)
+								if errInner != nil {
+									zlog.Logger.Error().Err(err).Msgf("fail to process the outbound tx record")
+								}
 								return
 							}
 							if err.Error() != "tx failed" {
