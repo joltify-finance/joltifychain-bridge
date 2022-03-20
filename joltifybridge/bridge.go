@@ -9,9 +9,8 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
-	"gitlab.com/joltify/joltifychain-bridge/config"
-
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/config"
 
 	tendertypes "github.com/tendermint/tendermint/types"
 
