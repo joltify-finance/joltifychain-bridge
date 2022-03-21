@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/joltify/joltifychain-bridge/monitor"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	"gitlab.com/joltify/joltifychain-bridge/config"
@@ -42,6 +43,11 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
+	metrics := monitor.NewMetric()
+	if config.EnableMonitor {
+		metrics.Enable()
+	}
+
 	// fixme, in docker it needs to be changed to basehome
 	tssServer, _, err := tssclient.StartTssServer(config.HomeDir, config.TssConfig)
 	if err != nil {
@@ -49,7 +55,7 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.InvoiceChainConfig.GrpcAddress, config.InvoiceChainConfig.WsAddress, tssServer)
+	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.JoltifyChain.GrpcAddress, config.JoltifyChain.WsAddress, tssServer)
 	if err != nil {
 		log.Fatalln("fail to create the invoice joltify_bridge", err)
 		return
@@ -76,13 +82,13 @@ func NewBridgeService(config config.Config) {
 		}
 	}()
 
-	err = joltifyBridge.InitValidators(config.InvoiceChainConfig.HTTPAddress)
+	err = joltifyBridge.InitValidators(config.JoltifyChain.HTTPAddress)
 	if err != nil {
 		fmt.Printf("error in init the validators %v", err)
 		cancel()
 		return
 	}
-	tssHTTPServer := NewTssHttpServer(config.TssConfig.HttpAddr, joltifyBridge.GetTssNodeID(), ctx)
+	tssHTTPServer := NewJoltifyHttpServer(ctx, config.TssConfig.HTTPAddr, joltifyBridge.GetTssNodeID())
 
 	wg.Add(1)
 	ret := tssHTTPServer.Start(&wg)
@@ -100,7 +106,7 @@ func NewBridgeService(config config.Config) {
 	}
 
 	wg.Add(1)
-	addEventLoop(ctx, &wg, joltifyBridge, ci)
+	addEventLoop(ctx, &wg, joltifyBridge, ci, metrics)
 
 	<-c
 	ctx.Done()
@@ -109,7 +115,7 @@ func NewBridgeService(config config.Config) {
 	fmt.Printf("we quit gracefully\n")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.PubChainInstance) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.PubChainInstance, metric *monitor.Metric) {
 	defer wg.Done()
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(ctx, time.Second*5)
@@ -182,8 +188,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 				// now we need to put the failed inbound request to the process channel, for each new joltify block
 				// we process one failure
-				pi.ShowItems()
 				itemInbound := pi.PopItem()
+				metric.UpdateInboundTxNum(float64(pi.Size()))
 				if itemInbound != nil {
 					itemInbound.SetItemHeight(currentBlockHeight)
 					pi.InboundReqChan <- itemInbound
@@ -269,6 +275,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				// now we need to put the failed outbound request to the process channel
 				// todo need to check after a given block gap
 				itemOutBound := joltChain.PopItem()
+				metric.UpdateOutboundTxNum(float64(joltChain.Size()))
 				if itemOutBound != nil {
 					// we set joltify chain height for both inbound/outbound tx
 					itemOutBound.SetItemHeight(joltifyBlockHeight)

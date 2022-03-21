@@ -3,12 +3,13 @@ package pubchain
 import (
 	"encoding/hex"
 	"fmt"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 	"hash"
 	"math/big"
 	"strings"
 	"sync"
 	"testing"
+
+	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -362,7 +363,7 @@ func TestProcessEachBlock(t *testing.T) {
 
 	err = pi.UpdatePool(&poolInfo)
 	require.Nil(t, err)
-	pi.processEachBlock(&tBlock)
+	pi.processEachBlock(&tBlock, 10)
 	ret, exist := pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	// indicate nothing happens
 	require.True(t, exist)
@@ -379,7 +380,7 @@ func TestProcessEachBlock(t *testing.T) {
 	}
 	//
 	tBlock1 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718Tx}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock1)
+	pi.processEachBlock(tBlock1, 10)
 	ret, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	require.True(t, exist)
 	storedInbound = ret.(*inboundTx)
@@ -387,7 +388,7 @@ func TestProcessEachBlock(t *testing.T) {
 
 	// check not to bridge
 	tBlock2 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxNotToBridge}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock2)
+	pi.processEachBlock(tBlock2, 10)
 	ret, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	require.True(t, exist)
 	storedInbound = ret.(*inboundTx)
@@ -396,7 +397,7 @@ func TestProcessEachBlock(t *testing.T) {
 	//
 	//// now we top up the fee
 	tBlock3 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFee}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock3)
+	pi.processEachBlock(tBlock3, 10)
 
 	ret, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	require.True(t, exist)
@@ -405,7 +406,7 @@ func TestProcessEachBlock(t *testing.T) {
 	require.True(t, storedInbound.fee.Amount.Equal(topupFee.Add(feeCoin.Amount)))
 
 	tBlock3 = ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpEmptyData}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock3)
+	pi.processEachBlock(tBlock3, 10)
 
 	ret, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	require.True(t, exist)
@@ -413,14 +414,14 @@ func TestProcessEachBlock(t *testing.T) {
 	require.True(t, storedInbound.fee.Amount.Equal(topupFee.Add(feeCoin.Amount)))
 	//
 	tBlock3 = ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFee}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock3)
+	pi.processEachBlock(tBlock3, 10)
 	_, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	require.False(t, exist)
 
 	//
 	//// now we top up the fee before ERC20 tx arrive
 	tBlock4 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFeeBeforeERC20}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock4)
+	pi.processEachBlock(tBlock4, 10)
 	ret, ok := pi.pendingInboundsBnB.Load(hex.EncodeToString([]byte("ERC20NOTREADY")))
 	assert.True(t, ok)
 	data := ret.(*inboundTxBnb)
@@ -481,7 +482,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 
 	// since token addr is not set, so the system should not put this tx in top-up queue
 	tBlock := ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718Tx}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock)
+	pi.processEachBlock(tBlock, 10)
 	counter := 0
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
 		counter += 1
@@ -500,7 +501,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 		Data:     data,
 	})
 	tBlock = ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718TxNotPool}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock)
+	pi.processEachBlock(tBlock, 10)
 	counter = 0
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
 		counter += 1
@@ -538,7 +539,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	})
 
 	tBlock = ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718TxGoodPass}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock)
+	pi.processEachBlock(tBlock, 10)
 
 	counter = 0
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {

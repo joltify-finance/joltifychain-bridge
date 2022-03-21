@@ -32,14 +32,13 @@ type (
 		// Pre-parameter define the pre-parameter generations timeout
 		PreParamTimeout time.Duration
 		// enable the tss monitor
-		EnableMonitor bool
 
 		// Config is configuration for Tss P2P
 		RendezvousString string
 		Port             int
 		BootstrapPeers   addrList
 		ExternalIP       string
-		HttpAddr         string
+		HTTPAddr         string
 	}
 )
 
@@ -63,24 +62,25 @@ func (al *addrList) Set(value string) error {
 }
 
 type Config struct {
-	InvoiceChainConfig InvoiceChainConfig
-	PubChainConfig     PubChainConfig
-	TssConfig          TssConfig
-	KeyringAddress     string
-	HomeDir            string
+	JoltifyChain   InvoiceChainConfig
+	PubChainConfig PubChainConfig
+	TssConfig      TssConfig
+	KeyringAddress string
+	HomeDir        string
+	EnableMonitor  bool
 }
 
 func DefaultConfig() Config {
 	var config Config
-	flag.StringVar(&config.InvoiceChainConfig.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for joltify pub_chain")
-	flag.StringVar(&config.InvoiceChainConfig.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for joltify pub_chain")
-	flag.StringVar(&config.InvoiceChainConfig.HTTPAddress, "http-port", "http://localhost:26657", "ws address for joltify pub_chain")
-	flag.StringVar(&config.InvoiceChainConfig.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for joltify pub_chain")
-	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://10.2.118.4:8456/", "endpoint for public pub_chain listener")
+	flag.StringVar(&config.JoltifyChain.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for joltify pub_chain")
+	flag.StringVar(&config.JoltifyChain.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for joltify pub_chain")
+	flag.StringVar(&config.JoltifyChain.HTTPAddress, "http-port", "http://localhost:26657", "ws address for joltify pub_chain")
+	flag.StringVar(&config.JoltifyChain.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for joltify pub_chain")
+	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://10.2.118.8:8456/", "endpoint for public pub_chain listener")
 	flag.StringVar(&config.PubChainConfig.TokenAddress, "pub-token-addr", "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79", "monitored token address")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
 	flag.StringVar(&config.HomeDir, "home", "/root/.joltifyChain/config", "home director for joltify_bridge")
-	flag.StringVar(&config.TssConfig.HttpAddr, "tss-http-port", "0.0.0.0:8321", "tss http port for info only")
+	flag.StringVar(&config.TssConfig.HTTPAddr, "tss-http-port", "0.0.0.0:8321", "tss http port for info only")
 
 	// we setup the Tss parameter configuration
 	flag.DurationVar(&config.TssConfig.KeyGenTimeout, "gentimeout", 30*time.Second, "keygen timeout")
@@ -88,7 +88,7 @@ func DefaultConfig() Config {
 	flag.DurationVar(&config.TssConfig.PartyTimeout, "joinpartytimeout", time.Minute, "join party timeout")
 
 	flag.DurationVar(&config.TssConfig.PreParamTimeout, "preparamtimeout", 5*time.Minute, "pre-parameter generation timeout")
-	flag.BoolVar(&config.TssConfig.EnableMonitor, "enablemonitor", true, "enable the tss monitor")
+	flag.BoolVar(&config.EnableMonitor, "enablemonitor", true, "enable the joltifyChain monitor")
 
 	// we setup the p2p network configuration
 	flag.StringVar(&config.TssConfig.RendezvousString, "rendezvous", "joltifyChainTss",

@@ -84,6 +84,15 @@ func (pi *PubChainInstance) PopItem() *InboundReq {
 	return nil
 }
 
+func (pi *PubChainInstance) Size() int {
+	i := 0
+	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
+		i += 1
+		return true
+	})
+	return i
+}
+
 func (pi *PubChainInstance) ShowItems() {
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
 		el := value.(*InboundReq)

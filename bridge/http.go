@@ -13,24 +13,24 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// TssHTTPServer provide http endpoint for tss server
-type TssHTTPServer struct {
+// JoltifyHTTPServer provide http endpoint for tss server
+type JoltifyHTTPServer struct {
 	logger zerolog.Logger
 	s      *http.Server
 	peerID string
 	ctx    context.Context
 }
 
-// NewTssHttpServer should only listen to the loopback
-func NewTssHttpServer(tssAddr string, peerID string, ctx context.Context) *TssHTTPServer {
-	hs := &TssHTTPServer{
+// NewJoltifyHttpServer should only listen to the loopback
+func NewJoltifyHttpServer(ctx context.Context, tssAddr string, peerID string) *JoltifyHTTPServer {
+	hs := &JoltifyHTTPServer{
 		logger: log.With().Str("module", "http").Logger(),
 		peerID: peerID,
 		ctx:    ctx,
 	}
 	s := &http.Server{
 		Addr:    tssAddr,
-		Handler: hs.tssNewHandler(),
+		Handler: hs.joltifyNewHandler(),
 	}
 	hs.s = s
 	return hs
@@ -50,7 +50,7 @@ func logMiddleware() mux.MiddlewareFunc {
 	}
 }
 
-func (t *TssHTTPServer) getP2pIDHandler(w http.ResponseWriter, _ *http.Request) {
+func (t *JoltifyHTTPServer) getP2pIDHandler(w http.ResponseWriter, _ *http.Request) {
 	_, err := w.Write([]byte(t.peerID))
 	if err != nil {
 		t.logger.Error().Err(err).Msg("fail to write to response")
@@ -58,7 +58,7 @@ func (t *TssHTTPServer) getP2pIDHandler(w http.ResponseWriter, _ *http.Request) 
 }
 
 // NewHandler registers the API routes and returns a new HTTP handler
-func (t *TssHTTPServer) tssNewHandler() http.Handler {
+func (t *JoltifyHTTPServer) joltifyNewHandler() http.Handler {
 	router := mux.NewRouter()
 	router.Handle("/p2pid", http.HandlerFunc(t.getP2pIDHandler)).Methods(http.MethodGet)
 	router.Handle("/metrics", promhttp.Handler())
@@ -66,7 +66,7 @@ func (t *TssHTTPServer) tssNewHandler() http.Handler {
 	return router
 }
 
-func (t *TssHTTPServer) Start(wg *sync.WaitGroup) error {
+func (t *JoltifyHTTPServer) Start(wg *sync.WaitGroup) error {
 	if t.s == nil {
 		return errors.New("invalid http server instance")
 	}

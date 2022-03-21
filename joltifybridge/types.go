@@ -5,11 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/joltify/joltifychain-bridge/config"
-
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	grpc1 "github.com/gogo/protobuf/grpc"
+	"gitlab.com/joltify/joltifychain-bridge/config"
 
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -95,6 +94,15 @@ func (pi *JoltifyChainInstance) PopItem() *OutBoundReq {
 		return item.(*OutBoundReq)
 	}
 	return nil
+}
+
+func (jc *JoltifyChainInstance) Size() int {
+	i := 0
+	jc.RetryOutboundReq.Range(func(key, value interface{}) bool {
+		i += 1
+		return true
+	})
+	return i
 }
 
 func (pi *JoltifyChainInstance) ShowItems() {
