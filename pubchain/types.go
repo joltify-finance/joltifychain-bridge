@@ -88,7 +88,7 @@ func (pi *PubChainInstance) Size() int {
 	i := 0
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
 		i += 1
-		return false
+		return true
 	})
 	return i
 }

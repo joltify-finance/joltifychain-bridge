@@ -100,7 +100,7 @@ func (jc *JoltifyChainInstance) Size() int {
 	i := 0
 	jc.RetryOutboundReq.Range(func(key, value interface{}) bool {
 		i += 1
-		return false
+		return true
 	})
 	return i
 }
