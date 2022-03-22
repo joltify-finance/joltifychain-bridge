@@ -54,7 +54,7 @@ func (pi *PubChainInstance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenA
 }
 
 // ProcessNewBlock process the blocks received from the public pub_chain
-func (pi *PubChainInstance) ProcessNewBlock(number *big.Int,joltifyBlockHeight int64) error {
+func (pi *PubChainInstance) ProcessNewBlock(number *big.Int, joltifyBlockHeight int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
 	block, err := pi.EthClient.BlockByNumber(ctx, number)
@@ -62,7 +62,7 @@ func (pi *PubChainInstance) ProcessNewBlock(number *big.Int,joltifyBlockHeight i
 		pi.logger.Error().Err(err).Msg("fail to retrieve the block")
 		return err
 	}
-	pi.processEachBlock(block,joltifyBlockHeight)
+	pi.processEachBlock(block, joltifyBlockHeight)
 	return nil
 }
 
@@ -145,7 +145,8 @@ func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, fr
 		pi.logger.Warn().Msgf("invalid tx ID %v\n", txIDBytes)
 		return nil
 	}
-	item := NewAccountInboundReq(tx.address, to, tx.token, txIDBytes, int64(blockHeight))
+	roundBlockHeight := blockHeight / ROUNDBLOCK
+	item := NewAccountInboundReq(tx.address, to, tx.token, txIDBytes, int64(roundBlockHeight))
 	pi.InboundReqChan <- &item
 	return nil
 }
@@ -176,7 +177,7 @@ func (pi *PubChainInstance) checkErc20(data []byte) (common.Address, *big.Int, e
 }
 
 // fixme we need to check timeout to remove the pending transactions
-func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block,joltifyBlockHeight int64) {
+func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block, joltifyBlockHeight int64) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
 			continue

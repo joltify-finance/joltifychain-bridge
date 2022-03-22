@@ -28,6 +28,7 @@ const (
 	chainQueryTimeout = time.Second * 5
 	GasLimit          = 2100000
 	GasPrice          = "0.00000001"
+	ROUNDBLOCK        = 50
 )
 
 // InboundReq is the account that top up account info to joltify pub_chain

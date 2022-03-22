@@ -76,7 +76,8 @@ func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.Ac
 		item := jc.processDemonAndFee(txID, blockHeight, wrapFromEthAddr, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
 		// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 		if item != nil {
-			itemReq := newOutboundReq(txID, item.outReceiverAddress, curEthAddr, item.token, blockHeight)
+			roundBlockHeight := blockHeight / ROUNDBLOCK
+			itemReq := newOutboundReq(txID, item.outReceiverAddress, curEthAddr, item.token, roundBlockHeight)
 			jc.AddItem(&itemReq)
 			return nil
 		}

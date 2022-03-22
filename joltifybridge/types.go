@@ -28,6 +28,7 @@ const (
 	grpcTimeout  = time.Second * 10
 	chainID      = "joltifyChain"
 	reqCacheSize = 512
+	ROUNDBLOCK   = 50
 )
 
 // tssPoolMsg this is the pool pre-submit message for the given height

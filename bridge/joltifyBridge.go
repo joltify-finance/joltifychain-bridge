@@ -191,7 +191,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				itemInbound := pi.PopItem()
 				metric.UpdateInboundTxNum(float64(pi.Size()))
 				if itemInbound != nil {
-					itemInbound.SetItemHeight(currentBlockHeight)
+					roundBlockHeight := currentBlockHeight / joltifybridge.ROUNDBLOCK
+					itemInbound.SetItemHeight(roundBlockHeight)
 					pi.InboundReqChan <- itemInbound
 				}
 
@@ -278,7 +279,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				metric.UpdateOutboundTxNum(float64(joltChain.Size()))
 				if itemOutBound != nil {
 					// we set joltify chain height for both inbound/outbound tx
-					itemOutBound.SetItemHeight(joltifyBlockHeight)
+					roundBlockHeight := joltifyBlockHeight / pubchain.ROUNDBLOCK
+					itemOutBound.SetItemHeight(roundBlockHeight)
 					joltChain.OutboundReqChan <- itemOutBound
 				}
 
