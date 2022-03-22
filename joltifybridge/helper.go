@@ -12,8 +12,8 @@ import (
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 )
 
-// queryAccount get the current sender account info
-func queryAccount(addr string, grpcClient grpc1.ClientConn) (authtypes.AccountI, error) {
+// QueryAccount get the current sender account info
+func QueryAccount(addr string, grpcClient grpc1.ClientConn) (authtypes.AccountI, error) {
 	accQuery := authtypes.NewQueryClient(grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
@@ -100,7 +100,6 @@ func GetLastBlockHeight(grpcClient grpc1.ClientConn) (int64, error) {
 	}
 	return resp.Block.Header.Height, nil
 }
-
 
 func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg) (bool, string, error) {
 	gasWanted, err := jc.GasEstimation([]sdk.Msg{sendMsg}, accSeq, signMsg)

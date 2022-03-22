@@ -155,7 +155,7 @@ func (b BridgeTestSuite) TestBridgeTx() {
 		PoolPubKey:  accs[1].pk,
 		BlockHeight: "5",
 	}
-	acc, err := queryAccount(b.network.Validators[0].Address.String(), jc.grpcClient)
+	acc, err := QueryAccount(b.network.Validators[0].Address.String(), jc.grpcClient)
 	b.Require().NoError(err)
 
 	num, seq := acc.GetAccountNumber(), acc.GetSequence()

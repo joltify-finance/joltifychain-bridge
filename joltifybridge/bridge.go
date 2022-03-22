@@ -270,7 +270,7 @@ func (jc *JoltifyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, t
 		jc.logger.Error().Err(err).Msg("fail to query the gas price")
 		return 0, err
 	}
-	//txBuilder.SetGasLimit(0)
+	// txBuilder.SetGasLimit(0)
 
 	key, err := jc.Keyring.Key("operator")
 	if err != nil {
@@ -351,7 +351,7 @@ func (jc *JoltifyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte)
 func (jc *JoltifyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
 	msg := types.NewMsgCreateCreatePool(creator, pubKey, height)
 
-	acc, err := queryAccount(creator.String(), jc.grpcClient)
+	acc, err := QueryAccount(creator.String(), jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("Fail to query the account")
 		return err

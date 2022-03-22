@@ -25,12 +25,16 @@ import (
 )
 
 const (
-	reqCacheSize      = 512
 	retryCacheSize    = 128
+	inboundprosSize   = 500
+	sbchannelsize     = 20000
 	chainQueryTimeout = time.Second * 5
 	GasLimit          = 2100000
 	GasPrice          = "0.00000001"
 	ROUNDBLOCK        = 50
+
+	GroupBlockGap = 5
+	GroupSign     = 3
 )
 
 // InboundReq is the account that top up account info to joltify pub_chain
@@ -40,6 +44,8 @@ type InboundReq struct {
 	toPoolAddr  common.Address
 	coin        sdk.Coin
 	blockHeight int64
+	accNum      int
+	accSeq      int
 }
 
 // Index generate the index of a given inbound req
@@ -63,6 +69,8 @@ func NewAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coi
 		toPoolAddr,
 		coin,
 		blockHeight,
+		0,
+		0,
 	}
 }
 
@@ -185,7 +193,7 @@ func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssSign) (*PubCh
 		poolLocker:         &sync.RWMutex{},
 		tssServer:          tssServer,
 		lastTwoPools:       make([]*bcommon.PoolInfo, 2),
-		InboundReqChan:     make(chan *InboundReq, reqCacheSize),
+		InboundReqChan:     make(chan *InboundReq, inboundprosSize),
 		RetryInboundReq:    &sync.Map{},
 		moveFundReq:        &sync.Map{},
 	}, nil

@@ -15,7 +15,7 @@ func (jc *JoltifyChainInstance) SubmitOutboundTx(req OutBoundReq, pubchainTx str
 		return err
 	}
 
-	acc, err := queryAccount(operator.GetAddress().String(), jc.grpcClient)
+	acc, err := QueryAccount(operator.GetAddress().String(), jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to query the account")
 		return err

@@ -51,13 +51,13 @@ func (pi *PubChainInstance) SendToken(signerPk string, sender, receiver common.A
 	//	return common.Hash{}, err
 	//}
 
-	//gasLimitd := new(big.Int).SetUint64(gasLimit)
+	// gasLimitd := new(big.Int).SetUint64(gasLimit)
 
-	//gasLimitDec := sdk.NewDecFromBigIntWithPrec(gasLimitd, sdk.Precision)
+	// gasLimitDec := sdk.NewDecFromBigIntWithPrec(gasLimitd, sdk.Precision)
 
-	//gasLimitDec = gasLimitDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO))
+	// gasLimitDec = gasLimitDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO))
 
-	//txo.GasLimit = gasLimitDec.BigInt().Uint64()
+	// txo.GasLimit = gasLimitDec.BigInt().Uint64()
 	txo.NoSend = true
 	readyTx, err := tokenInstance.Transfer(txo, receiver, amount)
 	if err != nil {
@@ -93,7 +93,7 @@ func (pi *PubChainInstance) ProcessOutBound(toAddr, fromAddr common.Address, amo
 
 // StartSubscription start the subscription of the token
 func (pi *PubChainInstance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) (chan *types.Header, error) {
-	blockEvent := make(chan *types.Header)
+	blockEvent := make(chan *types.Header, sbchannelsize)
 	blockSub, err := pi.EthClient.SubscribeNewHead(ctx, blockEvent)
 	if err != nil {
 		fmt.Printf("fail to subscribe the block event with err %v\n", err)
@@ -110,7 +110,6 @@ func (pi *PubChainInstance) StartSubscription(ctx context.Context, wg *sync.Wait
 }
 
 func (pi *PubChainInstance) tssSign(msg []byte, pk string, blockHeight int64) ([]byte, error) {
-
 	encodedMsg := base64.StdEncoding.EncodeToString(msg)
 	resp, err := pi.tssServer.KeySign(pk, []string{encodedMsg}, blockHeight, nil, "0.15.0")
 	if err != nil {

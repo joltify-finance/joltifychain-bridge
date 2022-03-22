@@ -24,8 +24,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
-const groupBlockGap = 10
-const batchSign = 5
+const ()
 
 // NewBridgeService starts the new bridge service
 func NewBridgeService(config config.Config) {
@@ -154,6 +153,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 		return
 	}
 	previousTssBlock := int64(0)
+	firstTime := true
 
 	go func() {
 		for {
@@ -192,11 +192,28 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 				// now we need to put the failed inbound request to the process channel, for each new joltify block
 				// we process one failure
-				if currentBlockHeight-previousTssBlock >= groupBlockGap {
+				if currentBlockHeight-previousTssBlock >= pubchain.GroupBlockGap {
+					if pi.Size() < pubchain.GroupSign && firstTime {
+						firstTime = false
+						continue
+					}
+
+					// we always increase the account seq regardless the tx successful or not
+					acc, err := joltifybridge.QueryAccount(pool[1].JoltifyAddress.String(), jc.grpcClient)
+					if err != nil {
+						jc.logger.Error().Err(err).Msgf("fail to query the account")
+						return "", "", errors.New("invalid account query")
+					}
+
+					inbounditems := pi.PopItem(pubchain.GroupSign)
+					roundBlockHeight := currentBlockHeight / joltifybridge.ROUNDBLOCK
+
+					for _, el := range inbounditems {
+						el.SetItemHeight(roundBlockHeight)
+					}
 
 					previousTssBlock = currentBlockHeight
 				}
-				itemInbound := pi.PopItem()
 				metric.UpdateInboundTxNum(float64(pi.Size()))
 
 				if itemInbound != nil {

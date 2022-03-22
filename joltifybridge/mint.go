@@ -2,6 +2,7 @@ package joltifybridge
 
 import (
 	"errors"
+
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
@@ -33,7 +34,7 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) (strin
 	}
 
 	// we always increase the account seq regardless the tx successful or not
-	acc, err := queryAccount(pool[1].JoltifyAddress.String(), jc.grpcClient)
+	acc, err := QueryAccount(pool[1].JoltifyAddress.String(), jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to query the account")
 		return "", "", errors.New("invalid account query")
