@@ -24,6 +24,9 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
+const groupBlockGap = 10
+const batchSign = 5
+
 // NewBridgeService starts the new bridge service
 func NewBridgeService(config config.Config) {
 	wg := sync.WaitGroup{}
@@ -150,6 +153,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 		fmt.Printf("fail to subscribe the token transfer with err %v\n", err)
 		return
 	}
+	previousTssBlock := int64(0)
 
 	go func() {
 		for {
@@ -188,8 +192,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 				// now we need to put the failed inbound request to the process channel, for each new joltify block
 				// we process one failure
+				if currentBlockHeight-previousTssBlock >= groupBlockGap {
+
+					previousTssBlock = currentBlockHeight
+				}
 				itemInbound := pi.PopItem()
 				metric.UpdateInboundTxNum(float64(pi.Size()))
+
 				if itemInbound != nil {
 					roundBlockHeight := currentBlockHeight / joltifybridge.ROUNDBLOCK
 					itemInbound.SetItemHeight(roundBlockHeight)

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -40,9 +42,18 @@ type InboundReq struct {
 	blockHeight int64
 }
 
-func (i *InboundReq) Hash() common.Hash {
+// Index generate the index of a given inbound req
+func (i *InboundReq) Index() *big.Int {
 	hash := crypto.Keccak256Hash(i.address.Bytes(), i.txID)
-	return hash
+	lower := hash.Big().String()
+	higher := strconv.FormatInt(i.blockHeight, 10)
+	indexStr := higher + lower
+
+	ret, ok := new(big.Int).SetString(indexStr, 10)
+	if !ok {
+		panic("invalid to create the index")
+	}
+	return ret
 }
 
 func NewAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coin sdk.Coin, txid []byte, blockHeight int64) InboundReq {
@@ -66,23 +77,32 @@ func (acq *InboundReq) SetItemHeight(blockHeight int64) {
 }
 
 func (pi *PubChainInstance) AddItem(req *InboundReq) {
-	pi.RetryInboundReq.Store(req.Hash().Big(), req)
+	pi.RetryInboundReq.Store(req.Index(), req)
 }
 
-func (pi *PubChainInstance) PopItem() *InboundReq {
-	max := big.NewInt(0)
+func (pi *PubChainInstance) PopItem(n int) []*InboundReq {
+	var allkeys []*big.Int
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
-		h := key.(*big.Int)
-		if max.Cmp(h) == -1 {
-			max = h
-		}
+		allkeys = append(allkeys, key.(*big.Int))
 		return true
 	})
-	if max.Cmp(big.NewInt(0)) == 1 {
-		item, _ := pi.RetryInboundReq.LoadAndDelete(max)
-		return item.(*InboundReq)
+
+	sort.Slice(allkeys, func(i, j int) bool {
+		if allkeys[i].Cmp(allkeys[j]) == -1 {
+			return true
+		}
+		return false
+	})
+	inboundReqs := make([]*InboundReq, n)
+	for i := 0; i < n; i++ {
+		el, loaded := pi.RetryInboundReq.LoadAndDelete(allkeys[i])
+		if !loaded {
+			panic("should never fail")
+		}
+		inboundReqs[i] = el.(*InboundReq)
 	}
-	return nil
+
+	return inboundReqs
 }
 
 func (pi *PubChainInstance) Size() int {
