@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"go.uber.org/atomic"
 	"strconv"
 	"sync"
 
@@ -64,6 +66,7 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssSign) (*
 	joltifyBridge.msgSendCache = []tssPoolMsg{}
 	joltifyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
 	joltifyBridge.poolUpdateLocker = &sync.RWMutex{}
+	joltifyBridge.inboundGas = atomic.NewInt64(250000)
 
 	// we put the dummy query here to avoid the panic
 	//query := "tm.event = 'Tx' AND transfer.sender = 'jolt1x'"
@@ -323,8 +326,23 @@ func (jc *JoltifyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, t
 	return uint64(gasWanted), nil
 }
 
+//UpdateGas update the gas needed from the last tx
+func (jc *JoltifyChainInstance) UpdateGas(gasUsed int64) {
+	jc.inboundGas.Store(gasUsed)
+}
+
+//GetGasEstimation get the gas estimation
+func (jc *JoltifyChainInstance) GetGasEstimation() int64 {
+	previousGasUsed := jc.inboundGas.Load()
+	gasUsedDec := sdk.NewDecFromIntWithPrec(sdk.NewIntFromUint64(uint64(previousGasUsed)), 0)
+	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO)).RoundInt64()
+	fmt.Printf(">>>>>gas we want>>>>>>>>%v\n", gasWanted)
+	//todo we need to get the gas dynamically in future, if different node get different fee, tss will fail
+	return 2500000
+}
+
 // BroadcastTx broadcast the tx to the joltifyChain
-func (jc *JoltifyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte) (bool, string, error) {
+func (jc *JoltifyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte, isTssMsg bool) (bool, string, error) {
 	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
 	// service.
 	txClient := cosTx.NewServiceClient(jc.grpcClient)
@@ -340,18 +358,27 @@ func (jc *JoltifyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte)
 		return false, "", err
 	}
 
+	//this mean tx has been submitted by others
+	if grpcRes.GetTxResponse().Code == 19 {
+		return true, "", nil
+	}
+
 	if grpcRes.GetTxResponse().Code != 0 {
 		jc.logger.Error().Err(err).Msgf("fail to broadcast with response %v", grpcRes.TxResponse)
 		return false, "", nil
 	}
 	txHash := grpcRes.GetTxResponse().TxHash
+	if isTssMsg {
+		jc.UpdateGas(grpcRes.GetTxResponse().GasUsed)
+	}
+
 	return true, txHash, nil
 }
 
 func (jc *JoltifyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
 	msg := types.NewMsgCreateCreatePool(creator, pubKey, height)
 
-	acc, err := QueryAccount(creator.String(), jc.grpcClient)
+	acc, err := queryAccount(creator.String(), jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("Fail to query the account")
 		return err
@@ -387,7 +414,8 @@ func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, str
 	jc.poolUpdateLocker.Lock()
 	if len(jc.msgSendCache) < 1 {
 		jc.poolUpdateLocker.Unlock()
-		return false, ""
+		// no need to submit
+		return true, ""
 	}
 	el := jc.msgSendCache[0]
 	jc.poolUpdateLocker.Unlock()
@@ -411,7 +439,7 @@ func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, str
 			jc.logger.Error().Err(err).Msg("fail to encode the tx")
 			return false, ""
 		}
-		ok, resp, err := jc.BroadcastTx(ctx, txBytes)
+		ok, resp, err := jc.BroadcastTx(ctx, txBytes, false)
 		if err != nil || !ok {
 			jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
 
@@ -426,7 +454,7 @@ func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, str
 		jc.logger.Info().Msgf("successfully broadcast the pool info")
 		return true, el.poolPubKey
 	}
-	return false, ""
+	return true, ""
 }
 
 // CheckOutBoundTx checks

@@ -24,8 +24,6 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
-const ()
-
 // NewBridgeService starts the new bridge service
 func NewBridgeService(config config.Config) {
 	wg := sync.WaitGroup{}
@@ -108,13 +106,17 @@ func NewBridgeService(config config.Config) {
 	}
 
 	wg.Add(1)
-	addEventLoop(ctx, &wg, joltifyBridge, ci, metrics)
+	go func() {
+		defer wg.Done()
+		<-c
+		ctx.Done()
+	}()
 
-	<-c
-	ctx.Done()
-	cancel()
+	wg.Add(1)
+	addEventLoop(ctx, &wg, joltifyBridge, ci, metrics)
 	wg.Wait()
-	fmt.Printf("we quit gracefully\n")
+	cancel()
+	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
 func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.PubChainInstance, metric *monitor.Metric) {
@@ -130,7 +132,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 	}
 
 	query = "tm.event = 'NewBlock'"
-	newBlockChan, err := joltChain.AddSubscribe(ctxLocal, query)
+	newJoltifyBlock, err := joltChain.AddSubscribe(ctxLocal, query)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return
@@ -144,9 +146,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 		return
 	}
 
-	wg.Add(1)
-
 	// pubNewBlockChan is the channel for the new blocks for the public chain
+	wg.Add(1)
 	pubNewBlockChan, err := pi.StartSubscription(ctx, wg)
 	if err != nil {
 		fmt.Printf("fail to subscribe the token transfer with err %v\n", err)
@@ -155,7 +156,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 	previousTssBlock := int64(0)
 	firstTime := true
 
-	go func() {
+	go func(wg *sync.WaitGroup) {
 		for {
 			select {
 			case <-ctx.Done():
@@ -174,9 +175,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 				// process the new joltify block, validator may need to submit the pool address
-			case block := <-newBlockChan:
+			case block := <-newJoltifyBlock:
 				currentBlockHeight := block.Data.(tmtypes.EventDataNewBlock).Block.Height
-				joltChain.CheckAndUpdatePool(currentBlockHeight)
+				ok, _ := joltChain.CheckAndUpdatePool(currentBlockHeight)
+				if !ok {
+					//it is okay to fail to submit a pool address as other nodes can submit, as long as 2/3 nodes submit, it is fine.
+					zlog.Logger.Warn().Msgf("we fail to submit the new pool address")
+				}
+
 				joltChain.CurrentHeight = currentBlockHeight
 				// now we check whether we need to update the pool
 				// we query the pool from the chain directly.
@@ -188,38 +194,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				if len(poolInfo) != 2 {
 					zlog.Logger.Warn().Msgf("the pool only have %v address, bridge will not work", len(poolInfo))
 					continue
-				}
-
-				// now we need to put the failed inbound request to the process channel, for each new joltify block
-				// we process one failure
-				if currentBlockHeight-previousTssBlock >= pubchain.GroupBlockGap {
-					if pi.Size() < pubchain.GroupSign && firstTime {
-						firstTime = false
-						continue
-					}
-
-					// we always increase the account seq regardless the tx successful or not
-					acc, err := joltifybridge.QueryAccount(pool[1].JoltifyAddress.String(), jc.grpcClient)
-					if err != nil {
-						jc.logger.Error().Err(err).Msgf("fail to query the account")
-						return "", "", errors.New("invalid account query")
-					}
-
-					inbounditems := pi.PopItem(pubchain.GroupSign)
-					roundBlockHeight := currentBlockHeight / joltifybridge.ROUNDBLOCK
-
-					for _, el := range inbounditems {
-						el.SetItemHeight(roundBlockHeight)
-					}
-
-					previousTssBlock = currentBlockHeight
-				}
-				metric.UpdateInboundTxNum(float64(pi.Size()))
-
-				if itemInbound != nil {
-					roundBlockHeight := currentBlockHeight / joltifybridge.ROUNDBLOCK
-					itemInbound.SetItemHeight(roundBlockHeight)
-					pi.InboundReqChan <- itemInbound
 				}
 
 				currentPool := pi.GetPool()
@@ -248,30 +222,34 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 				}
 
-				// we move fund if some pool retired
-				previousPool, _ := joltChain.PopMoveFundItemAfterBlock(currentBlockHeight)
-				if previousPool == nil {
+				latestPool := poolInfo[0].CreatePool.PoolAddr
+				moveFound := joltChain.MoveFound(currentBlockHeight, latestPool)
+				if moveFound {
+					// if we move fund in this round, we do not send tx to sign
 					continue
 				}
-				// we get the latest pool address and move funds to the latest pool
-				isSigner, err := joltChain.CheckWhetherSigner(previousPool.PoolInfo)
-				if err != nil {
-					zlog.Logger.Warn().Msg("fail in check whether we are signer in moving fund")
-					continue
+				// now we need to put the failed inbound request to the process channel, for each new joltify block
+				// we process one failure
+				//todo we need also to add the check to avoid send tx near the churn blocks
+
+				if currentBlockHeight-previousTssBlock >= pubchain.GroupBlockGap && pi.Size() != 0 {
+					// if we do not have enough tx to process, we wait for another round
+					if pi.Size() < pubchain.GroupSign && firstTime {
+						firstTime = false
+						metric.UpdateInboundTxNum(float64(pi.Size()))
+						continue
+					}
+
+					pools := joltChain.GetPool()
+					zlog.Logger.Warn().Msgf("we feed the tx now %v", pools[1].PoolInfo.CreatePool.String())
+					err := joltChain.FeedTx(pools[1].PoolInfo, pi, currentBlockHeight)
+					if err != nil {
+						zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
+					}
+					previousTssBlock = currentBlockHeight
+					firstTime = true
+					metric.UpdateInboundTxNum(float64(pi.Size()))
 				}
-				if !isSigner {
-					continue
-				}
-				emptyAcc, err := joltChain.MoveFunds(previousPool, poolInfo[0].CreatePool.PoolAddr, currentBlockHeight)
-				if emptyAcc {
-					tick := html.UnescapeString("&#" + "127974" + ";")
-					zlog.Logger.Info().Msgf("%v successfully moved funds from %v to %v", tick, previousPool.JoltifyAddress.String(), poolInfo[0].CreatePool.PoolAddr.String())
-					continue
-				}
-				if err != nil {
-					zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.JoltifyAddress.String(), poolInfo[1].CreatePool.PoolAddr.String())
-				}
-				joltChain.AddMoveFundItem(previousPool, currentBlockHeight)
 
 			case r := <-newJoltifyTxChan:
 				result := r.Data.(tmtypes.EventDataTx).Result
@@ -344,31 +322,40 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 			// process the in-bound top up event which will mint coin for users
 			case item := <-pi.InboundReqChan:
 				// first we check whether this tx has already been submitted by others
-				pools := joltChain.GetPool()
-				found, err := joltChain.CheckWhetherSigner(pools[1].PoolInfo)
-				if err != nil {
-					zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
-					continue
-				}
-				if found {
-					txHash, index, err := joltChain.ProcessInBound(item)
-					if err != nil {
-						pi.AddItem(item)
-						zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
-						continue
-					}
-
+				//pools := joltChain.GetPool()
+				//found, err := joltChain.CheckWhetherSigner(pools[1].PoolInfo)
+				//if err != nil {
+				//	zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
+				//	continue
+				//}
+				//if found {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					txHash, index, _ := joltChain.ProcessInBound(item)
+					//if err != nil {
+					//	pi.AddItem(item)
+					//	zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
+					//	return
+					//}
+					wg.Add(1)
 					go func() {
+						defer wg.Done()
 						err := joltChain.CheckTxStatus(index)
 						if err != nil {
 							zlog.Logger.Error().Err(err).Msgf("the tx has not been sussfully submitted retry")
 							pi.AddItem(item)
 						}
 						tick := html.UnescapeString("&#" + "128229" + ";")
+						if txHash == "" {
+							zlog.Logger.Info().Msgf("%v index(%v) have successfully top up by others", tick, index)
+						}
 						zlog.Logger.Info().Msgf("%v txid(%v) have successfully top up", tick, txHash)
 					}()
 
-				}
+				}()
+
+				//}
 
 			case item := <-joltChain.OutboundReqChan:
 
@@ -425,5 +412,5 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 			}
 		}
-	}()
+	}(wg)
 }

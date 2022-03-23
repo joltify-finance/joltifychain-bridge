@@ -15,7 +15,7 @@ func (jc *JoltifyChainInstance) SubmitOutboundTx(req OutBoundReq, pubchainTx str
 		return err
 	}
 
-	acc, err := QueryAccount(operator.GetAddress().String(), jc.grpcClient)
+	acc, err := queryAccount(operator.GetAddress().String(), jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to query the account")
 		return err
@@ -29,7 +29,7 @@ func (jc *JoltifyChainInstance) SubmitOutboundTx(req OutBoundReq, pubchainTx str
 		BlockHeight: strconv.FormatInt(req.blockHeight, 10),
 	}
 
-	ok, _, err := jc.composeAndSend(&outboundMsg, accSeq, accNum, nil)
+	ok, _, err := jc.composeAndSend(&outboundMsg, accSeq, accNum, nil, operator.GetAddress())
 	if !ok || err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to broadcast the outbound tx record")
 		return errors.New("fail to broadcast the outbound tx record")
@@ -37,6 +37,7 @@ func (jc *JoltifyChainInstance) SubmitOutboundTx(req OutBoundReq, pubchainTx str
 	return nil
 }
 
+//GetPubChainSubmittedTx get the submitted mint tx
 func (jc *JoltifyChainInstance) GetPubChainSubmittedTx(req OutBoundReq) (string, error) {
 	reqStr := req.Hash().Hex()
 	vaultQuery := vaulttypes.NewQueryClient(jc.grpcClient)

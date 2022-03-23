@@ -143,7 +143,7 @@ func (m MintTestSuite) TestProcessInbound() {
 	// m.Require().NoError(err)
 	send := banktypes.NewMsgSend(valAddr, accs[0].joltAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
-	acc, err := QueryAccount(accs[0].joltAddr.String(), jc.grpcClient)
+	acc, err := queryAccount(accs[0].joltAddr.String(), jc.grpcClient)
 	m.Require().NoError(err)
 	txBuilder, err := jc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, nil)
 	m.Require().NoError(err)

@@ -2,6 +2,9 @@ package joltifybridge
 
 import (
 	"context"
+	"errors"
+	"github.com/cenkalti/backoff"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -12,8 +15,8 @@ import (
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 )
 
-// QueryAccount get the current sender account info
-func QueryAccount(addr string, grpcClient grpc1.ClientConn) (authtypes.AccountI, error) {
+// queryAccount get the current sender account info
+func queryAccount(addr string, grpcClient grpc1.ClientConn) (authtypes.AccountI, error) {
 	accQuery := authtypes.NewQueryClient(grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
@@ -101,13 +104,34 @@ func GetLastBlockHeight(grpcClient grpc1.ClientConn) (int64, error) {
 	return resp.Block.Header.Height, nil
 }
 
-func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg) (bool, string, error) {
-	gasWanted, err := jc.GasEstimation([]sdk.Msg{sendMsg}, accSeq, signMsg)
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("Fail to get the gas estimation")
-		return false, "", err
+// CheckTxStatus check whether the tx has been done successfully
+func (jc *JoltifyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSeq uint64) error {
+	bf := backoff.NewExponentialBackOff()
+	bf.InitialInterval = time.Second
+	bf.MaxInterval = time.Second * 10
+	bf.MaxElapsedTime = time.Minute
+
+	op := func() error {
+		acc, err := queryAccount(poolAddress.String(), jc.grpcClient)
+		if err != nil {
+			jc.logger.Error().Err(err).Msgf("fail to query the account")
+			return errors.New("invalid account query")
+		}
+		if acc.GetSequence() == targetSeq {
+			return nil
+		}
+		return errors.New("not our round")
 	}
-	txBuilder, err := jc.genSendTx([]sdk.Msg{sendMsg}, accSeq, accNum, gasWanted, signMsg)
+
+	err := backoff.Retry(op, bf)
+	return err
+
+}
+
+func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
+
+	gasWanted := jc.GetGasEstimation()
+	txBuilder, err := jc.genSendTx([]sdk.Msg{sendMsg}, accSeq, accNum, uint64(gasWanted), signMsg)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the tx")
 		return false, "", err
@@ -122,6 +146,14 @@ func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum u
 		return false, "", err
 	}
 
-	ok, resp, err := jc.BroadcastTx(ctx, txBytes)
-	return ok, resp, err
+	err = jc.waitAndSend(poolAddress, accSeq)
+	if err == nil {
+		isTssMsg := true
+		if signMsg == nil {
+			isTssMsg = false
+		}
+		ok, resp, err := jc.BroadcastTx(ctx, txBytes, isTssMsg)
+		return ok, resp, err
+	}
+	return false, "", err
 }

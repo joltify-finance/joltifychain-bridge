@@ -1,6 +1,7 @@
 package joltifybridge
 
 import (
+	"go.uber.org/atomic"
 	"math/big"
 	"sync"
 	"time"
@@ -25,7 +26,7 @@ import (
 )
 
 const (
-	grpcTimeout  = time.Second * 10
+	grpcTimeout  = time.Second * 30
 	chainID      = "joltifyChain"
 	reqCacheSize = 512
 	ROUNDBLOCK   = 50
@@ -43,8 +44,8 @@ func (pi *JoltifyChainInstance) AddMoveFundItem(pool *bcommon.PoolInfo, height i
 	pi.moveFundReq.Store(height, pool)
 }
 
-// PopMoveFundItemAfterBlock pop a move fund item after give block duration
-func (pi *JoltifyChainInstance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
+// popMoveFundItemAfterBlock pop a move fund item after give block duration
+func (pi *JoltifyChainInstance) popMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
 	min := int64(math.MaxInt64)
 	pi.moveFundReq.Range(func(key, value interface{}) bool {
 		h := key.(int64)
@@ -131,6 +132,7 @@ type JoltifyChainInstance struct {
 	RetryOutboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq      *sync.Map
 	CurrentHeight    int64
+	inboundGas       *atomic.Int64
 }
 
 // info the import structure of the cosmos validator info

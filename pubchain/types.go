@@ -33,26 +33,34 @@ const (
 	GasPrice          = "0.00000001"
 	ROUNDBLOCK        = 50
 
-	GroupBlockGap = 5
-	GroupSign     = 3
+	GroupBlockGap = 10
+	GroupSign     = 5
 )
 
 // InboundReq is the account that top up account info to joltify pub_chain
 type InboundReq struct {
-	address     sdk.AccAddress
-	txID        []byte // this indicates the identical inbound req
-	toPoolAddr  common.Address
-	coin        sdk.Coin
-	blockHeight int64
-	accNum      int
-	accSeq      int
+	address            sdk.AccAddress
+	txID               []byte // this indicates the identical inbound req
+	toPoolAddr         common.Address
+	coin               sdk.Coin
+	blockHeight        int64
+	originalHeight     int64
+	accNum             uint64
+	accSeq             uint64
+	poolJoltifyAddress sdk.AccAddress
+	poolPk             string
+}
+
+func (i *InboundReq) Hash() common.Hash {
+	hash := crypto.Keccak256Hash(i.address.Bytes(), i.txID)
+	return hash
 }
 
 // Index generate the index of a given inbound req
 func (i *InboundReq) Index() *big.Int {
 	hash := crypto.Keccak256Hash(i.address.Bytes(), i.txID)
 	lower := hash.Big().String()
-	higher := strconv.FormatInt(i.blockHeight, 10)
+	higher := strconv.FormatInt(i.originalHeight, 10)
 	indexStr := higher + lower
 
 	ret, ok := new(big.Int).SetString(indexStr, 10)
@@ -69,8 +77,11 @@ func NewAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coi
 		toPoolAddr,
 		coin,
 		blockHeight,
+		blockHeight,
 		0,
 		0,
+		nil,
+		"",
 	}
 }
 
@@ -82,6 +93,19 @@ func (acq *InboundReq) GetInboundReqInfo() (sdk.AccAddress, common.Address, sdk.
 // SetItemHeight sets the block height of the tx
 func (acq *InboundReq) SetItemHeight(blockHeight int64) {
 	acq.blockHeight = blockHeight
+}
+
+// SetAccountInfo sets the block height of the tx
+func (acq *InboundReq) SetAccountInfo(number, seq uint64, address sdk.AccAddress, pk string) {
+	acq.accNum = number
+	acq.accSeq = seq
+	acq.poolJoltifyAddress = address
+	acq.poolPk = pk
+}
+
+//GetAccountInfo returns the account number and seq
+func (acq *InboundReq) GetAccountInfo() (uint64, uint64, sdk.AccAddress, string) {
+	return acq.accSeq, acq.accNum, acq.poolJoltifyAddress, acq.poolPk
 }
 
 func (pi *PubChainInstance) AddItem(req *InboundReq) {
@@ -101,8 +125,19 @@ func (pi *PubChainInstance) PopItem(n int) []*InboundReq {
 		}
 		return false
 	})
-	inboundReqs := make([]*InboundReq, n)
-	for i := 0; i < n; i++ {
+	indexNum := len(allkeys)
+	if indexNum == 0 {
+		return nil
+	}
+
+	returnNum := n
+	if indexNum < n {
+		returnNum = indexNum
+	}
+
+	inboundReqs := make([]*InboundReq, returnNum)
+
+	for i := 0; i < returnNum; i++ {
 		el, loaded := pi.RetryInboundReq.LoadAndDelete(allkeys[i])
 		if !loaded {
 			panic("should never fail")

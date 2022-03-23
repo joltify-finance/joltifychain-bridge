@@ -26,17 +26,17 @@ import (
 
 type BridgeTestSuite struct {
 	suite.Suite
-	cfg         network.Config
-	network     *network.Network
-	validatorky keyring.Keyring
-	queryClient tmservice.ServiceClient
+	cfg          network.Config
+	network      *network.Network
+	validatorKey keyring.Keyring
+	queryClient  tmservice.ServiceClient
 }
 
 func (b *BridgeTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
 	cfg.MinGasPrices = "0stake"
-	b.validatorky = keyring.NewInMemory()
+	b.validatorKey = keyring.NewInMemory()
 
 	// now we put the mock pool list in the test
 	state := vaulttypes.GenesisState{}
@@ -44,7 +44,7 @@ func (b *BridgeTestSuite) SetupSuite() {
 	b.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[vaulttypes.ModuleName], &state))
 	b.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[stakingtypes.ModuleName], &stateStaking))
 
-	validators, err := genNValidator(3, b.validatorky)
+	validators, err := genNValidator(3, b.validatorKey)
 	b.Require().NoError(err)
 	for i := 1; i < 50; i++ {
 		randPoolSk := ed25519.GenPrivKey()
@@ -101,7 +101,7 @@ func (b BridgeTestSuite) TestBridge() {
 	}
 	jc, err := NewJoltifyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss)
 	b.Require().NoError(err)
-	jc.Keyring = b.validatorky
+	jc.Keyring = b.validatorKey
 
 	// we need to add this as it seems the rpcaddress is incorrect
 	jc.grpcClient = b.network.Validators[0].ClientCtx
@@ -139,7 +139,7 @@ func (b BridgeTestSuite) TestBridgeTx() {
 	}
 	jc, err := NewJoltifyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss)
 	b.Require().NoError(err)
-	jc.Keyring = b.validatorky
+	jc.Keyring = b.validatorKey
 
 	// we need to add this as it seems the rpcaddress is incorrect
 	jc.grpcClient = b.network.Validators[0].ClientCtx
@@ -155,7 +155,7 @@ func (b BridgeTestSuite) TestBridgeTx() {
 		PoolPubKey:  accs[1].pk,
 		BlockHeight: "5",
 	}
-	acc, err := QueryAccount(b.network.Validators[0].Address.String(), jc.grpcClient)
+	acc, err := queryAccount(b.network.Validators[0].Address.String(), jc.grpcClient)
 	b.Require().NoError(err)
 
 	num, seq := acc.GetAccountNumber(), acc.GetSequence()
@@ -210,7 +210,7 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 	}
 	jc, err := NewJoltifyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss)
 	b.Require().NoError(err)
-	jc.Keyring = b.validatorky
+	jc.Keyring = b.validatorKey
 
 	// we need to add this as it seems the rpcaddress is incorrect
 	jc.grpcClient = b.network.Validators[0].ClientCtx

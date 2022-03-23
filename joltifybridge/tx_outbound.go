@@ -28,7 +28,7 @@ func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.Ac
 	}
 
 	// here we need to calculate the node's eth address from public key rather than the joltify chain address
-	acc, err := QueryAccount(msg.FromAddress, jc.grpcClient)
+	acc, err := queryAccount(msg.FromAddress, jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("Fail to query the account")
 		return err
@@ -155,7 +155,7 @@ func (jc *JoltifyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.P
 
 func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) (bool, error) {
 	from := fromPool.JoltifyAddress
-	acc, err := QueryAccount(from.String(), jc.grpcClient)
+	acc, err := queryAccount(from.String(), jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
 		return false, err
@@ -179,7 +179,7 @@ func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.A
 		Version:     tssclient.TssVersion,
 	}
 
-	ok, resp, err := jc.composeAndSend(msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg)
+	ok, resp, err := jc.composeAndSend(msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, acc.GetAddress())
 	if err != nil || !ok {
 		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
 		return false, errors.New("fail to process the inbound tx")
