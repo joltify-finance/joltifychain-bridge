@@ -1,6 +1,7 @@
 package joltifybridge
 
 import (
+	common2 "gitlab.com/joltify/joltifychain-bridge/common"
 	"strconv"
 	"testing"
 	"time"
@@ -214,8 +215,8 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 func (o OutBoundTestSuite) TestOutBoundReq() {
 	accs, err := generateRandomPrivKey(2)
 	o.Require().NoError(err)
-	boundReq := newOutboundReq("testID", accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("testcoing", sdk.NewInt(1)), 101)
-	boundReq.SetItemHeight(100)
+	boundReq := common2.NewOutboundReq("testID", accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("testcoing", sdk.NewInt(1)), 101)
+	boundReq.SetItemHeightandNonce(100)
 	a, b, _, h := boundReq.GetOutBoundInfo()
 	o.Require().Equal(a.String(), accs[0].commAddr.String())
 	o.Require().Equal(b.String(), accs[1].commAddr.String())

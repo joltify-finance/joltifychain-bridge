@@ -153,8 +153,10 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 		fmt.Printf("fail to subscribe the token transfer with err %v\n", err)
 		return
 	}
-	previousTssBlock := int64(0)
-	firstTime := true
+	previousTssBlockInbound := int64(0)
+	previousTssBlockOutBound := int64(0)
+	firstTimeInbound := true
+	firstTimeOutbound := true
 
 	go func(wg *sync.WaitGroup) {
 		for {
@@ -228,14 +230,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					// if we move fund in this round, we do not send tx to sign
 					continue
 				}
-				// now we need to put the failed inbound request to the process channel, for each new joltify block
-				// we process one failure
-				//todo we need also to add the check to avoid send tx near the churn blocks
 
-				if currentBlockHeight-previousTssBlock >= pubchain.GroupBlockGap && pi.Size() != 0 {
+				//todo we need also to add the check to avoid send tx near the churn blocks
+				if currentBlockHeight-previousTssBlockInbound >= pubchain.GroupBlockGap && pi.Size() != 0 {
 					// if we do not have enough tx to process, we wait for another round
-					if pi.Size() < pubchain.GroupSign && firstTime {
-						firstTime = false
+					if pi.Size() < pubchain.GroupSign && firstTimeInbound {
+						firstTimeInbound = false
 						metric.UpdateInboundTxNum(float64(pi.Size()))
 						continue
 					}
@@ -246,8 +246,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
 					}
-					previousTssBlock = currentBlockHeight
-					firstTime = true
+					previousTssBlockInbound = currentBlockHeight
+					firstTimeInbound = true
 					metric.UpdateInboundTxNum(float64(pi.Size()))
 				}
 
@@ -277,67 +277,89 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				// we delete the expired tx
 				pi.DeleteExpired(head.Number.Uint64())
 
-				// now we need to put the failed outbound request to the process channel
-				// todo need to check after a given block gap
-				itemOutBound := joltChain.PopItem()
-				metric.UpdateOutboundTxNum(float64(joltChain.Size()))
-				if itemOutBound != nil {
-					// we set joltify chain height for both inbound/outbound tx
-					roundBlockHeight := joltifyBlockHeight / pubchain.ROUNDBLOCK
-					itemOutBound.SetItemHeight(roundBlockHeight)
-					joltChain.OutboundReqChan <- itemOutBound
-				}
-
-				// we move fund in the public chain
-				previousPool, _ := pi.PopMoveFundItemAfterBlock(int64(head.Number.Uint64()))
+				isMoveFund := true
+				previousPool, _ := pi.PopMoveFundItemAfterBlock(head.Number.Int64())
 				if previousPool == nil {
 					continue
 				}
 
-				// we get the latest pool address and move funds to the latest pool
-				currentPool := pi.GetPool()
 				isSigner, err := joltChain.CheckWhetherSigner(previousPool.PoolInfo)
 				if err != nil {
 					zlog.Logger.Warn().Msg("fail in check whether we are signer in moving fund")
 					continue
 				}
-				if !isSigner {
-					continue
+				if !isSigner || (previousPool == nil) {
+					isMoveFund = false
 				}
-				emptyAccount, err := pi.MoveFunds(previousPool, currentPool[1].EthAddress, head.Number.Int64())
-				if err != nil {
-					zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
-					pi.AddMoveFundItem(previousPool, pi.CurrentHeight)
-					continue
-				}
-				if emptyAccount {
-					tick := html.UnescapeString("&#" + "9989" + ";")
-					zlog.Logger.Info().Msgf("%v account %v is clear no need to move", tick, previousPool.EthAddress.String())
+
+				// we move fund in the public chain
+				pi.MoveFound(head.Number.Int64(), previousPool)
+				if isMoveFund {
+					//once we move fund, we do not send tx to be processed
 					continue
 				}
 
-				// we add this account to "retry" to ensure it is the empty account in the next balance check
-				pi.AddMoveFundItem(previousPool, pi.CurrentHeight)
+				//todo we need also to add the check to avoid send tx near the churn blocks
+
+				if joltifyBlockHeight-previousTssBlockOutBound >= joltifybridge.GroupBlockGap && joltChain.Size() != 0 {
+					// if we do not have enough tx to process, we wait for another round
+					if pi.Size() < pubchain.GroupSign && firstTimeOutbound {
+						firstTimeOutbound = false
+						metric.UpdateOutboundTxNum(float64(joltChain.Size()))
+						continue
+					}
+
+					pools := joltChain.GetPool()
+					zlog.Logger.Warn().Msgf("we feed the tx now %v", pools[1].PoolInfo.CreatePool.String())
+
+					found, err := joltChain.CheckWhetherSigner(pools[1].PoolInfo)
+					if err != nil {
+						zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
+						continue
+					}
+					if !found {
+						zlog.Logger.Info().Msgf("we are not the signer")
+						continue
+					}
+
+					outboundItems := joltChain.PopItem(pubchain.GroupSign)
+					if outboundItems == nil {
+						zlog.Logger.Info().Msgf("empty queue")
+						continue
+					}
+
+					err = pi.FeedTx(joltifyBlockHeight, pools[1].PoolInfo, outboundItems)
+					if err != nil {
+						zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
+						continue
+					}
+					previousTssBlockOutBound = joltifyBlockHeight
+					firstTimeOutbound = true
+					metric.UpdateInboundTxNum(float64(joltChain.Size()))
+
+					for _, el := range outboundItems {
+						joltChain.OutboundReqChan <- el
+					}
+				}
+
+				//pi.FeedTx()
+				// now we need to put the failed outbound request to the process channel
+				// todo need to check after a given block gap
+				//itemOutBound := joltChain.PopItem()
+				//metric.UpdateOutboundTxNum(float64(joltChain.Size()))
+				//if itemOutBound != nil {
+				//	// we set joltify chain height for both inbound/outbound tx
+				//	roundBlockHeight := joltifyBlockHeight / pubchain.ROUNDBLOCK
+				//	itemOutBound.SetItemHeight(roundBlockHeight)
+				//	joltChain.OutboundReqChan <- itemOutBound
+				//}
 
 			// process the in-bound top up event which will mint coin for users
 			case item := <-pi.InboundReqChan:
-				// first we check whether this tx has already been submitted by others
-				//pools := joltChain.GetPool()
-				//found, err := joltChain.CheckWhetherSigner(pools[1].PoolInfo)
-				//if err != nil {
-				//	zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
-				//	continue
-				//}
-				//if found {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
 					txHash, index, _ := joltChain.ProcessInBound(item)
-					//if err != nil {
-					//	pi.AddItem(item)
-					//	zlog.Logger.Error().Err(err).Msg("fail to mint the coin for the user")
-					//	return
-					//}
 					wg.Add(1)
 					go func() {
 						defer wg.Done()
@@ -355,39 +377,35 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 				}()
 
-				//}
-
 			case item := <-joltChain.OutboundReqChan:
 
-				submittedTx, err := joltChain.GetPubChainSubmittedTx(*item)
-				if err != nil {
-					zlog.Logger.Error().Err(err).Msg("fail to query the submitted tx record, we continue process this tx")
-				}
-
-				if submittedTx != "" {
-					zlog.Logger.Info().Msgf("we check whether someone has already submitted this tx %v", submittedTx)
-					err := pi.CheckTxStatus(submittedTx)
-					if err == nil {
-						zlog.Logger.Info().Msg("this tx has been submitted by others, we skip it")
-						continue
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					submittedTx, err := joltChain.GetPubChainSubmittedTx(*item)
+					if err != nil {
+						zlog.Logger.Error().Err(err).Msg("fail to query the submitted tx record, we continue process this tx")
 					}
-				}
 
-				pools := joltChain.GetPool()
-				found, err := joltChain.CheckWhetherSigner(pools[1].PoolInfo)
-				if err != nil {
-					zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
-					continue
-				}
-				if found {
-					toAddr, fromAddr, amount, blockHeight := item.GetOutBoundInfo()
-					txHash, err := pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight)
+					if submittedTx != "" {
+						zlog.Logger.Info().Msgf("we check whether someone has already submitted this tx %v", submittedTx)
+						err := pi.CheckTxStatus(submittedTx)
+						if err == nil {
+							zlog.Logger.Info().Msg("this tx has been submitted by others, we skip it")
+							return
+						}
+					}
+
+					toAddr, fromAddr, amount, blockHeight, nonce := item.GetOutBoundInfo()
+					txHash, err := pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight, nonce)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
 						joltChain.AddItem(item)
 					} else {
 						// though we submit the tx successful, we may still fail as tx may run out of gas,so we need to check
+						wg.Add(1)
 						go func() {
+							defer wg.Done()
 							err := pi.CheckTxStatus(txHash)
 							if err == nil {
 								tick := html.UnescapeString("&#" + "128228" + ";")
@@ -408,8 +426,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 							joltChain.AddItem(item)
 						}()
 					}
-				}
-
+				}()
 			}
 		}
 	}(wg)

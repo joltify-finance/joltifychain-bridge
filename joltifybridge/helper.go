@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"github.com/cenkalti/backoff"
-	"time"
-
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -106,10 +104,7 @@ func GetLastBlockHeight(grpcClient grpc1.ClientConn) (int64, error) {
 
 // CheckTxStatus check whether the tx has been done successfully
 func (jc *JoltifyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSeq uint64) error {
-	bf := backoff.NewExponentialBackOff()
-	bf.InitialInterval = time.Second
-	bf.MaxInterval = time.Second * 10
-	bf.MaxElapsedTime = time.Minute
+	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
 
 	op := func() error {
 		acc, err := queryAccount(poolAddress.String(), jc.grpcClient)

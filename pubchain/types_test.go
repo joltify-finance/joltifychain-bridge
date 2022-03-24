@@ -66,7 +66,7 @@ func (tm *TssMock) Stop() {
 	return
 }
 
-type sortInboundReq []*InboundReq
+type sortInboundReq []*common2.InboundReq
 
 func (s sortInboundReq) Len() int {
 	return len(s)
@@ -82,15 +82,15 @@ func (s sortInboundReq) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func createNreq(n int) ([]*InboundReq, []*InboundReq, error) {
+func createNreq(n int) ([]*common2.InboundReq, []*common2.InboundReq, error) {
 	accs, err := generateRandomPrivKey(n + 1)
 	if err != nil {
 		return nil, nil, err
 	}
-	reqs := make([]*InboundReq, n)
+	reqs := make([]*common2.InboundReq, n)
 	reqsSorted := make(sortInboundReq, n)
 	for i := 0; i < n; i++ {
-		req := InboundReq{
+		req := common2.InboundReq{
 			address:     accs[i].joltAddr,
 			txID:        []byte(strconv.Itoa(i)), // this indicates the identical inbound req
 			toPoolAddr:  accs[n].commAddr,

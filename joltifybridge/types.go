@@ -3,11 +3,11 @@ package joltifybridge
 import (
 	"go.uber.org/atomic"
 	"math/big"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/crypto"
 	grpc1 "github.com/gogo/protobuf/grpc"
 	"gitlab.com/joltify/joltifychain-bridge/config"
 
@@ -26,10 +26,13 @@ import (
 )
 
 const (
-	grpcTimeout  = time.Second * 30
-	chainID      = "joltifyChain"
-	reqCacheSize = 512
-	ROUNDBLOCK   = 50
+	grpcTimeout   = time.Second * 30
+	chainID       = "joltifyChain"
+	reqCacheSize  = 1024
+	ROUNDBLOCK    = 50
+	submitBackoff = time.Millisecond * 500
+	GroupBlockGap = 6
+	GroupSign     = 8
 )
 
 // tssPoolMsg this is the pool pre-submit message for the given height
@@ -40,14 +43,14 @@ type tssPoolMsg struct {
 	blockHeight int64
 }
 
-func (pi *JoltifyChainInstance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64) {
-	pi.moveFundReq.Store(height, pool)
+func (jc *JoltifyChainInstance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64) {
+	jc.moveFundReq.Store(height, pool)
 }
 
 // popMoveFundItemAfterBlock pop a move fund item after give block duration
-func (pi *JoltifyChainInstance) popMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
+func (jc *JoltifyChainInstance) popMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
 	min := int64(math.MaxInt64)
-	pi.moveFundReq.Range(func(key, value interface{}) bool {
+	jc.moveFundReq.Range(func(key, value interface{}) bool {
 		h := key.(int64)
 		if h <= min {
 			min = h
@@ -56,15 +59,15 @@ func (pi *JoltifyChainInstance) popMoveFundItemAfterBlock(currentBlockHeight int
 	})
 
 	if min < math.MaxInt64 && (currentBlockHeight-min > config.MINCHECKBLOCKGAP) {
-		item, _ := pi.moveFundReq.LoadAndDelete(min)
+		item, _ := jc.moveFundReq.LoadAndDelete(min)
 		return item.(*bcommon.PoolInfo), min
 	}
 	return nil, 0
 }
 
-func (pi *JoltifyChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
+func (jc *JoltifyChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
 	min := int64(math.MaxInt64)
-	pi.moveFundReq.Range(func(key, value interface{}) bool {
+	jc.moveFundReq.Range(func(key, value interface{}) bool {
 		h := key.(int64)
 		if h <= min {
 			min = h
@@ -72,30 +75,50 @@ func (pi *JoltifyChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
 		return true
 	})
 	if min < math.MaxInt64 {
-		item, _ := pi.moveFundReq.LoadAndDelete(min)
+		item, _ := jc.moveFundReq.LoadAndDelete(min)
 		return item.(*bcommon.PoolInfo), min
 	}
 	return nil, 0
 }
 
-func (pi *JoltifyChainInstance) AddItem(req *OutBoundReq) {
-	pi.RetryOutboundReq.Store(req.Hash().Big(), req)
+func (jc *JoltifyChainInstance) AddItem(req *bcommon.OutBoundReq) {
+	jc.RetryOutboundReq.Store(req.Index(), req)
 }
 
-func (pi *JoltifyChainInstance) PopItem() *OutBoundReq {
-	max := big.NewInt(0)
-	pi.RetryOutboundReq.Range(func(key, value interface{}) bool {
-		h := key.(*big.Int)
-		if max.Cmp(h) == -1 {
-			max = h
-		}
+func (jc *JoltifyChainInstance) PopItem(n int) []*bcommon.OutBoundReq {
+	var allkeys []*big.Int
+	jc.RetryOutboundReq.Range(func(key, value interface{}) bool {
+		allkeys = append(allkeys, key.(*big.Int))
 		return true
 	})
-	if max.Cmp(big.NewInt(0)) == 1 {
-		item, _ := pi.RetryOutboundReq.LoadAndDelete(max)
-		return item.(*OutBoundReq)
+
+	sort.Slice(allkeys, func(i, j int) bool {
+		if allkeys[i].Cmp(allkeys[j]) == -1 {
+			return true
+		}
+		return false
+	})
+	indexNum := len(allkeys)
+	if indexNum == 0 {
+		return nil
 	}
-	return nil
+
+	returnNum := n
+	if indexNum < n {
+		returnNum = indexNum
+	}
+
+	inboundReqs := make([]*bcommon.OutBoundReq, returnNum)
+
+	for i := 0; i < returnNum; i++ {
+		el, loaded := jc.RetryOutboundReq.LoadAndDelete(allkeys[i])
+		if !loaded {
+			panic("should never fail")
+		}
+		inboundReqs[i] = el.(*bcommon.OutBoundReq)
+	}
+
+	return inboundReqs
 }
 
 func (jc *JoltifyChainInstance) Size() int {
@@ -107,10 +130,10 @@ func (jc *JoltifyChainInstance) Size() int {
 	return i
 }
 
-func (pi *JoltifyChainInstance) ShowItems() {
-	pi.RetryOutboundReq.Range(func(key, value interface{}) bool {
-		el := value.(*OutBoundReq)
-		pi.logger.Warn().Msgf("tx in the retry pool %v:%v\n", key, el.txID)
+func (jc *JoltifyChainInstance) ShowItems() {
+	jc.RetryOutboundReq.Range(func(key, value interface{}) bool {
+		el := value.(*bcommon.OutBoundReq)
+		jc.logger.Warn().Msgf("tx in the retry pool %v:%v\n", key, el.TxID)
 		return true
 	})
 }
@@ -128,7 +151,7 @@ type JoltifyChainInstance struct {
 	poolUpdateLocker *sync.RWMutex
 	msgSendCache     []tssPoolMsg
 	lastTwoPools     []*bcommon.PoolInfo
-	OutboundReqChan  chan *OutBoundReq
+	OutboundReqChan  chan *bcommon.OutBoundReq
 	RetryOutboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq      *sync.Map
 	CurrentHeight    int64
@@ -154,28 +177,4 @@ type outboundTx struct {
 	blockHeight        uint64
 	token              sdk.Coin
 	fee                sdk.Coin
-}
-
-func (i *OutBoundReq) Hash() common.Hash {
-	hash := crypto.Keccak256Hash(i.outReceiverAddress.Bytes(), []byte(i.txID))
-	return hash
-}
-
-// OutBoundReq is the entity for the outbound tx
-type OutBoundReq struct {
-	txID               string
-	outReceiverAddress common.Address
-	fromPoolAddr       common.Address
-	coin               sdk.Coin
-	blockHeight        int64
-}
-
-func newOutboundReq(txID string, address, fromPoolAddr common.Address, coin sdk.Coin, blockHeight int64) OutBoundReq {
-	return OutBoundReq{
-		txID,
-		address,
-		fromPoolAddr,
-		coin,
-		blockHeight,
-	}
 }

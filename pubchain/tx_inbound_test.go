@@ -2,7 +2,6 @@ package pubchain
 
 import (
 	"encoding/hex"
-	"fmt"
 	"hash"
 	"math/big"
 	"strings"
@@ -175,7 +174,6 @@ func TestProcessInBound(t *testing.T) {
 	require.Nil(t, err)
 
 	err = pi.ProcessInBoundERC20(tx, tokenAddr, transferTo, testAmount, uint64(10))
-	fmt.Printf(">>>>>>%v\n", err)
 	require.EqualError(t, err, "tx existed")
 }
 
@@ -332,7 +330,7 @@ func TestProcessEachBlock(t *testing.T) {
 		pendingInboundsBnB: &sync.Map{},
 		tokenAbi:           &tAbi,
 		RetryInboundReq:    &sync.Map{},
-		InboundReqChan:     make(chan *InboundReq, 1),
+		InboundReqChan:     make(chan *common2.InboundReq, 1),
 	}
 
 	coin := sdk.Coin{
@@ -439,7 +437,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
 		tokenAbi:           &tAbi,
-		InboundReqChan:     make(chan *InboundReq, 1),
+		InboundReqChan:     make(chan *common2.InboundReq, 1),
 		tokenAddr:          accs[1].commAddr.String(),
 	}
 
@@ -587,7 +585,7 @@ func TestDeleteExpire(t *testing.T) {
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
-		InboundReqChan:     make(chan *InboundReq, 1),
+		InboundReqChan:     make(chan *common2.InboundReq, 1),
 	}
 	pi.pendingInbounds.Store("test1", &btx1)
 	pi.pendingInbounds.Store("test2", &btx2)
@@ -673,7 +671,7 @@ func TestDeleteExpireBnB(t *testing.T) {
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
-		InboundReqChan:     make(chan *InboundReq, 1),
+		InboundReqChan:     make(chan *common2.InboundReq, 1),
 	}
 	pi.pendingInboundsBnB.Store("test1", &btx1)
 	pi.pendingInboundsBnB.Store("test2", &btx2)
@@ -738,7 +736,7 @@ func TestProcessBlockFeeAhead(t *testing.T) {
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
 		tokenAddr:          accs[0].commAddr.String(),
-		InboundReqChan:     make(chan *InboundReq, 1),
+		InboundReqChan:     make(chan *common2.InboundReq, 1),
 	}
 
 	bnbTx := inboundTxBnb{

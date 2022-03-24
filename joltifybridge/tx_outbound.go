@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
@@ -77,7 +76,7 @@ func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.Ac
 		// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 		if item != nil {
 			roundBlockHeight := blockHeight / ROUNDBLOCK
-			itemReq := newOutboundReq(txID, item.outReceiverAddress, curEthAddr, item.token, roundBlockHeight)
+			itemReq := bcommon.NewOutboundReq(txID, item.outReceiverAddress, curEthAddr, item.token, roundBlockHeight)
 			jc.AddItem(&itemReq)
 			return nil
 		}
@@ -187,11 +186,6 @@ func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.A
 	return false, nil
 }
 
-// GetOutBoundInfo return the outbound tx info
-func (o *OutBoundReq) GetOutBoundInfo() (ethcommon.Address, ethcommon.Address, *big.Int, int64) {
-	return o.outReceiverAddress, o.fromPoolAddr, o.coin.Amount.BigInt(), o.blockHeight
-}
-
 // Verify checks whether the outbound tx has paid enough fee
 func (a *outboundTx) Verify() error {
 	if a.fee.Denom != config.OutBoundDenomFee {
@@ -205,9 +199,4 @@ func (a *outboundTx) Verify() error {
 		return fmt.Errorf("the fee is not enough with %s<%s", a.fee.Amount, amount.BigInt().String())
 	}
 	return nil
-}
-
-// SetItemHeight sets the block height of the tx
-func (o *OutBoundReq) SetItemHeight(blockHeight int64) {
-	o.blockHeight = blockHeight
 }

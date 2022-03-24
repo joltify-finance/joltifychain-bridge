@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 	"gitlab.com/joltify/joltifychain/testutil/network"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 )
@@ -93,7 +92,7 @@ func (v *MintTestSuite) SetupSuite() {
 func (m MintTestSuite) TestPrepareIssueTokenRequest() {
 	accs, err := generateRandomPrivKey(3)
 	m.Require().NoError(err)
-	tx := pubchain.NewAccountInboundReq(accs[0].joltAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100))
+	tx := common.NewAccountInboundReq(accs[0].joltAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100))
 	_, err = prepareIssueTokenRequest(&tx, accs[2].commAddr.String(), "1")
 	m.Require().EqualError(err, "decoding bech32 failed: string not all lowercase or all uppercase")
 
@@ -133,7 +132,7 @@ func (m MintTestSuite) TestProcessInbound() {
 	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
 	valAddr, err := misc.PoolPubKeyToJoltAddress(pkstr)
 	m.Require().NoError(err)
-	tx := pubchain.NewAccountInboundReq(m.network.Validators[0].Address, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100))
+	tx := common.NewAccountInboundReq(m.network.Validators[0].Address, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100))
 	_, _, err = jc.ProcessInBound(&tx)
 	m.Require().EqualError(err, "not enough signer")
 

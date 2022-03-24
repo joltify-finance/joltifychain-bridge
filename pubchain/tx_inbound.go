@@ -146,7 +146,7 @@ func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, fr
 		return nil
 	}
 	roundBlockHeight := blockHeight / ROUNDBLOCK
-	item := NewAccountInboundReq(tx.address, to, tx.token, txIDBytes, int64(roundBlockHeight))
+	item := bcommon.NewAccountInboundReq(tx.address, to, tx.token, txIDBytes, int64(roundBlockHeight))
 	pi.InboundReqChan <- &item
 	return nil
 }
@@ -214,7 +214,7 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block, joltifyBlock
 			payTxID := tx.Data()
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
-				item := NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, joltifyBlockHeight)
+				item := bcommon.NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, joltifyBlockHeight)
 				// we add to the retry pool to  sort the tx
 				pi.AddItem(&item)
 			}
@@ -436,7 +436,7 @@ func (pi *PubChainInstance) moveBnb(senderPk string, receiver common.Address, am
 
 func (pi *PubChainInstance) moveERC20Token(senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64) (string, error) {
 
-	txHash, err := pi.SendToken(senderPk, sender, receiver, balance, blockheight)
+	txHash, err := pi.SendToken(senderPk, sender, receiver, balance, blockheight, nil)
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")

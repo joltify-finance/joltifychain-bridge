@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/cenkalti/backoff"
 	"html"
 	"math/big"
 	"sync"
@@ -17,8 +18,34 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
+// CheckTxStatus check whether the tx has been done successfully
+func (pi *PubChainInstance) waitAndSend(poolAddress common.Address, targetNonce uint64) error {
+	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
+
+	op := func() error {
+
+		ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
+		defer cancel()
+
+		nonce, err := pi.EthClient.PendingNonceAt(ctx, poolAddress)
+		if err != nil {
+			pi.logger.Error().Err(err).Msgf("fail to get the nonce of the given pool address")
+			return err
+		}
+
+		if nonce == targetNonce {
+			return nil
+		}
+		return errors.New("not our round")
+	}
+
+	err := backoff.Retry(op, bf)
+	return err
+
+}
+
 // SendToken sends the token to the public chain
-func (pi *PubChainInstance) SendToken(signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64) (common.Hash, error) {
+func (pi *PubChainInstance) SendToken(signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int) (common.Hash, error) {
 	tokenInstance := pi.tokenInstance
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
@@ -35,29 +62,10 @@ func (pi *PubChainInstance) SendToken(signerPk string, sender, receiver common.A
 	if err != nil {
 		return common.Hash{}, err
 	}
+	if nonce != nil {
+		txo.Nonce = nonce
+	}
 
-	//data, err := pi.tokenAbi.Pack("transfer", receiver, amount)
-	//if err != nil {
-	//	pi.logger.Error().Msgf("fail to pack the data")
-	//	return common.Hash{}, err
-	//}
-	//
-	//gasLimit, err := pi.EthClient.EstimateGas(context.Background(), ethereum.CallMsg{
-	//	To:   &receiver,
-	//	Data: data,
-	//})
-	//
-	//if err != nil {
-	//	return common.Hash{}, err
-	//}
-
-	// gasLimitd := new(big.Int).SetUint64(gasLimit)
-
-	// gasLimitDec := sdk.NewDecFromBigIntWithPrec(gasLimitd, sdk.Precision)
-
-	// gasLimitDec = gasLimitDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO))
-
-	// txo.GasLimit = gasLimitDec.BigInt().Uint64()
 	txo.NoSend = true
 	readyTx, err := tokenInstance.Transfer(txo, receiver, amount)
 	if err != nil {
@@ -68,15 +76,21 @@ func (pi *PubChainInstance) SendToken(signerPk string, sender, receiver common.A
 	ctxSend, cancelSend := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancelSend()
 
+	if nonce != nil {
+		err = pi.waitAndSend(sender, nonce.Uint64())
+		if err != nil {
+			return common.Hash{}, err
+		}
+	}
 	err = pi.EthClient.SendTransaction(ctxSend, readyTx)
 
 	return readyTx.Hash(), err
 }
 
 // ProcessOutBound send the money to public chain
-func (pi *PubChainInstance) ProcessOutBound(toAddr, fromAddr common.Address, amount *big.Int, blockHeight int64) (string, error) {
+func (pi *PubChainInstance) ProcessOutBound(toAddr, fromAddr common.Address, amount *big.Int, blockHeight int64, nonce uint64) (string, error) {
 	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18))
-	txHash, err := pi.SendToken("", fromAddr, toAddr, amount, blockHeight)
+	txHash, err := pi.SendToken("", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce))
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")

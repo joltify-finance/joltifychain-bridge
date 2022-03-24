@@ -3,13 +3,14 @@ package joltifybridge
 import (
 	"context"
 	"errors"
+	"gitlab.com/joltify/joltifychain-bridge/common"
 	"strconv"
 
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 )
 
 // SubmitOutboundTx submit the outbound record to joltify chain
-func (jc *JoltifyChainInstance) SubmitOutboundTx(req OutBoundReq, pubchainTx string) error {
+func (jc *JoltifyChainInstance) SubmitOutboundTx(req common.OutBoundReq, pubchainTx string) error {
 	operator, err := jc.Keyring.Key("operator")
 	if err != nil {
 		return err
@@ -26,7 +27,7 @@ func (jc *JoltifyChainInstance) SubmitOutboundTx(req OutBoundReq, pubchainTx str
 		Creator:     operator.GetAddress(),
 		RequestID:   req.Hash().String(),
 		OutboundTx:  pubchainTx,
-		BlockHeight: strconv.FormatInt(req.blockHeight, 10),
+		BlockHeight: strconv.FormatInt(req.BlockHeight, 10),
 	}
 
 	ok, _, err := jc.composeAndSend(&outboundMsg, accSeq, accNum, nil, operator.GetAddress())
@@ -38,7 +39,7 @@ func (jc *JoltifyChainInstance) SubmitOutboundTx(req OutBoundReq, pubchainTx str
 }
 
 //GetPubChainSubmittedTx get the submitted mint tx
-func (jc *JoltifyChainInstance) GetPubChainSubmittedTx(req OutBoundReq) (string, error) {
+func (jc *JoltifyChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (string, error) {
 	reqStr := req.Hash().Hex()
 	vaultQuery := vaulttypes.NewQueryClient(jc.grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)

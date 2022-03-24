@@ -2,13 +2,13 @@ package joltifybridge
 
 import (
 	"errors"
+	"gitlab.com/joltify/joltifychain-bridge/common"
 
-	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 )
 
-func prepareIssueTokenRequest(item *pubchain.InboundReq, creatorAddr, index string) (*vaulttypes.MsgCreateIssueToken, error) {
+func prepareIssueTokenRequest(item *common.InboundReq, creatorAddr, index string) (*vaulttypes.MsgCreateIssueToken, error) {
 	userAddr, _, coin, _ := item.GetInboundReqInfo()
 
 	a, err := vaulttypes.NewMsgCreateIssueToken(creatorAddr, index, coin.String(), userAddr.String())
@@ -19,7 +19,7 @@ func prepareIssueTokenRequest(item *pubchain.InboundReq, creatorAddr, index stri
 }
 
 // ProcessInBound mint the token in joltify chain
-func (jc *JoltifyChainInstance) ProcessInBound(item *pubchain.InboundReq) (string, string, error) {
+func (jc *JoltifyChainInstance) ProcessInBound(item *common.InboundReq) (string, string, error) {
 	//pool := jc.GetPool()
 	//if pool[0] == nil {
 	//	jc.logger.Info().Msgf("fail to query the pool with length 1")

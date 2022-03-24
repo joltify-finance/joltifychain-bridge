@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/rs/zerolog"
 	"gitlab.com/joltify/joltifychain-bridge/generated"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
@@ -26,93 +24,22 @@ import (
 
 const (
 	retryCacheSize    = 128
-	inboundprosSize   = 500
+	inboundprosSize   = 512
 	sbchannelsize     = 20000
 	chainQueryTimeout = time.Second * 5
 	GasLimit          = 2100000
 	GasPrice          = "0.00000001"
 	ROUNDBLOCK        = 50
-
-	GroupBlockGap = 10
-	GroupSign     = 5
+	submitBackoff     = time.Millisecond * 500
+	GroupBlockGap     = 8
+	GroupSign         = 4
 )
 
-// InboundReq is the account that top up account info to joltify pub_chain
-type InboundReq struct {
-	address            sdk.AccAddress
-	txID               []byte // this indicates the identical inbound req
-	toPoolAddr         common.Address
-	coin               sdk.Coin
-	blockHeight        int64
-	originalHeight     int64
-	accNum             uint64
-	accSeq             uint64
-	poolJoltifyAddress sdk.AccAddress
-	poolPk             string
-}
-
-func (i *InboundReq) Hash() common.Hash {
-	hash := crypto.Keccak256Hash(i.address.Bytes(), i.txID)
-	return hash
-}
-
-// Index generate the index of a given inbound req
-func (i *InboundReq) Index() *big.Int {
-	hash := crypto.Keccak256Hash(i.address.Bytes(), i.txID)
-	lower := hash.Big().String()
-	higher := strconv.FormatInt(i.originalHeight, 10)
-	indexStr := higher + lower
-
-	ret, ok := new(big.Int).SetString(indexStr, 10)
-	if !ok {
-		panic("invalid to create the index")
-	}
-	return ret
-}
-
-func NewAccountInboundReq(address sdk.AccAddress, toPoolAddr common.Address, coin sdk.Coin, txid []byte, blockHeight int64) InboundReq {
-	return InboundReq{
-		address,
-		txid,
-		toPoolAddr,
-		coin,
-		blockHeight,
-		blockHeight,
-		0,
-		0,
-		nil,
-		"",
-	}
-}
-
-// GetInboundReqInfo returns the info of the inbound transaction
-func (acq *InboundReq) GetInboundReqInfo() (sdk.AccAddress, common.Address, sdk.Coin, int64) {
-	return acq.address, acq.toPoolAddr, acq.coin, acq.blockHeight
-}
-
-// SetItemHeight sets the block height of the tx
-func (acq *InboundReq) SetItemHeight(blockHeight int64) {
-	acq.blockHeight = blockHeight
-}
-
-// SetAccountInfo sets the block height of the tx
-func (acq *InboundReq) SetAccountInfo(number, seq uint64, address sdk.AccAddress, pk string) {
-	acq.accNum = number
-	acq.accSeq = seq
-	acq.poolJoltifyAddress = address
-	acq.poolPk = pk
-}
-
-//GetAccountInfo returns the account number and seq
-func (acq *InboundReq) GetAccountInfo() (uint64, uint64, sdk.AccAddress, string) {
-	return acq.accSeq, acq.accNum, acq.poolJoltifyAddress, acq.poolPk
-}
-
-func (pi *PubChainInstance) AddItem(req *InboundReq) {
+func (pi *PubChainInstance) AddItem(req *bcommon.InboundReq) {
 	pi.RetryInboundReq.Store(req.Index(), req)
 }
 
-func (pi *PubChainInstance) PopItem(n int) []*InboundReq {
+func (pi *PubChainInstance) PopItem(n int) []*bcommon.InboundReq {
 	var allkeys []*big.Int
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
 		allkeys = append(allkeys, key.(*big.Int))
@@ -135,14 +62,14 @@ func (pi *PubChainInstance) PopItem(n int) []*InboundReq {
 		returnNum = indexNum
 	}
 
-	inboundReqs := make([]*InboundReq, returnNum)
+	inboundReqs := make([]*bcommon.InboundReq, returnNum)
 
 	for i := 0; i < returnNum; i++ {
 		el, loaded := pi.RetryInboundReq.LoadAndDelete(allkeys[i])
 		if !loaded {
 			panic("should never fail")
 		}
-		inboundReqs[i] = el.(*InboundReq)
+		inboundReqs[i] = el.(*bcommon.InboundReq)
 	}
 
 	return inboundReqs
@@ -159,8 +86,8 @@ func (pi *PubChainInstance) Size() int {
 
 func (pi *PubChainInstance) ShowItems() {
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
-		el := value.(*InboundReq)
-		pi.logger.Warn().Msgf("tx in the prepare pool %v:%v\n", key, el.txID)
+		el := value.(*bcommon.InboundReq)
+		pi.logger.Warn().Msgf("tx in the prepare pool %v:%v\n", key, el.TxID)
 		return true
 	})
 	return
@@ -191,7 +118,7 @@ type PubChainInstance struct {
 	lastTwoPools       []*bcommon.PoolInfo
 	poolLocker         *sync.RWMutex
 	tssServer          tssclient.TssSign
-	InboundReqChan     chan *InboundReq
+	InboundReqChan     chan *bcommon.InboundReq
 	RetryInboundReq    *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq        *sync.Map
 	CurrentHeight      int64
@@ -228,7 +155,7 @@ func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssSign) (*PubCh
 		poolLocker:         &sync.RWMutex{},
 		tssServer:          tssServer,
 		lastTwoPools:       make([]*bcommon.PoolInfo, 2),
-		InboundReqChan:     make(chan *InboundReq, inboundprosSize),
+		InboundReqChan:     make(chan *bcommon.InboundReq, inboundprosSize),
 		RetryInboundReq:    &sync.Map{},
 		moveFundReq:        &sync.Map{},
 	}, nil

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"go.uber.org/atomic"
 	"strconv"
 	"sync"
@@ -79,7 +78,7 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssSign) (*
 
 	encode := MakeEncodingConfig()
 	joltifyBridge.encoding = &encode
-	joltifyBridge.OutboundReqChan = make(chan *OutBoundReq, reqCacheSize)
+	joltifyBridge.OutboundReqChan = make(chan *bcommon.OutBoundReq, reqCacheSize)
 	joltifyBridge.RetryOutboundReq = &sync.Map{}
 	joltifyBridge.moveFundReq = &sync.Map{}
 	return &joltifyBridge, nil
@@ -336,7 +335,7 @@ func (jc *JoltifyChainInstance) GetGasEstimation() int64 {
 	previousGasUsed := jc.inboundGas.Load()
 	gasUsedDec := sdk.NewDecFromIntWithPrec(sdk.NewIntFromUint64(uint64(previousGasUsed)), 0)
 	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO)).RoundInt64()
-	fmt.Printf(">>>>>gas we want>>>>>>>>%v\n", gasWanted)
+	_ = gasWanted
 	//todo we need to get the gas dynamically in future, if different node get different fee, tss will fail
 	return 2500000
 }

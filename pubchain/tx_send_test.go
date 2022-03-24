@@ -49,7 +49,7 @@ func TestPubChainInstance_composeTx(t *testing.T) {
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
 		tokenAddr:          accs[0].commAddr.String(),
-		InboundReqChan:     make(chan *InboundReq, 1),
+		InboundReqChan:     make(chan *common.InboundReq, 1),
 		tssServer:          &tssServer,
 	}
 
