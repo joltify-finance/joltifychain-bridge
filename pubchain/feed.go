@@ -24,7 +24,7 @@ func (pi *PubChainInstance) FeedTx(currentBlockHeight int64, lastPoolInfo *vault
 	}
 
 	roundBlockHeight := currentBlockHeight / ROUNDBLOCK
-
+	// for BSC we need to use the next nonce while for joltify, we used the returned nonce
 	for _, el := range outboundReqs {
 		el.SetItemHeightandNonce(roundBlockHeight, nonce)
 		nonce += 1

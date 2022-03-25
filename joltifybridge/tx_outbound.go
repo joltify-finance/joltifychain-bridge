@@ -102,11 +102,12 @@ func (jc *JoltifyChainInstance) processDemonAndFee(txID string, blockHeight int6
 		token,
 		fee,
 	}
-	jc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.token.String())
 	err := tx.Verify()
 	if err != nil {
+		jc.logger.Error().Err(err).Msgf("the transaction is invalid")
 		return nil
 	}
+	jc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.token.String())
 	return &tx
 }
 

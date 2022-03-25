@@ -36,7 +36,7 @@ func (pi *PubChainInstance) waitAndSend(poolAddress common.Address, targetNonce 
 		if nonce == targetNonce {
 			return nil
 		}
-		return errors.New("not our round")
+		return fmt.Errorf("not our round, the current nonce is %v and we want %v", nonce, targetNonce)
 	}
 
 	err := backoff.Retry(op, bf)

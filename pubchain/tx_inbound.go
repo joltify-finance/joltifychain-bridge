@@ -5,11 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"html"
-	"math"
-	"math/big"
-	"time"
-
 	"github.com/cenkalti/backoff"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -17,6 +12,9 @@ import (
 	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"html"
+	"math"
+	"math/big"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -522,10 +520,7 @@ func (pi *PubChainInstance) checkEachTx(h common.Hash) (uint64, error) {
 //CheckTxStatus check whether the tx is already in the chain
 func (pi *PubChainInstance) CheckTxStatus(hashStr string) error {
 
-	bf := backoff.NewExponentialBackOff()
-	bf.InitialInterval = time.Second
-	bf.MaxInterval = time.Second * 3
-	bf.MaxElapsedTime = time.Minute
+	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
 
 	var status uint64
 	op := func() error {
