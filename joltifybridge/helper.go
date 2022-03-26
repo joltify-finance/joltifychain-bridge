@@ -3,6 +3,7 @@ package joltifybridge
 import (
 	"context"
 	"errors"
+
 	"github.com/cenkalti/backoff"
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -141,7 +142,10 @@ func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum u
 		return false, "", err
 	}
 
-	err = jc.waitAndSend(poolAddress, accSeq)
+	err = nil
+	if signMsg != nil {
+		err = jc.waitAndSend(poolAddress, accSeq)
+	}
 	if err == nil {
 		isTssMsg := true
 		if signMsg == nil {

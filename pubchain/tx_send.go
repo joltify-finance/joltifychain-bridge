@@ -5,10 +5,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/cenkalti/backoff"
 	"html"
 	"math/big"
 	"sync"
+
+	"github.com/cenkalti/backoff"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -79,7 +80,7 @@ func (pi *PubChainInstance) SendToken(signerPk string, sender, receiver common.A
 	if nonce != nil {
 		err = pi.waitAndSend(sender, nonce.Uint64())
 		if err != nil {
-			return common.Hash{}, err
+			return readyTx.Hash(), err
 		}
 	}
 	err = pi.EthClient.SendTransaction(ctxSend, readyTx)
@@ -97,7 +98,7 @@ func (pi *PubChainInstance) ProcessOutBound(toAddr, fromAddr common.Address, amo
 			return txHash.Hex(), nil
 		}
 		pi.logger.Error().Err(err).Msgf("fail to send the token with err %v", err)
-		return "", err
+		return txHash.Hex(), err
 	}
 
 	tick := html.UnescapeString("&#" + "128228" + ";")
