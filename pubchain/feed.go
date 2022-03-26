@@ -2,14 +2,14 @@ package pubchain
 
 import (
 	"context"
+
 	"gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 )
 
 func (pi *PubChainInstance) FeedTx(currentBlockHeight int64, lastPoolInfo *vaulttypes.PoolInfo, outboundReqs []*common.OutBoundReq) error {
-
-	//we always increase the account seq regardless the tx successful or not
+	// we always increase the account seq regardless the tx successful or not
 
 	poolEthAddress, err := misc.PoolPubKeyToEthAddress(lastPoolInfo.CreatePool.GetPoolPubKey())
 	if err != nil {
@@ -26,9 +26,8 @@ func (pi *PubChainInstance) FeedTx(currentBlockHeight int64, lastPoolInfo *vault
 	roundBlockHeight := currentBlockHeight / ROUNDBLOCK
 	// for BSC we need to use the next nonce while for joltify, we used the returned nonce
 	for _, el := range outboundReqs {
-		el.SetItemHeightandNonce(roundBlockHeight, nonce)
+		el.SetItemHeightAndNonce(roundBlockHeight, currentBlockHeight, nonce)
 		nonce += 1
 	}
 	return nil
-
 }

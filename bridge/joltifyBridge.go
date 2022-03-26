@@ -182,7 +182,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				currentBlockHeight := block.Data.(tmtypes.EventDataNewBlock).Block.Height
 				ok, _ := joltChain.CheckAndUpdatePool(currentBlockHeight)
 				if !ok {
-					//it is okay to fail to submit a pool address as other nodes can submit, as long as 2/3 nodes submit, it is fine.
+					// it is okay to fail to submit a pool address as other nodes can submit, as long as 2/3 nodes submit, it is fine.
 					zlog.Logger.Warn().Msgf("we fail to submit the new pool address")
 				}
 
@@ -232,7 +232,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					continue
 				}
 
-				//todo we need also to add the check to avoid send tx near the churn blocks
+				// todo we need also to add the check to avoid send tx near the churn blocks
 				if currentBlockHeight-previousTssBlockInbound >= pubchain.GroupBlockGap && pi.Size() != 0 {
 					// if we do not have enough tx to process, we wait for another round
 					if pi.Size() < pubchain.GroupSign && firstTimeInbound {
@@ -293,11 +293,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					isMoveFund = pi.MoveFound(head.Number.Int64(), previousPool)
 				}
 				if isMoveFund {
-					//once we move fund, we do not send tx to be processed
+					// once we move fund, we do not send tx to be processed
 					continue
 				}
 
-				//todo we need also to add the check to avoid send tx near the churn blocks
+				// todo we need also to add the check to avoid send tx near the churn blocks
 				if joltifyBlockHeight-previousTssBlockOutBound >= joltifybridge.GroupBlockGap && joltChain.Size() != 0 {
 					// if we do not have enough tx to process, we wait for another round
 					if pi.Size() < pubchain.GroupSign && firstTimeOutbound {
@@ -373,7 +373,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 							zlog.Logger.Info().Msgf("%v txid(%v) have successfully top up", tick, txHash)
 						}
 					}()
-
 				}()
 
 			case item := <-joltChain.OutboundReqChan:
@@ -395,8 +394,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						}
 					}
 
-					toAddr, fromAddr, amount, blockHeight, nonce := item.GetOutBoundInfo()
-					txHash, err := pi.ProcessOutBound(toAddr, fromAddr, amount, blockHeight, nonce)
+					toAddr, fromAddr, amount, roundBlockHeight, nonce := item.GetOutBoundInfo()
+					txHash, err := pi.ProcessOutBound(toAddr, fromAddr, amount, roundBlockHeight, nonce)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
 					}
@@ -422,7 +421,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						zlog.Logger.Warn().Msgf("the tx is fail in submission, we need to resend")
 						joltChain.AddItem(item)
 					}()
-
 				}()
 			}
 		}

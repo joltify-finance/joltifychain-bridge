@@ -1,11 +1,12 @@
 package common
 
 import (
+	"math/big"
+	"strconv"
+
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"math/big"
-	"strconv"
 )
 
 // OutBoundReq is the entity for the outbound tx
@@ -14,6 +15,7 @@ type OutBoundReq struct {
 	outReceiverAddress common.Address
 	fromPoolAddr       common.Address
 	coin               types.Coin
+	RoundBlockHeight   int64
 	BlockHeight        int64
 	nonce              uint64
 }
@@ -23,12 +25,13 @@ func (i *OutBoundReq) Hash() common.Hash {
 	return hash
 }
 
-func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin types.Coin, blockHeight int64) OutBoundReq {
+func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin types.Coin, blockHeight, roundBlockHeight int64) OutBoundReq {
 	return OutBoundReq{
 		txID,
 		address,
 		fromPoolAddr,
 		coin,
+		roundBlockHeight,
 		blockHeight,
 		uint64(0),
 	}
@@ -38,7 +41,7 @@ func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin type
 func (i *OutBoundReq) Index() *big.Int {
 	hash := crypto.Keccak256Hash(i.outReceiverAddress.Bytes(), []byte(i.TxID))
 	lower := hash.Big().String()
-	higher := strconv.FormatInt(i.BlockHeight, 10)
+	higher := strconv.FormatInt(i.RoundBlockHeight, 10)
 	indexStr := higher + lower
 
 	ret, ok := new(big.Int).SetString(indexStr, 10)
@@ -48,15 +51,16 @@ func (i *OutBoundReq) Index() *big.Int {
 	return ret
 }
 
-// SetItemHeightandNonce sets the block height of the tx
-func (o *OutBoundReq) SetItemHeightandNonce(blockHeight int64, nonce uint64) {
+// SetItemHeightAndNonce sets the block height of the tx
+func (o *OutBoundReq) SetItemHeightAndNonce(roundBlockHeight, blockHeight int64, nonce uint64) {
+	o.RoundBlockHeight = roundBlockHeight
 	o.BlockHeight = blockHeight
 	o.nonce = nonce
 }
 
 // GetOutBoundInfo return the outbound tx info
 func (o *OutBoundReq) GetOutBoundInfo() (common.Address, common.Address, *big.Int, int64, uint64) {
-	return o.outReceiverAddress, o.fromPoolAddr, o.coin.Amount.BigInt(), o.BlockHeight, o.nonce
+	return o.outReceiverAddress, o.fromPoolAddr, o.coin.Amount.BigInt(), o.RoundBlockHeight, o.nonce
 }
 
 func (i *InboundReq) Hash() common.Hash {
@@ -125,7 +129,7 @@ func (acq *InboundReq) SetAccountInfo(number, seq uint64, address types.AccAddre
 	acq.poolPk = pk
 }
 
-//GetAccountInfo returns the account number and seq
+// GetAccountInfo returns the account number and seq
 func (acq *InboundReq) GetAccountInfo() (uint64, uint64, types.AccAddress, string) {
 	return acq.accSeq, acq.accNum, acq.poolJoltifyAddress, acq.poolPk
 }

@@ -1,10 +1,11 @@
 package joltifybridge
 
 import (
-	common2 "gitlab.com/joltify/joltifychain-bridge/common"
 	"strconv"
 	"testing"
 	"time"
+
+	common2 "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
@@ -216,7 +217,7 @@ func (o OutBoundTestSuite) TestOutBoundReq() {
 	accs, err := generateRandomPrivKey(2)
 	o.Require().NoError(err)
 	boundReq := common2.NewOutboundReq("testID", accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("testcoing", sdk.NewInt(1)), 101)
-	boundReq.SetItemHeightandNonce(100)
+	boundReq.SetItemHeightAndNonce(100)
 	a, b, _, h := boundReq.GetOutBoundInfo()
 	o.Require().Equal(a.String(), accs[0].commAddr.String())
 	o.Require().Equal(b.String(), accs[1].commAddr.String())

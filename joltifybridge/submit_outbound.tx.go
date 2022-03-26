@@ -41,7 +41,7 @@ func (jc *JoltifyChainInstance) SubmitOutboundTx(req common.OutBoundReq, pubchai
 	return nil
 }
 
-//GetPubChainSubmittedTx get the submitted mint tx
+// GetPubChainSubmittedTx get the submitted mint tx
 func (jc *JoltifyChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (string, error) {
 	reqStr := req.Hash().Hex()
 	vaultQuery := vaulttypes.NewQueryClient(jc.grpcClient)
