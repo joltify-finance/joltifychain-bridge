@@ -35,11 +35,11 @@ const (
 	GroupSign         = 4
 )
 
-func (pi *PubChainInstance) AddItem(req *bcommon.InboundReq) {
+func (pi *Instance) AddItem(req *bcommon.InboundReq) {
 	pi.RetryInboundReq.Store(req.Index(), req)
 }
 
-func (pi *PubChainInstance) PopItem(n int) []*bcommon.InboundReq {
+func (pi *Instance) PopItem(n int) []*bcommon.InboundReq {
 	var allkeys []*big.Int
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
 		allkeys = append(allkeys, key.(*big.Int))
@@ -47,10 +47,7 @@ func (pi *PubChainInstance) PopItem(n int) []*bcommon.InboundReq {
 	})
 
 	sort.Slice(allkeys, func(i, j int) bool {
-		if allkeys[i].Cmp(allkeys[j]) == -1 {
-			return true
-		}
-		return false
+		return allkeys[i].Cmp(allkeys[j]) == -1
 	})
 	indexNum := len(allkeys)
 	if indexNum == 0 {
@@ -75,7 +72,7 @@ func (pi *PubChainInstance) PopItem(n int) []*bcommon.InboundReq {
 	return inboundReqs
 }
 
-func (pi *PubChainInstance) Size() int {
+func (pi *Instance) Size() int {
 	i := 0
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
 		i += 1
@@ -84,7 +81,7 @@ func (pi *PubChainInstance) Size() int {
 	return i
 }
 
-func (pi *PubChainInstance) ShowItems() {
+func (pi *Instance) ShowItems() {
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
 		el := value.(*bcommon.InboundReq)
 		pi.logger.Warn().Msgf("tx in the prepare pool %v:%v\n", key, el.TxID)
@@ -106,8 +103,8 @@ type inboundTxBnb struct {
 	fee         sdk.Coin
 }
 
-// PubChainInstance hold the joltify_bridge entity
-type PubChainInstance struct {
+// Instance hold the joltify_bridge entity
+type Instance struct {
 	EthClient          *ethclient.Client
 	tokenAddr          string
 	tokenInstance      *generated.Token
@@ -125,7 +122,7 @@ type PubChainInstance struct {
 }
 
 // NewChainInstance initialize the joltify_bridge entity
-func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssSign) (*PubChainInstance, error) {
+func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssSign) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
 
 	wsClient, err := ethclient.Dial(ws)
@@ -144,7 +141,7 @@ func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssSign) (*PubCh
 		return nil, fmt.Errorf("fail to get the tokenABI with err %v", err)
 	}
 
-	return &PubChainInstance{
+	return &Instance{
 		logger:             logger,
 		EthClient:          wsClient,
 		tokenAddr:          tokenAddr,

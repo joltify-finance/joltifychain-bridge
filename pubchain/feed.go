@@ -8,12 +8,12 @@ import (
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 )
 
-func (pi *PubChainInstance) FeedTx(currentBlockHeight int64, lastPoolInfo *vaulttypes.PoolInfo, outboundReqs []*common.OutBoundReq) error {
+func (pi *Instance) FeedTx(currentBlockHeight int64, lastPoolInfo *vaulttypes.PoolInfo, outboundReqs []*common.OutBoundReq) error {
 	// we always increase the account seq regardless the tx successful or not
-
 	poolEthAddress, err := misc.PoolPubKeyToEthAddress(lastPoolInfo.CreatePool.GetPoolPubKey())
 	if err != nil {
-		panic(err)
+		pi.logger.Error().Err(err).Msgf("fail to convert the poolpubkey to eth address")
+		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()

@@ -20,7 +20,7 @@ import (
 )
 
 // CheckTxStatus check whether the tx has been done successfully
-func (pi *PubChainInstance) waitAndSend(poolAddress common.Address, targetNonce uint64) error {
+func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) error {
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
 
 	op := func() error {
@@ -46,7 +46,7 @@ func (pi *PubChainInstance) waitAndSend(poolAddress common.Address, targetNonce 
 }
 
 // SendToken sends the token to the public chain
-func (pi *PubChainInstance) SendToken(signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int) (common.Hash, error) {
+func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int) (common.Hash, error) {
 	tokenInstance := pi.tokenInstance
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
@@ -89,7 +89,7 @@ func (pi *PubChainInstance) SendToken(signerPk string, sender, receiver common.A
 }
 
 // ProcessOutBound send the money to public chain
-func (pi *PubChainInstance) ProcessOutBound(toAddr, fromAddr common.Address, amount *big.Int, blockHeight int64, nonce uint64) (string, error) {
+func (pi *Instance) ProcessOutBound(toAddr, fromAddr common.Address, amount *big.Int, blockHeight int64, nonce uint64) (string, error) {
 	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18))
 	txHash, err := pi.SendToken("", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce))
 	if err != nil {
@@ -107,7 +107,7 @@ func (pi *PubChainInstance) ProcessOutBound(toAddr, fromAddr common.Address, amo
 }
 
 // StartSubscription start the subscription of the token
-func (pi *PubChainInstance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) (chan *types.Header, error) {
+func (pi *Instance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) (chan *types.Header, error) {
 	blockEvent := make(chan *types.Header, sbchannelsize)
 	blockSub, err := pi.EthClient.SubscribeNewHead(ctx, blockEvent)
 	if err != nil {
@@ -124,7 +124,7 @@ func (pi *PubChainInstance) StartSubscription(ctx context.Context, wg *sync.Wait
 	return blockEvent, nil
 }
 
-func (pi *PubChainInstance) tssSign(msg []byte, pk string, blockHeight int64) ([]byte, error) {
+func (pi *Instance) tssSign(msg []byte, pk string, blockHeight int64) ([]byte, error) {
 	encodedMsg := base64.StdEncoding.EncodeToString(msg)
 	resp, err := pi.tssServer.KeySign(pk, []string{encodedMsg}, blockHeight, nil, "0.15.0")
 	if err != nil {
@@ -149,7 +149,7 @@ func (pi *PubChainInstance) tssSign(msg []byte, pk string, blockHeight int64) ([
 	return signature, nil
 }
 
-func (pi *PubChainInstance) composeTx(signerPk string, sender common.Address, chainID *big.Int, blockHeight int64) (*bind.TransactOpts, error) {
+func (pi *Instance) composeTx(signerPk string, sender common.Address, chainID *big.Int, blockHeight int64) (*bind.TransactOpts, error) {
 	if chainID == nil {
 		return nil, bind.ErrNoChainID
 	}

@@ -26,7 +26,7 @@ import (
 )
 
 // ProcessInBoundERC20 process the inbound contract token top-up
-func (pi *PubChainInstance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, transferTo common.Address, amount *big.Int, blockHeight uint64) error {
+func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, transferTo common.Address, amount *big.Int, blockHeight uint64) error {
 	v, r, s := tx.RawSignatureValues()
 	signer := ethTypes.LatestSignerForChainID(tx.ChainId())
 	plainV := misc.RecoverRecID(tx.ChainId().Uint64(), v)
@@ -53,7 +53,7 @@ func (pi *PubChainInstance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenA
 }
 
 // ProcessNewBlock process the blocks received from the public pub_chain
-func (pi *PubChainInstance) ProcessNewBlock(number *big.Int, joltifyBlockHeight int64) error {
+func (pi *Instance) ProcessNewBlock(number *big.Int, joltifyBlockHeight int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
 	block, err := pi.EthClient.BlockByNumber(ctx, number)
@@ -66,7 +66,7 @@ func (pi *PubChainInstance) ProcessNewBlock(number *big.Int, joltifyBlockHeight 
 }
 
 // updateInboundTx update the top-up token with fee
-func (pi *PubChainInstance) updateInboundTx(txID string, amount *big.Int, blockNum uint64) *inboundTx {
+func (pi *Instance) updateInboundTx(txID string, amount *big.Int, blockNum uint64) *inboundTx {
 	data, ok := pi.pendingInbounds.Load(txID)
 	if !ok {
 		pi.logger.Warn().Msgf("inbound fail to get the stored tx from pool with %v\n", pi.pendingInbounds)
@@ -92,7 +92,7 @@ func (pi *PubChainInstance) updateInboundTx(txID string, amount *big.Int, blockN
 	return thisAccount
 }
 
-func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
+func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
 	_, ok := pi.pendingInbounds.Load(txID)
 	if ok {
 		pi.logger.Error().Msgf("the tx already exist!!")
@@ -145,12 +145,12 @@ func (pi *PubChainInstance) processInboundTx(txID string, blockHeight uint64, fr
 		return nil
 	}
 	roundBlockHeight := blockHeight / ROUNDBLOCK
-	item := bcommon.NewAccountInboundReq(tx.address, to, tx.token, txIDBytes, int64(roundBlockHeight))
+	item := bcommon.NewAccountInboundReq(tx.address, to, tx.token, txIDBytes, int64(blockHeight), int64(roundBlockHeight))
 	pi.InboundReqChan <- &item
 	return nil
 }
 
-func (pi *PubChainInstance) checkErc20(data []byte) (common.Address, *big.Int, error) {
+func (pi *Instance) checkErc20(data []byte) (common.Address, *big.Int, error) {
 	if method, ok := pi.tokenAbi.Methods["transfer"]; ok {
 		if len(data) < 4 {
 			return common.Address{}, nil, errors.New("invalid data")
@@ -176,7 +176,7 @@ func (pi *PubChainInstance) checkErc20(data []byte) (common.Address, *big.Int, e
 }
 
 // fixme we need to check timeout to remove the pending transactions
-func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block, joltifyBlockHeight int64) {
+func (pi *Instance) processEachBlock(block *ethTypes.Block, joltifyBlockHeight int64) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
 			continue
@@ -213,7 +213,8 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block, joltifyBlock
 			payTxID := tx.Data()
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
-				item := bcommon.NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, joltifyBlockHeight)
+				roundBlockHeight := joltifyBlockHeight / ROUNDBLOCK
+				item := bcommon.NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, joltifyBlockHeight, roundBlockHeight)
 				// we add to the retry pool to  sort the tx
 				pi.AddItem(&item)
 			}
@@ -222,7 +223,7 @@ func (pi *PubChainInstance) processEachBlock(block *ethTypes.Block, joltifyBlock
 }
 
 // UpdatePool update the tss pool address
-func (pi *PubChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) error {
+func (pi *Instance) UpdatePool(pool *vaulttypes.PoolInfo) error {
 	if pool == nil {
 		return errors.New("nil pool")
 	}
@@ -257,7 +258,7 @@ func (pi *PubChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) error {
 }
 
 // GetPool get the latest two pool address
-func (pi *PubChainInstance) GetPool() []*bcommon.PoolInfo {
+func (pi *Instance) GetPool() []*bcommon.PoolInfo {
 	pi.poolLocker.RLock()
 	defer pi.poolLocker.RUnlock()
 	var ret []*bcommon.PoolInfo
@@ -266,7 +267,7 @@ func (pi *PubChainInstance) GetPool() []*bcommon.PoolInfo {
 }
 
 // GetPool get the latest two pool address
-func (pi *PubChainInstance) checkToBridge(dest common.Address) bool {
+func (pi *Instance) checkToBridge(dest common.Address) bool {
 	pools := pi.GetPool()
 	for _, el := range pools {
 		if el != nil && dest.String() == el.EthAddress.String() {
@@ -277,7 +278,7 @@ func (pi *PubChainInstance) checkToBridge(dest common.Address) bool {
 }
 
 // DeleteExpired delete the expired tx
-func (pi *PubChainInstance) DeleteExpired(currentHeight uint64) {
+func (pi *Instance) DeleteExpired(currentHeight uint64) {
 	var expiredTx []string
 	var expiredTxBnb []string
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
@@ -322,11 +323,11 @@ func (a *inboundTx) Verify() error {
 	return nil
 }
 
-func (pi *PubChainInstance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64) {
+func (pi *Instance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64) {
 	pi.moveFundReq.Store(height, pool)
 }
 
-func (pi *PubChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
+func (pi *Instance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
 	min := int64(math.MaxInt64)
 	pi.moveFundReq.Range(func(key, value interface{}) bool {
 		h := key.(int64)
@@ -343,7 +344,7 @@ func (pi *PubChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
 }
 
 // PopMoveFundItemAfterBlock pop up the item after the given block duration
-func (pi *PubChainInstance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
+func (pi *Instance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
 	min := int64(math.MaxInt64)
 	pi.moveFundReq.Range(func(key, value interface{}) bool {
 		h := key.(int64)
@@ -359,7 +360,7 @@ func (pi *PubChainInstance) PopMoveFundItemAfterBlock(currentBlockHeight int64) 
 	return nil, 0
 }
 
-func (pi *PubChainInstance) moveBnb(senderPk string, receiver common.Address, amount *big.Int, nonce uint64, blockHeight int64) (string, error) {
+func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *big.Int, nonce uint64, blockHeight int64) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel()
 	chainID, err := pi.EthClient.NetworkID(ctx)
@@ -432,7 +433,7 @@ func (pi *PubChainInstance) moveBnb(senderPk string, receiver common.Address, am
 	return rawTx.Hash().Hex(), nil
 }
 
-func (pi *PubChainInstance) moveERC20Token(senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64) (string, error) {
+func (pi *Instance) moveERC20Token(senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64) (string, error) {
 	txHash, err := pi.SendToken(senderPk, sender, receiver, balance, blockheight, nil)
 	if err != nil {
 		if err.Error() == "already known" {
@@ -446,7 +447,7 @@ func (pi *PubChainInstance) moveERC20Token(senderPk string, sender, receiver com
 	return txHash.Hex(), nil
 }
 
-func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, error) {
+func (pi *Instance) MoveFunds(previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, error) {
 	tokenInstance := pi.tokenInstance
 	balance, err := tokenInstance.BalanceOf(&bind.CallOpts{}, previousPool.EthAddress)
 	if err != nil {
@@ -506,7 +507,7 @@ func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, receiver c
 	return false, nil
 }
 
-func (pi *PubChainInstance) checkEachTx(h common.Hash) (uint64, error) {
+func (pi *Instance) checkEachTx(h common.Hash) (uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel()
 	receipt, err := pi.EthClient.TransactionReceipt(ctx, h)
@@ -517,7 +518,7 @@ func (pi *PubChainInstance) checkEachTx(h common.Hash) (uint64, error) {
 }
 
 // CheckTxStatus check whether the tx is already in the chain
-func (pi *PubChainInstance) CheckTxStatus(hashStr string) error {
+func (pi *Instance) CheckTxStatus(hashStr string) error {
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
 
 	var status uint64

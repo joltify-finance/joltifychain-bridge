@@ -7,7 +7,7 @@ import (
 )
 
 //MoveFound moves the fund for the public chain
-func (pi *PubChainInstance) MoveFound(blockHeight int64, previousPool *bcommon.PoolInfo) bool {
+func (pi *Instance) MoveFound(blockHeight int64, previousPool *bcommon.PoolInfo) bool {
 
 	// we get the latest pool address and move funds to the latest pool
 	currentPool := pi.GetPool()

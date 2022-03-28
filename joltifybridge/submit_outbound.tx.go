@@ -3,7 +3,6 @@ package joltifybridge
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
 
 	"gitlab.com/joltify/joltifychain-bridge/common"
@@ -32,12 +31,11 @@ func (jc *JoltifyChainInstance) SubmitOutboundTx(req common.OutBoundReq, pubchai
 		BlockHeight: strconv.FormatInt(req.BlockHeight, 10),
 	}
 
-	ok, resp, err := jc.composeAndSend(&outboundMsg, accSeq, accNum, nil, operator.GetAddress())
+	ok, _, err := jc.composeAndSend(&outboundMsg, accSeq, accNum, nil, operator.GetAddress())
 	if !ok || err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to broadcast the outbound tx record")
 		return errors.New("fail to broadcast the outbound tx record")
 	}
-	fmt.Printf("########%v$############\n", resp)
 	return nil
 }
 

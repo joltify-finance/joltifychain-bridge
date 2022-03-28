@@ -8,7 +8,7 @@ import (
 )
 
 //FeedTx feed the tx with the given
-func (jc *JoltifyChainInstance) FeedTx(lastPoolInfo *vaulttypes.PoolInfo, pi *pubchain.PubChainInstance, currentBlockHeight int64) error {
+func (jc *JoltifyChainInstance) FeedTx(lastPoolInfo *vaulttypes.PoolInfo, pi *pubchain.Instance, currentBlockHeight int64) error {
 
 	// we always increase the account seq regardless the tx successful or not
 	currentPool := lastPoolInfo.CreatePool.PoolAddr

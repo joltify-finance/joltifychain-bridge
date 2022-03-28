@@ -2,6 +2,7 @@ package pubchain
 
 import (
 	"encoding/base64"
+	"math/big"
 	"sort"
 	"strconv"
 	"sync"
@@ -78,10 +79,6 @@ func (s sortInboundReq) Less(i, j int) bool {
 	return hi.Cmp(hj) == 1
 }
 
-func (s sortInboundReq) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
 func createNreq(n int) ([]*common2.InboundReq, []*common2.InboundReq, error) {
 	accs, err := generateRandomPrivKey(n + 1)
 	if err != nil {
@@ -90,22 +87,32 @@ func createNreq(n int) ([]*common2.InboundReq, []*common2.InboundReq, error) {
 	reqs := make([]*common2.InboundReq, n)
 	reqsSorted := make(sortInboundReq, n)
 	for i := 0; i < n; i++ {
-		req := common2.InboundReq{
-			address:     accs[i].joltAddr,
-			txID:        []byte(strconv.Itoa(i)), // this indicates the identical inbound req
-			toPoolAddr:  accs[n].commAddr,
-			coin:        sdk.NewCoin("test", sdk.NewInt(1)),
-			blockHeight: int64(i),
-		}
+		req := common2.NewAccountInboundReq(accs[i].joltAddr, accs[n].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte(strconv.Itoa(i)), int64(i), int64(i)/ROUNDBLOCK)
+		req2 := common2.NewAccountInboundReq(accs[i].joltAddr, accs[n].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte(strconv.Itoa(i)), int64(i), int64(i)/ROUNDBLOCK)
 		reqs[i] = &req
-		reqsSorted[i] = &req
+		reqsSorted[i] = &req2
 	}
-	sort.Stable(reqsSorted)
+	sort.Slice(reqsSorted, func(i, j int) bool {
+		a := reqsSorted[i]
+		b := reqsSorted[j]
+		hash := crypto.Keccak256Hash(a.Address.Bytes(), a.TxID)
+		lower := hash.Big().String()
+		higher := strconv.FormatInt(a.BlockHeight, 10)
+		indexStr := higher + lower
+		aret, _ := new(big.Int).SetString(indexStr, 10)
+
+		hash2 := crypto.Keccak256Hash(b.Address.Bytes(), b.TxID)
+		lower2 := hash2.Big().String()
+		higher2 := strconv.FormatInt(b.BlockHeight, 10)
+		indexStr2 := higher2 + lower2
+		bret, _ := new(big.Int).SetString(indexStr2, 10)
+		return aret.Cmp(bret) == -1
+	})
 	return reqs, reqsSorted, nil
 }
 
 func TestCreateInstance(t *testing.T) {
-	pi := PubChainInstance{
+	pi := Instance{
 		lastTwoPools:    make([]*common2.PoolInfo, 2),
 		poolLocker:      &sync.RWMutex{},
 		RetryInboundReq: &sync.Map{}, // if a tx fail to process, we need to put in this channel and wait for retry
@@ -115,10 +122,11 @@ func TestCreateInstance(t *testing.T) {
 	for i := 0; i < len(sortedReqs); i++ {
 		pi.AddItem(reqs[i])
 	}
+
 	// now we test whether the pop is in the correct order
+	returnedReqs := pi.PopItem(len(sortedReqs))
 
 	for i := 0; i < len(sortedReqs); i++ {
-		el := pi.PopItem()
-		assert.True(t, el.address.Equals(sortedReqs[i].address))
+		assert.True(t, returnedReqs[i].Address.Equals(sortedReqs[i].Address))
 	}
 }

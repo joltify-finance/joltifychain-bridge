@@ -2,6 +2,15 @@ package pubchain
 
 import (
 	"encoding/hex"
+	"fmt"
+	"github.com/ethereum/go-ethereum/consensus/ethash"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/eth"
+	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/params"
 	"hash"
 	"math/big"
 	"strings"
@@ -37,7 +46,7 @@ func TestUpdatePoolAndGetPool(t *testing.T) {
 	accs, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 
-	ci := PubChainInstance{
+	ci := Instance{
 		lastTwoPools: make([]*common2.PoolInfo, 2),
 		poolLocker:   &sync.RWMutex{},
 	}
@@ -88,7 +97,7 @@ func TestCheckToBridge(t *testing.T) {
 	accs, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 
-	ci := PubChainInstance{
+	ci := Instance{
 		lastTwoPools: make([]*common2.PoolInfo, 2),
 		poolLocker:   &sync.RWMutex{},
 	}
@@ -145,7 +154,7 @@ func TestProcessInBound(t *testing.T) {
 	privkey991 := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
 	privateKey, err := crypto.HexToECDSA(privkey991)
 	assert.Nil(t, err)
-	pi := PubChainInstance{
+	pi := Instance{
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
@@ -178,7 +187,7 @@ func TestProcessInBound(t *testing.T) {
 }
 
 func TestUpdateBridgeTx(t *testing.T) {
-	pi := PubChainInstance{
+	pi := Instance{
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
@@ -262,13 +271,73 @@ func newHasher() *testHasher {
 	return &testHasher{hasher: sha3.NewLegacyKeccak256()}
 }
 
+var (
+	testKey, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+	testAddr    = crypto.PubkeyToAddress(testKey.PublicKey)
+	testBalance = big.NewInt(200e15)
+)
+
+var genesis = &core.Genesis{
+	Config:    params.AllEthashProtocolChanges,
+	Alloc:     core.GenesisAlloc{testAddr: {Balance: testBalance}},
+	ExtraData: []byte("test genesis"),
+	Timestamp: 9000,
+	BaseFee:   big.NewInt(1),
+}
+
+func generateTestChain(testTx []*ethTypes.Transaction) []*ethTypes.Block {
+	db := rawdb.NewMemoryDatabase()
+	generate := func(i int, g *core.BlockGen) {
+		g.OffsetTime(5)
+		g.SetExtra([]byte("test"))
+		if i == 1 {
+			fmt.Printf(">>222>>%v\n", testAddr)
+			for _, el := range testTx {
+				g.AddTx(el)
+			}
+		}
+	}
+	gblock := genesis.ToBlock(db)
+	engine := ethash.NewFaker()
+	blocks, _ := core.GenerateChain(genesis.Config, gblock, engine, db, 2, generate)
+	blocks = append([]*ethTypes.Block{gblock}, blocks...)
+	return blocks
+}
+
+func newTestBackend(t *testing.T, txs []*ethTypes.Transaction) (*node.Node, []*ethTypes.Block) {
+	// Generate test chain.
+
+	blocks := generateTestChain(txs)
+
+	// Create node
+	n, err := node.New(&node.Config{})
+	if err != nil {
+		t.Fatalf("can't create new node: %v", err)
+	}
+	// Create Ethereum Service
+	config := &ethconfig.Config{Genesis: genesis}
+	config.Ethash.PowMode = ethash.ModeFake
+	ethservice, err := eth.New(n, config)
+	if err != nil {
+		t.Fatalf("can't create new ethereum service: %v", err)
+	}
+	// Import the test chain.
+	if err := n.Start(); err != nil {
+		t.Fatalf("can't start test node: %v", err)
+	}
+	if _, err := ethservice.BlockChain().InsertChain(blocks[1:]); err != nil {
+		t.Fatalf("can't import test blocks: %v", err)
+	}
+	return n, blocks
+}
+
 func TestProcessEachBlock(t *testing.T) {
 	misc.SetupBech32Prefix()
 	accs, err := generateRandomPrivKey(2)
 	assert.Nil(t, err)
-	emptyEip2718Tx := ethTypes.NewTx(&ethTypes.AccessListTx{
-		ChainID:  big.NewInt(1),
-		Nonce:    3,
+	emptyEip2718Tx := ethTypes.MustSignNewTx(testKey, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
+		ChainID:  big.NewInt(1337),
+		Nonce:    0,
 		To:       &accs[0].commAddr,
 		Value:    big.NewInt(10),
 		Gas:      25000,
@@ -276,9 +345,9 @@ func TestProcessEachBlock(t *testing.T) {
 		Data:     []byte("wrongTx"),
 	})
 
-	emptyEip2718TxNotToBridge := ethTypes.NewTx(&ethTypes.AccessListTx{
-		ChainID:  big.NewInt(1),
-		Nonce:    3,
+	emptyEip2718TxNotToBridge := ethTypes.MustSignNewTx(testKey, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
+		ChainID:  big.NewInt(1337),
+		Nonce:    1,
 		To:       &accs[1].commAddr,
 		Value:    big.NewInt(10),
 		Gas:      25000,
@@ -287,9 +356,9 @@ func TestProcessEachBlock(t *testing.T) {
 	})
 
 	// fee, err := sdk.NewDecFromStr(config.InBoundFeeMin)
-	emptyEip2718TxGoodTopUpFee := ethTypes.NewTx(&ethTypes.AccessListTx{
-		ChainID:  big.NewInt(1),
-		Nonce:    3,
+	emptyEip2718TxGoodTopUpFee := ethTypes.MustSignNewTx(testKey, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
+		ChainID:  big.NewInt(1337),
+		Nonce:    2,
 		To:       &accs[0].commAddr,
 		Value:    big.NewInt(8),
 		Gas:      25000,
@@ -298,8 +367,8 @@ func TestProcessEachBlock(t *testing.T) {
 	})
 
 	// fee, err := sdk.NewDecFromStr(config.InBoundFeeMin)
-	emptyEip2718TxGoodTopUpEmptyData := ethTypes.NewTx(&ethTypes.AccessListTx{
-		ChainID:  big.NewInt(1),
+	emptyEip2718TxGoodTopUpEmptyData := ethTypes.MustSignNewTx(testKey, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
+		ChainID:  big.NewInt(1337),
 		Nonce:    3,
 		To:       &accs[0].commAddr,
 		Value:    big.NewInt(8),
@@ -309,9 +378,9 @@ func TestProcessEachBlock(t *testing.T) {
 	})
 
 	// fee, err := sdk.NewDecFromStr(config.InBoundFeeMin)
-	emptyEip2718TxGoodTopUpFeeBeforeERC20 := ethTypes.NewTx(&ethTypes.AccessListTx{
-		ChainID:  big.NewInt(1),
-		Nonce:    3,
+	emptyEip2718TxGoodTopUpFeeBeforeERC20 := ethTypes.MustSignNewTx(testKey, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
+		ChainID:  big.NewInt(1337),
+		Nonce:    4,
 		To:       &accs[0].commAddr,
 		Value:    big.NewInt(8),
 		Gas:      25000,
@@ -323,7 +392,15 @@ func TestProcessEachBlock(t *testing.T) {
 
 	tAbi, err := abi.JSON(strings.NewReader(generated.TokenMetaData.ABI))
 	assert.Nil(t, err)
-	pi := PubChainInstance{
+
+	allTxs := []*ethTypes.Transaction{emptyEip2718Tx, emptyEip2718TxNotToBridge, emptyEip2718TxGoodTopUpFee, emptyEip2718TxGoodTopUpEmptyData, emptyEip2718TxGoodTopUpFeeBeforeERC20}
+	backend, _ := newTestBackend(t, allTxs)
+	client, _ := backend.Attach()
+	defer backend.Close()
+	defer client.Close()
+	c := ethclient.NewClient(client)
+	pi := Instance{
+		EthClient:          c,
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
@@ -378,6 +455,7 @@ func TestProcessEachBlock(t *testing.T) {
 	}
 	//
 	tBlock1 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718Tx}, nil, nil, newHasher())
+
 	pi.processEachBlock(tBlock1, 10)
 	ret, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	require.True(t, exist)
@@ -428,10 +506,11 @@ func TestProcessEachBlock(t *testing.T) {
 
 func TestProcessEachBlockErc20(t *testing.T) {
 	accs, err := generateRandomPrivKey(3)
+
 	assert.Nil(t, err)
 	tAbi, err := abi.JSON(strings.NewReader(generated.TokenMetaData.ABI))
 	assert.Nil(t, err)
-	pi := PubChainInstance{
+	pi := Instance{
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
@@ -468,15 +547,61 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	// we need to put 4 leading 0 to match the format in test
 	data := append([]byte("0000"), dataRaw...)
 
-	Eip2718Tx := ethTypes.NewTx(&ethTypes.AccessListTx{
-		ChainID:  big.NewInt(1),
-		Nonce:    3,
+	sk, err := crypto.ToECDSA(accs[0].sk.Bytes())
+	assert.Nil(t, err)
+
+	Eip2718Tx := ethTypes.MustSignNewTx(sk, ethTypes.LatestSigner(genesis.Config), &ethTypes.LegacyTx{
+		Nonce:    0,
 		To:       &accs[2].commAddr,
 		Value:    big.NewInt(10),
-		Gas:      25000,
+		Gas:      5,
 		GasPrice: big.NewInt(1),
 		Data:     data,
 	})
+
+	// though to the token addr but not to the pool, so we ignore this tx
+	Eip2718TxNotPool := ethTypes.MustSignNewTx(sk, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
+		Nonce:    1,
+		To:       &accs[1].commAddr,
+		Value:    big.NewInt(10),
+		Gas:      2,
+		GasPrice: big.NewInt(1),
+		Data:     data,
+	})
+
+	dataToSign := []byte("hello")
+	hash := crypto.Keccak256Hash(dataToSign)
+	signature, err := crypto.Sign(hash.Bytes(), sk)
+	assert.Nil(t, err)
+	r := signature[:32]
+	s := signature[32:64]
+	v := signature[64:65]
+
+	// though to the token addr but not to the pool, so we ignore this tx
+	Eip2718TxGoodPass := ethTypes.MustSignNewTx(sk, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
+		Nonce:    0,
+		To:       &accs[1].commAddr,
+		Value:    big.NewInt(10),
+		Gas:      2,
+		GasPrice: big.NewInt(1),
+		Data:     data,
+		R:        new(big.Int).SetBytes(r),
+		S:        new(big.Int).SetBytes(s),
+		V:        new(big.Int).SetBytes(v),
+	})
+
+	mySk := hex.EncodeToString(accs[0].sk.Bytes())
+	testKey, err = crypto.HexToECDSA(mySk)
+	testAddr = crypto.PubkeyToAddress(testKey.PublicKey)
+	fmt.Printf(">>>%v\n", testAddr.String())
+	assert.NoError(t, err)
+	backend, _ := newTestBackend(t, []*ethTypes.Transaction{Eip2718Tx, Eip2718TxNotPool, Eip2718TxGoodPass})
+	defer backend.Close()
+	client, err := backend.Attach()
+	assert.NoError(t, err)
+	defer client.Close()
+	c := ethclient.NewClient(client)
+	pi.EthClient = c
 
 	// since token addr is not set, so the system should not put this tx in top-up queue
 	tBlock := ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718Tx}, nil, nil, newHasher())
@@ -488,16 +613,6 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	})
 	assert.Equal(t, counter, 0)
 
-	// though to the token addr but not to the pool, so we ignore this tx
-	Eip2718TxNotPool := ethTypes.NewTx(&ethTypes.AccessListTx{
-		ChainID:  big.NewInt(1),
-		Nonce:    3,
-		To:       &accs[1].commAddr,
-		Value:    big.NewInt(10),
-		Gas:      25000,
-		GasPrice: big.NewInt(1),
-		Data:     data,
-	})
 	tBlock = ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718TxNotPool}, nil, nil, newHasher())
 	pi.processEachBlock(tBlock, 10)
 	counter = 0
@@ -510,31 +625,8 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	dataRaw, err = method.Inputs.Pack(accs[0].commAddr, big.NewInt(10))
 	assert.Nil(t, err)
 
-	dataToSign := []byte("hello")
-	hash := crypto.Keccak256Hash(dataToSign)
-	sk, err := crypto.ToECDSA(accs[0].sk.Bytes())
-	assert.Nil(t, err)
-	signature, err := crypto.Sign(hash.Bytes(), sk)
-	assert.Nil(t, err)
-	r := signature[:32]
-	s := signature[32:64]
-	v := signature[64:65]
-
 	// we need to put 4 leading 0 to match the format in test
 	data = append([]byte("0000"), dataRaw...)
-	// though to the token addr but not to the pool, so we ignore this tx
-	Eip2718TxGoodPass := ethTypes.NewTx(&ethTypes.AccessListTx{
-		ChainID:  big.NewInt(1),
-		Nonce:    3,
-		To:       &accs[1].commAddr,
-		Value:    big.NewInt(10),
-		Gas:      25000,
-		GasPrice: big.NewInt(1),
-		Data:     data,
-		R:        new(big.Int).SetBytes(r),
-		S:        new(big.Int).SetBytes(s),
-		V:        new(big.Int).SetBytes(v),
-	})
 
 	tBlock = ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718TxGoodPass}, nil, nil, newHasher())
 	pi.processEachBlock(tBlock, 10)
@@ -580,7 +672,7 @@ func TestDeleteExpire(t *testing.T) {
 		coin,
 	}
 
-	pi := PubChainInstance{
+	pi := Instance{
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
@@ -666,7 +758,7 @@ func TestDeleteExpireBnB(t *testing.T) {
 		coin,
 	}
 
-	pi := PubChainInstance{
+	pi := Instance{
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
@@ -730,7 +822,7 @@ func TestProcessBlockFeeAhead(t *testing.T) {
 	accs, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 
-	pi := PubChainInstance{
+	pi := Instance{
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
@@ -798,7 +890,7 @@ func TestAccountVerify(t *testing.T) {
 	}
 
 	addr, err := sdk.AccAddressFromBech32("jolt1ljh48799pqcnezpsjr69ukpfq4mgapvpr7kzhm")
-
+	assert.NoError(t, err)
 	minFee, err := sdk.NewDecFromStr(config.InBoundFeeMin)
 	assert.Nil(t, err)
 	deltaFee, err := sdk.NewDecFromStr("0.00001")

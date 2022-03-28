@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/stretchr/testify/require"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+
 	"math/big"
 	"sync"
 	"testing"
@@ -43,7 +44,7 @@ func TestPubChainInstance_composeTx(t *testing.T) {
 	accs, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 	tssServer := TssMock{accs[1].sk}
-	pi := PubChainInstance{
+	pi := Instance{
 		lastTwoPools:       make([]*common.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
@@ -98,8 +99,7 @@ func TestSendToken(t *testing.T) {
 	tss := TssMock{
 		accs[0].sk,
 	}
-
-	websocketTest := "wss://apis-sj.ankr.com/wss/783303b49f7b4f988a67631cc709c8ce/a08ea9fddcad7113ac6454229b82c598/binance/full/test"
+	websocketTest := "ws://10.2.118.8:8456/"
 	tokenAddrTest := "0x0cD80A18df1C5eAd4B5Fb549391d58B06EFfDBC4"
 	pubChain, err := NewChainInstance(websocketTest, tokenAddrTest, &tss)
 	assert.Nil(t, err)
@@ -136,7 +136,7 @@ func TestSendToken(t *testing.T) {
 	wg.Wait()
 
 	// now we test send the token
-	_, err = pubChain.ProcessOutBound(accs[0].commAddr, accs[1].commAddr, big.NewInt(100), int64(10))
+	_, err = pubChain.ProcessOutBound(accs[0].commAddr, accs[1].commAddr, big.NewInt(100), int64(10), 0)
 	pubChain.tssServer.Stop()
-	assert.EqualError(t, err, "insufficient funds for gas * price + value")
+	assert.EqualError(t, err, "insufficient funds for transfer")
 }

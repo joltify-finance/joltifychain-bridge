@@ -119,7 +119,7 @@ func NewBridgeService(config config.Config) {
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.PubChainInstance, metric *monitor.Metric) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric) {
 	defer wg.Done()
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(ctx, time.Second*5)
