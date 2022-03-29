@@ -34,6 +34,7 @@ func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin type
 		coin,
 		roundBlockHeight,
 		blockHeight,
+		blockHeight,
 		uint64(0),
 	}
 }
@@ -73,7 +74,7 @@ func (i *InboundReq) Hash() common.Hash {
 func (i *InboundReq) Index() *big.Int {
 	hash := crypto.Keccak256Hash(i.Address.Bytes(), i.TxID)
 	lower := hash.Big().String()
-	higher := strconv.FormatInt(i.BlockHeight, 10)
+	higher := strconv.FormatInt(i.originalHeight, 10)
 	indexStr := higher + lower
 
 	ret, ok := new(big.Int).SetString(indexStr, 10)
@@ -90,6 +91,7 @@ func NewAccountInboundReq(address types.AccAddress, toPoolAddr common.Address, c
 		toPoolAddr,
 		coin,
 		blockHeight,
+		blockHeight,
 		roundBlockHeight,
 		0,
 		0,
@@ -105,6 +107,7 @@ type InboundReq struct {
 	toPoolAddr         common.Address
 	coin               types.Coin
 	BlockHeight        int64
+	originalHeight     int64
 	roundBlockHeight   int64
 	accNum             uint64
 	accSeq             uint64
