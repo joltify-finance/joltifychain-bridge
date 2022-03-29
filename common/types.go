@@ -17,6 +17,7 @@ type OutBoundReq struct {
 	coin               types.Coin
 	RoundBlockHeight   int64
 	BlockHeight        int64
+	originalHeight     int64
 	nonce              uint64
 }
 

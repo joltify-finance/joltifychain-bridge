@@ -3,7 +3,9 @@ package joltifybridge
 import (
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 
@@ -476,10 +478,27 @@ func (jc *JoltifyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendert
 	if !ok {
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
 	for _, msg := range txWithMemo.GetMsgs() {
 		switch eachMsg := msg.(type) {
 		case *banktypes.MsgSend:
-			err := jc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, rawTx.Hash())
+			txClient := cosTx.NewServiceClient(jc.grpcClient)
+			fmt.Printf(">>>>%v\n", hex.EncodeToString(rawTx.Hash()))
+			txquery := cosTx.GetTxRequest{Hash: hex.EncodeToString(rawTx.Hash())}
+			t, err := txClient.GetTx(ctx, &txquery)
+			if err != nil {
+				jc.logger.Error().Err(err).Msgf("fail to query the tx")
+				continue
+			}
+
+			if t.TxResponse.Code != 0 {
+				//		this means this tx is not a successful tx
+				zlog.Warn().Msgf("not a valid top up message with error code %v (%v)", t.TxResponse.Code, t.TxResponse.RawLog)
+				continue
+			}
+
+			err = jc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, rawTx.Hash())
 			if err != nil {
 				if err.Error() != "not a top up message to the pool" {
 					jc.logger.Error().Err(err).Msgf("fail to process the message, it is not a top up message")

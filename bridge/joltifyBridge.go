@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"fmt"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"html"
 	"io/ioutil"
 	"log"
@@ -23,6 +24,8 @@ import (
 
 	tmtypes "github.com/tendermint/tendermint/types"
 )
+
+const blockCache = 512
 
 // NewBridgeService starts the new bridge service
 func NewBridgeService(config config.Config) {
@@ -138,13 +141,15 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 		return
 	}
 
-	query = "tm.event = 'Tx'"
+	//query = "tm.event = 'Tx'"
 
-	newJoltifyTxChan, err := joltChain.AddSubscribe(ctxLocal, query)
-	if err != nil {
-		fmt.Printf("fail to start the subscription")
-		return
-	}
+	//newJoltifyTxChan, err := joltChain.AddSubscribe(ctxLocal, query)
+	//if err != nil {
+	//	fmt.Printf("fail to start the subscription")
+	//	return
+	//}
+
+	currentBlock := make([]*ctypes.ResultEvent, 1)
 
 	// pubNewBlockChan is the channel for the new blocks for the public chain
 	wg.Add(1)
@@ -187,6 +192,18 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 				joltChain.CurrentHeight = currentBlockHeight
+
+				// we update the tx new, since the tx is committed in the next block, we need to handle the tx once the next block coms
+				if currentBlock[0] == nil {
+					currentBlock[0] = &block
+				} else {
+					previousBlock := currentBlock[0]
+					currentBlock[0] = &block
+					preBlockHeight := previousBlock.Data.(tmtypes.EventDataNewBlock).Block.Height
+					for _, el := range previousBlock.Data.(tmtypes.EventDataNewBlock).Block.Txs {
+						joltChain.CheckOutBoundTx(preBlockHeight, el)
+					}
+				}
 				// now we check whether we need to update the pool
 				// we query the pool from the chain directly.
 				poolInfo, err := joltChain.QueryLastPoolAddress()
@@ -252,18 +269,18 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					metric.UpdateInboundTxNum(float64(pi.Size()))
 				}
 
-			case r := <-newJoltifyTxChan:
-				result := r.Data.(tmtypes.EventDataTx).Result
-				if result.Code != 0 {
-					// this means this tx is not a successful tx
-					zlog.Warn().Msgf("not a valid top up message with error code %v (%v)", result.Code, result.Log)
-					continue
-				}
-				blockHeight := r.Data.(tmtypes.EventDataTx).Height
-				tx := r.Data.(tmtypes.EventDataTx).Tx
-				joltChain.CheckOutBoundTx(blockHeight, tx)
+			//case r := <-newJoltifyTxChan:
+			//result := r.Data.(tmtypes.EventDataTx).Result
+			//if result.Code != 0 {
+			//	// this means this tx is not a successful tx
+			//	zlog.Warn().Msgf("not a valid top up message with error code %v (%v)", result.Code, result.Log)
+			//	continue
+			//}
+			//blockHeight := r.Data.(tmtypes.EventDataTx).Height
+			//tx := r.Data.(tmtypes.EventDataTx).Tx
+			//joltChain.CheckOutBoundTx(blockHeight, tx)
 
-				// process the public chain new block event
+			// process the public chain new block event
 			case head := <-pubNewBlockChan:
 				joltifyBlockHeight, errInner := joltChain.GetLastBlockHeight()
 				if errInner != nil {
@@ -405,7 +422,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						defer wg.Done()
 						err := pi.CheckTxStatus(txHash)
 						if err == nil {
-
 							tick := html.UnescapeString("&#" + "128228" + ";")
 							zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, fromAddr, toAddr, amount.String())
 							// now we submit our public chain tx to joltifychain
