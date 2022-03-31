@@ -78,6 +78,7 @@ func NewBridgeService(config config.Config) {
 	// fixme need to update the passcode
 	err = joltifyBridge.Keyring.ImportPrivKey("operator", string(dat), "12345678")
 	if err != nil {
+		cancel()
 		return
 	}
 
@@ -112,23 +113,16 @@ func NewBridgeService(config config.Config) {
 	}
 
 	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		<-c
-		ctx.Done()
-	}()
-
-	wg.Add(1)
-	addEventLoop(ctx, &wg, joltifyBridge, ci, metrics)
+	addEventLoop(c, &wg, joltifyBridge, ci, metrics)
 	wg.Wait()
 	cancel()
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric) {
+func addEventLoop(c chan os.Signal, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric) {
 	defer wg.Done()
 	query := "tm.event = 'ValidatorSetUpdates'"
-	ctxLocal, cancelLocal := context.WithTimeout(ctx, time.Second*5)
+	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
 
 	validatorUpdateChan, err := joltChain.AddSubscribe(ctxLocal, query)
@@ -144,19 +138,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 		return
 	}
 
-	//query = "tm.event = 'Tx'"
-
-	//newJoltifyTxChan, err := joltChain.AddSubscribe(ctxLocal, query)
-	//if err != nil {
-	//	fmt.Printf("fail to start the subscription")
-	//	return
-	//}
-
 	currentBlock := make([]*ctypes.ResultEvent, 1)
 
 	// pubNewBlockChan is the channel for the new blocks for the public chain
+	subscriptionCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	wg.Add(1)
-	pubNewBlockChan, err := pi.StartSubscription(ctx, wg)
+	pubNewBlockChan, err := pi.StartSubscription(subscriptionCtx, wg)
 	if err != nil {
 		fmt.Printf("fail to subscribe the token transfer with err %v\n", err)
 		return
@@ -170,7 +158,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 	go func(wg *sync.WaitGroup) {
 		for {
 			select {
-			case <-ctx.Done():
+			case <-c:
+				zlog.Logger.Info().Msgf("we quit the bridge")
 				return
 				// process the update of the validators
 			case vals := <-validatorUpdateChan:
