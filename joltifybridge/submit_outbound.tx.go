@@ -34,7 +34,7 @@ func (jc *JoltifyChainInstance) SubmitOutboundTx(requestID string, blockHeight i
 
 	ok, _, err := jc.composeAndSend(&outboundMsg, accSeq, accNum, nil, operator.GetAddress())
 	if !ok || err != nil {
-		jc.logger.Error().Err(err).Msgf("fail to broadcast the outbound tx record")
+		jc.logger.Error().Err(err).Msgf("fail to submit the outbound tx record")
 		return errors.New("fail to broadcast the outbound tx record")
 	}
 	return nil
@@ -56,6 +56,7 @@ func (jc *JoltifyChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (
 
 	validators, _ := jc.GetLastValidator()
 	min := float32(len(validators)*2) / float32(3)
+	fmt.Printf("%v====%v\n", validators, min)
 
 	target := ""
 	for key, value := range resp.OutboundTx.Items {

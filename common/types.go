@@ -49,7 +49,7 @@ func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin type
 func (i *OutBoundReq) Index() *big.Int {
 	hash := crypto.Keccak256Hash(i.outReceiverAddress.Bytes(), []byte(i.TxID))
 	lower := hash.Big().String()
-	higher := strconv.FormatInt(i.BlockHeight, 10)
+	higher := strconv.FormatInt(i.OriginalHeight, 10)
 	indexStr := higher + lower
 
 	ret, ok := new(big.Int).SetString(indexStr, 10)
