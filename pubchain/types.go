@@ -1,6 +1,7 @@
 package pubchain
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -26,11 +27,11 @@ const (
 	retryCacheSize    = 128
 	inboundprosSize   = 512
 	sbchannelsize     = 20000
-	chainQueryTimeout = time.Second * 5
+	chainQueryTimeout = time.Second * 15
 	GasLimit          = 2100000
 	GasPrice          = "0.00000001"
 	ROUNDBLOCK        = 50
-	submitBackoff     = time.Millisecond * 500
+	submitBackoff     = time.Second * 4
 	GroupBlockGap     = 8
 	GroupSign         = 4
 )
@@ -106,6 +107,8 @@ type inboundTxBnb struct {
 // Instance hold the joltify_bridge entity
 type Instance struct {
 	EthClient          *ethclient.Client
+	configAddr         string
+	chainID            *big.Int
 	tokenAddr          string
 	tokenInstance      *generated.Token
 	tokenAbi           *abi.ABI
@@ -125,13 +128,21 @@ type Instance struct {
 func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssSign) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
 
-	wsClient, err := ethclient.Dial(ws)
+	ethClient, err := ethclient.Dial(ws)
 	if err != nil {
 		logger.Error().Err(err).Msg("fail to dial the websocket")
 		return nil, errors.New("fail to dial the network")
 	}
 
-	tokenIns, err := generated.NewToken(common.HexToAddress(tokenAddr), wsClient)
+	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
+	defer cancel()
+	chainID, err := ethClient.NetworkID(ctx)
+	if err != nil {
+		logger.Error().Err(err).Msg("fail to get the chain ID")
+		return nil, err
+	}
+
+	tokenIns, err := generated.NewToken(common.HexToAddress(tokenAddr), ethClient)
 	if err != nil {
 		return nil, errors.New("fail to get the new token")
 	}
@@ -143,7 +154,9 @@ func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssSign) (*Insta
 
 	return &Instance{
 		logger:             logger,
-		EthClient:          wsClient,
+		EthClient:          ethClient,
+		configAddr:         ws,
+		chainID:            chainID,
 		tokenAddr:          tokenAddr,
 		tokenInstance:      tokenIns,
 		tokenAbi:           &tAbi,

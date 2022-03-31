@@ -3,7 +3,6 @@ package bridge
 import (
 	"context"
 	"fmt"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"html"
 	"io/ioutil"
 	"log"
@@ -12,6 +11,10 @@ import (
 	"path"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
+	common2 "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"gitlab.com/joltify/joltifychain-bridge/monitor"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
@@ -307,7 +310,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 				if isSigner && previousPool != nil {
 					// we move fund in the public chain
-					isMoveFund = pi.MoveFound(head.Number.Int64(), previousPool)
+					isMoveFund = pi.MoveFound(wg, head.Number.Int64(), previousPool)
 				}
 				if isMoveFund {
 					// once we move fund, we do not send tx to be processed
@@ -317,7 +320,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				// todo we need also to add the check to avoid send tx near the churn blocks
 				if joltifyBlockHeight-previousTssBlockOutBound >= joltifybridge.GroupBlockGap && joltChain.Size() != 0 {
 					// if we do not have enough tx to process, we wait for another round
-					if pi.Size() < pubchain.GroupSign && firstTimeOutbound {
+					if joltChain.Size() < pubchain.GroupSign && firstTimeOutbound {
 						firstTimeOutbound = false
 						metric.UpdateOutboundTxNum(float64(joltChain.Size()))
 						continue
@@ -350,7 +353,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 					previousTssBlockOutBound = joltifyBlockHeight
 					firstTimeOutbound = true
-					metric.UpdateInboundTxNum(float64(joltChain.Size()))
+					metric.UpdateOutboundTxNum(float64(joltChain.Size()))
 
 					for _, el := range outboundItems {
 						joltChain.OutboundReqChan <- el
@@ -392,12 +395,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}()
 				}()
 
-			case item := <-joltChain.OutboundReqChan:
+			case itemRecv := <-joltChain.OutboundReqChan:
 
 				wg.Add(1)
-				go func() {
+				go func(litem *common2.OutBoundReq) {
 					defer wg.Done()
-					submittedTx, err := joltChain.GetPubChainSubmittedTx(*item)
+					submittedTx, err := joltChain.GetPubChainSubmittedTx(*litem)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to query the submitted tx record, we continue process this tx")
 					}
@@ -411,33 +414,35 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						}
 					}
 
-					toAddr, fromAddr, amount, roundBlockHeight, nonce := item.GetOutBoundInfo()
-					txHash, err := pi.ProcessOutBound(toAddr, fromAddr, amount, roundBlockHeight, nonce)
+					toAddr, fromAddr, amount, roundBlockHeight, nonce := litem.GetOutBoundInfo()
+					txHashCheck, err := pi.ProcessOutBound(wg, toAddr, fromAddr, amount, roundBlockHeight, nonce)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
 					}
 					// though we submit the tx successful, we may still fail as tx may run out of gas,so we need to check
 					wg.Add(1)
-					go func() {
+					go func(itemCheck *common2.OutBoundReq, txHash string) {
 						defer wg.Done()
-						err := pi.CheckTxStatus(txHash)
-						if err == nil {
-							tick := html.UnescapeString("&#" + "128228" + ";")
-							zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, fromAddr, toAddr, amount.String())
-							// now we submit our public chain tx to joltifychain
-							localSubmitLocker.Lock()
-							errInner := joltChain.SubmitOutboundTx(*item, txHash)
-							localSubmitLocker.Unlock()
-							if errInner != nil {
-								zlog.Logger.Error().Err(err).Msgf("fail to process the outbound tx record")
+						emptyHash := common.Hash{}.Hex()
+						if txHash != emptyHash {
+							err := pi.CheckTxStatus(txHash)
+							if err == nil {
+								tick := html.UnescapeString("&#" + "128228" + ";")
+								zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, fromAddr, toAddr, amount.String())
+								// now we submit our public chain tx to joltifychain
+								localSubmitLocker.Lock()
+								errInner := joltChain.SubmitOutboundTx(itemCheck.Hash().Hex(), itemCheck.OriginalHeight, txHash)
+								localSubmitLocker.Unlock()
+								if errInner != nil {
+									zlog.Logger.Error().Err(err).Msgf("fail to process the outbound tx record")
+								}
+								return
 							}
-							return
 						}
-
 						zlog.Logger.Warn().Msgf("the tx is fail in submission, we need to resend")
-						joltChain.AddItem(item)
-					}()
-				}()
+						joltChain.AddItem(itemCheck)
+					}(litem, txHashCheck)
+				}(itemRecv)
 			}
 		}
 	}(wg)

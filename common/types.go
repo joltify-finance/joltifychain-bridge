@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"math/big"
 	"strconv"
 
@@ -17,13 +18,18 @@ type OutBoundReq struct {
 	coin               types.Coin
 	RoundBlockHeight   int64
 	BlockHeight        int64
-	originalHeight     int64
+	OriginalHeight     int64
 	nonce              uint64
 }
 
 func (i *OutBoundReq) Hash() common.Hash {
 	hash := crypto.Keccak256Hash(i.outReceiverAddress.Bytes(), []byte(i.TxID))
 	return hash
+}
+
+func (i *OutBoundReq) Show() string {
+	str := fmt.Sprintf("debvug >>>%v>>>%v>>>%v", i.outReceiverAddress.Hex(), i.TxID, i.OriginalHeight)
+	return str
 }
 
 func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin types.Coin, blockHeight, roundBlockHeight int64) OutBoundReq {

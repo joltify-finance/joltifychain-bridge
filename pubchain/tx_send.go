@@ -5,9 +5,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"html"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/cenkalti/backoff"
 
@@ -21,7 +23,10 @@ import (
 
 // CheckTxStatus check whether the tx has been done successfully
 func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) error {
-	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
+	//bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)\
+	bf := backoff.NewExponentialBackOff()
+	bf.MaxElapsedTime = time.Minute * 2
+	bf.MaxInterval = time.Second * 20
 
 	op := func() error {
 
@@ -46,20 +51,14 @@ func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) 
 }
 
 // SendToken sends the token to the public chain
-func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int) (common.Hash, error) {
+func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int) (common.Hash, error) {
 	tokenInstance := pi.tokenInstance
-	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
-	defer cancel()
-	chainID, err := pi.EthClient.NetworkID(ctx)
-	if err != nil {
-		pi.logger.Error().Err(err).Msg("fail to get the chain ID")
-		return common.Hash{}, err
-	}
+
 	if signerPk == "" {
 		lastPool := pi.GetPool()[1]
 		signerPk = lastPool.Pk
 	}
-	txo, err := pi.composeTx(signerPk, sender, chainID, blockHeight)
+	txo, err := pi.composeTx(signerPk, sender, pi.chainID, blockHeight)
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -84,14 +83,40 @@ func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, 
 		}
 	}
 	err = pi.EthClient.SendTransaction(ctxSend, readyTx)
+	if err != nil {
+		//we reset the ethcliet
+		fmt.Printf("error of the ethclient is %v\n", err)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second*10), 3)
+
+			op := func() error {
+				ethClient, err := ethclient.Dial(pi.configAddr)
+				if err != nil {
+					pi.logger.Error().Err(err).Msg("fail to dial the websocket")
+					return err
+				}
+				pi.EthClient = ethClient
+				return nil
+			}
+
+			err := backoff.Retry(op, bf)
+			if err != nil {
+				fmt.Printf("#########we fail all the retries#########")
+				return
+			}
+		}()
+
+	}
 
 	return readyTx.Hash(), err
 }
 
 // ProcessOutBound send the money to public chain
-func (pi *Instance) ProcessOutBound(toAddr, fromAddr common.Address, amount *big.Int, blockHeight int64, nonce uint64) (string, error) {
+func (pi *Instance) ProcessOutBound(wg *sync.WaitGroup, toAddr, fromAddr common.Address, amount *big.Int, blockHeight int64, nonce uint64) (string, error) {
 	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18))
-	txHash, err := pi.SendToken("", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce))
+	txHash, err := pi.SendToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce))
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")

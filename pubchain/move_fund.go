@@ -4,14 +4,15 @@ import (
 	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"html"
+	"sync"
 )
 
 //MoveFound moves the fund for the public chain
-func (pi *Instance) MoveFound(blockHeight int64, previousPool *bcommon.PoolInfo) bool {
+func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPool *bcommon.PoolInfo) bool {
 
 	// we get the latest pool address and move funds to the latest pool
 	currentPool := pi.GetPool()
-	emptyAccount, err := pi.MoveFunds(previousPool, currentPool[1].EthAddress, blockHeight)
+	emptyAccount, err := pi.MoveFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight)
 	if err != nil {
 		zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
 		pi.AddMoveFundItem(previousPool, pi.CurrentHeight)

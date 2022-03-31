@@ -30,13 +30,14 @@ func (jc *JoltifyChainInstance) InitValidators(addr string) error {
 	for {
 		result, err := ts.GetSyncing(ctx, &tmservice.GetSyncingRequest{})
 		if err != nil {
+			jc.logger.Error().Err(err).Msgf("fail to sync the blocks")
 			return err
 		}
 		if !result.GetSyncing() {
 			break
 		}
 		zlog.Logger.Info().Msg("the blockchain is not fully synced, please wait....")
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 10)
 	}
 
 	nodeInfo, err := ts.GetNodeInfo(ctx, &tmservice.GetNodeInfoRequest{})

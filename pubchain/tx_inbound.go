@@ -8,6 +8,7 @@ import (
 	"html"
 	"math"
 	"math/big"
+	"sync"
 
 	"github.com/cenkalti/backoff"
 	"github.com/ethereum/go-ethereum"
@@ -433,21 +434,20 @@ func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *bi
 	return rawTx.Hash().Hex(), nil
 }
 
-func (pi *Instance) moveERC20Token(senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64) (string, error) {
-	txHash, err := pi.SendToken(senderPk, sender, receiver, balance, blockheight, nil)
+func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64) (string, error) {
+	txHash, err := pi.SendToken(wg, senderPk, sender, receiver, balance, blockheight, nil)
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")
 			return txHash.Hex(), nil
 		}
 		pi.logger.Error().Err(err).Msgf("fail to send the token with err %v for amount %v ", err, balance)
-		return "", err
+		return txHash.Hex(), err
 	}
-
 	return txHash.Hex(), nil
 }
 
-func (pi *Instance) MoveFunds(previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, error) {
+func (pi *Instance) MoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, error) {
 	tokenInstance := pi.tokenInstance
 	balance, err := tokenInstance.BalanceOf(&bind.CallOpts{}, previousPool.EthAddress)
 	if err != nil {
@@ -475,7 +475,7 @@ func (pi *Instance) MoveFunds(previousPool *bcommon.PoolInfo, receiver common.Ad
 
 	var erc20TxHash, bnbTxHash string
 	if balance.Cmp(big.NewInt(0)) == 1 {
-		erc20TxHash, err = pi.moveERC20Token(previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight)
+		erc20TxHash, err = pi.moveERC20Token(wg, previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight)
 		// if we fail erc20 token transfer, we should not transfer the bnb otherwise,we do not have enough fee to pay retry
 		if err != nil {
 			return false, errors.New("fail to transfer erc20 token")
@@ -519,7 +519,7 @@ func (pi *Instance) checkEachTx(h common.Hash) (uint64, error) {
 
 // CheckTxStatus check whether the tx is already in the chain
 func (pi *Instance) CheckTxStatus(hashStr string) error {
-	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
+	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 30)
 
 	var status uint64
 	op := func() error {

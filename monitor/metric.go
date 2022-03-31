@@ -22,6 +22,7 @@ func (m *Metric) UpdateOutboundTxNum(num float64) {
 
 func (m *Metric) Enable() {
 	prometheus.MustRegister(m.inboundTxNum)
+	prometheus.MustRegister(m.outboundTxNum)
 }
 
 func NewMetric() *Metric {
