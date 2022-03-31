@@ -14,6 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
+
 	common2 "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"gitlab.com/joltify/joltifychain-bridge/monitor"
@@ -34,7 +35,6 @@ const blockCache = 512
 func NewBridgeService(config config.Config) {
 	wg := sync.WaitGroup{}
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
@@ -42,10 +42,12 @@ func NewBridgeService(config config.Config) {
 	passcode := make([]byte, passcodeLength)
 	n, err := os.Stdin.Read(passcode)
 	if err != nil {
+		cancel()
 		return
 	}
 	if n > passcodeLength {
 		log.Fatalln("the passcode is too long")
+		cancel()
 		return
 	}
 
@@ -58,12 +60,14 @@ func NewBridgeService(config config.Config) {
 	tssServer, _, err := tssclient.StartTssServer(config.HomeDir, config.TssConfig)
 	if err != nil {
 		log.Fatalln("fail to start the tss")
+		cancel()
 		return
 	}
 
 	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.JoltifyChain.GrpcAddress, config.JoltifyChain.WsAddress, tssServer)
 	if err != nil {
 		log.Fatalln("fail to create the invoice joltify_bridge", err)
+		cancel()
 		return
 	}
 
@@ -72,6 +76,7 @@ func NewBridgeService(config config.Config) {
 	dat, err := ioutil.ReadFile(keyringPath)
 	if err != nil {
 		log.Fatalln("error in read keyring file")
+		cancel()
 		return
 	}
 
@@ -112,13 +117,15 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	addEventLoop(c, &wg, joltifyBridge, ci, metrics)
+	addEventLoop(ctx, &wg, joltifyBridge, ci, metrics)
+	<-c
+	cancel()
 	wg.Wait()
 	cancel()
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(c chan os.Signal, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric) {
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
@@ -158,7 +165,7 @@ func addEventLoop(c chan os.Signal, wg *sync.WaitGroup, joltChain *joltifybridge
 		defer wg.Done()
 		for {
 			select {
-			case <-c:
+			case <-ctx.Done():
 				cancelsubscription()
 				zlog.Info().Msgf("we quit the whole process")
 				return
@@ -175,7 +182,7 @@ func addEventLoop(c chan os.Signal, wg *sync.WaitGroup, joltChain *joltifybridge
 					continue
 				}
 
-				// process the new joltify block, validator may need to submit the pool address
+			// process the new joltify block, validator may need to submit the pool address
 			case block := <-newJoltifyBlock:
 				currentBlockHeight := block.Data.(tmtypes.EventDataNewBlock).Block.Height
 				ok, _ := joltChain.CheckAndUpdatePool(currentBlockHeight)
@@ -262,18 +269,7 @@ func addEventLoop(c chan os.Signal, wg *sync.WaitGroup, joltChain *joltifybridge
 					metric.UpdateInboundTxNum(float64(pi.Size()))
 				}
 
-			//case r := <-newJoltifyTxChan:
-			//result := r.Data.(tmtypes.EventDataTx).Result
-			//if result.Code != 0 {
-			//	// this means this tx is not a successful tx
-			//	zlog.Warn().Msgf("not a valid top up message with error code %v (%v)", result.Code, result.Log)
-			//	continue
-			//}
-			//blockHeight := r.Data.(tmtypes.EventDataTx).Height
-			//tx := r.Data.(tmtypes.EventDataTx).Tx
-			//joltChain.CheckOutBoundTx(blockHeight, tx)
-
-			// process the public chain new block event
+				// process the public chain new block event
 			case head := <-pubNewBlockChan:
 				joltifyBlockHeight, errInner := joltChain.GetLastBlockHeight()
 				if errInner != nil {
@@ -349,18 +345,6 @@ func addEventLoop(c chan os.Signal, wg *sync.WaitGroup, joltChain *joltifybridge
 						joltChain.OutboundReqChan <- el
 					}
 				}
-
-				//pi.FeedTx()
-				// now we need to put the failed outbound request to the process channel
-				// todo need to check after a given block gap
-				//itemOutBound := joltChain.PopItem()
-				//metric.UpdateOutboundTxNum(float64(joltChain.Size()))
-				//if itemOutBound != nil {
-				//	// we set joltify chain height for both inbound/outbound tx
-				//	roundBlockHeight := joltifyBlockHeight / pubchain.ROUNDBLOCK
-				//	itemOutBound.SetItemHeight(roundBlockHeight)
-				//	joltChain.OutboundReqChan <- itemOutBound
-				//}
 
 			// process the in-bound top up event which will mint coin for users
 			case item := <-pi.InboundReqChan:
