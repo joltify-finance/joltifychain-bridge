@@ -112,7 +112,6 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	wg.Add(1)
 	addEventLoop(c, &wg, joltifyBridge, ci, metrics)
 	wg.Wait()
 	cancel()
@@ -120,7 +119,6 @@ func NewBridgeService(config config.Config) {
 }
 
 func addEventLoop(c chan os.Signal, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric) {
-	defer wg.Done()
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
@@ -141,12 +139,12 @@ func addEventLoop(c chan os.Signal, wg *sync.WaitGroup, joltChain *joltifybridge
 	currentBlock := make([]*ctypes.ResultEvent, 1)
 
 	// pubNewBlockChan is the channel for the new blocks for the public chain
-	subscriptionCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	subscriptionCtx, cancelsubscription := context.WithCancel(context.Background())
 	wg.Add(1)
 	pubNewBlockChan, err := pi.StartSubscription(subscriptionCtx, wg)
 	if err != nil {
 		fmt.Printf("fail to subscribe the token transfer with err %v\n", err)
+		cancelsubscription()
 		return
 	}
 	previousTssBlockInbound := int64(0)
@@ -155,11 +153,14 @@ func addEventLoop(c chan os.Signal, wg *sync.WaitGroup, joltChain *joltifybridge
 	firstTimeOutbound := true
 	localSubmitLocker := sync.Mutex{}
 
+	wg.Add(1)
 	go func(wg *sync.WaitGroup) {
+		defer wg.Done()
 		for {
 			select {
 			case <-c:
-				zlog.Logger.Info().Msgf("we quit the bridge")
+				cancelsubscription()
+				zlog.Info().Msgf("we quit the whole process")
 				return
 				// process the update of the validators
 			case vals := <-validatorUpdateChan:
