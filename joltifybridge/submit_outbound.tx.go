@@ -56,7 +56,6 @@ func (jc *JoltifyChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (
 
 	validators, _ := jc.GetLastValidator()
 	min := float32(len(validators)*2) / float32(3)
-	fmt.Printf("%v====%v\n", validators, min)
 
 	target := ""
 	for key, value := range resp.OutboundTx.Items {

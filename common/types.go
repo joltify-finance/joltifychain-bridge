@@ -28,7 +28,7 @@ func (i *OutBoundReq) Hash() common.Hash {
 }
 
 func (i *OutBoundReq) Show() string {
-	str := fmt.Sprintf("debvug >>>%v>>>%v>>>%v", i.outReceiverAddress.Hex(), i.TxID, i.OriginalHeight)
+	str := fmt.Sprintf("debug >>>%v>>>%v>>>%v", i.outReceiverAddress.Hex(), i.TxID, i.OriginalHeight)
 	return str
 }
 
