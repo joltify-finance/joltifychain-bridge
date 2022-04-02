@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"fmt"
+	"github.com/cenkalti/backoff"
 	"html"
 	"io/ioutil"
 	"log"
@@ -405,11 +406,18 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 								zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, fromAddr, toAddr, amount.String())
 								// now we submit our public chain tx to joltifychain
 								localSubmitLocker.Lock()
-								errInner := joltChain.SubmitOutboundTx(itemCheck.Hash().Hex(), itemCheck.OriginalHeight, txHash)
-								localSubmitLocker.Unlock()
-								if errInner != nil {
-									zlog.Logger.Error().Err(err).Msgf("fail to process the outbound tx record")
+								bf := backoff.NewExponentialBackOff()
+								bf.MaxElapsedTime = time.Minute
+								bf.MaxInterval = time.Second * 10
+								op := func() error {
+									errInner := joltChain.SubmitOutboundTx(itemCheck.Hash().Hex(), itemCheck.OriginalHeight, txHash)
+									return errInner
 								}
+								err := backoff.Retry(op, bf)
+								if err != nil {
+									zlog.Logger.Error().Err(err).Msgf("we have tried but failed to submit the record with backoff")
+								}
+								localSubmitLocker.Unlock()
 								return
 							}
 						}

@@ -5,11 +5,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"html"
 	"math/big"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/cenkalti/backoff"
 
@@ -28,6 +29,7 @@ func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) 
 	bf.MaxElapsedTime = time.Minute * 2
 	bf.MaxInterval = time.Second * 20
 
+	alreadyPassed := false
 	op := func() error {
 
 		ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
@@ -42,10 +44,18 @@ func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) 
 		if nonce == targetNonce {
 			return nil
 		}
+		if nonce > targetNonce {
+			alreadyPassed = true
+			return nil
+		}
 		return fmt.Errorf("not our round, the current nonce is %v and we want %v", nonce, targetNonce)
 	}
 
 	err := backoff.Retry(op, bf)
+	if alreadyPassed {
+		pi.logger.Warn().Msgf("already passed the tx, we quit")
+		return errors.New("already passed the seq")
+	}
 	return err
 
 }

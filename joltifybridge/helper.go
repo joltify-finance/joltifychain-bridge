@@ -107,6 +107,7 @@ func GetLastBlockHeight(grpcClient grpc1.ClientConn) (int64, error) {
 func (jc *JoltifyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSeq uint64) error {
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
 
+	alreadyPassed := false
 	op := func() error {
 		acc, err := queryAccount(poolAddress.String(), jc.grpcClient)
 		if err != nil {
@@ -116,10 +117,17 @@ func (jc *JoltifyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSe
 		if acc.GetSequence() == targetSeq {
 			return nil
 		}
+		if acc.GetSequence() > targetSeq {
+			alreadyPassed = true
+			return nil
+		}
 		return errors.New("not our round")
 	}
 
 	err := backoff.Retry(op, bf)
+	if alreadyPassed {
+		return errors.New("already passed")
+	}
 	return err
 
 }
