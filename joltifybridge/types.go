@@ -1,11 +1,12 @@
 package joltifybridge
 
 import (
-	"go.uber.org/atomic"
 	"math/big"
 	"sort"
 	"sync"
 	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/ethereum/go-ethereum/common/math"
 	grpc1 "github.com/gogo/protobuf/grpc"
@@ -33,6 +34,7 @@ const (
 	submitBackoff = time.Millisecond * 500
 	GroupBlockGap = 6
 	GroupSign     = 8
+	DEFAULTGAS    = 15000000
 )
 
 // tssPoolMsg this is the pool pre-submit message for the given height
