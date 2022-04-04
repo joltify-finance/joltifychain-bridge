@@ -81,6 +81,15 @@ func (jc *JoltifyChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
 	return nil, 0
 }
 
+func (jc *JoltifyChainInstance) ExportItems() []*bcommon.OutBoundReq {
+	var items []*bcommon.OutBoundReq
+	jc.RetryOutboundReq.Range(func(_, value interface{}) bool {
+		items = append(items, value.(*bcommon.OutBoundReq))
+		return true
+	})
+	return items
+}
+
 func (jc *JoltifyChainInstance) AddItem(req *bcommon.OutBoundReq) {
 	jc.RetryOutboundReq.Store(req.Index(), req)
 }

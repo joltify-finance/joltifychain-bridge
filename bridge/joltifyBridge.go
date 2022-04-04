@@ -3,7 +3,6 @@ package bridge
 import (
 	"context"
 	"fmt"
-	"github.com/cenkalti/backoff"
 	"html"
 	"io/ioutil"
 	"log"
@@ -12,6 +11,9 @@ import (
 	"path"
 	"sync"
 	"time"
+
+	"github.com/cenkalti/backoff"
+	"gitlab.com/joltify/joltifychain-bridge/storage"
 
 	"github.com/ethereum/go-ethereum/common"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -118,15 +120,34 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	addEventLoop(ctx, &wg, joltifyBridge, ci, metrics)
+	fsm := storage.NewTxStateMgr(config.HomeDir)
+	//now we load the existing requests
+	items, err := fsm.LoadOutBoundState()
+	if err != nil {
+		fmt.Printf("we do not need to have the items to be loaded")
+	}
+	if items != nil {
+		for _, el := range items {
+			joltifyBridge.AddItem(el)
+		}
+		fmt.Printf("we have loaded the unprocessed tx")
+	}
+
+	addEventLoop(ctx, &wg, joltifyBridge, ci, metrics, fsm)
 	<-c
 	cancel()
 	wg.Wait()
-	cancel()
+
+	itemsexported := joltifyBridge.ExportItems()
+	err = fsm.SaveOutBoundState(itemsexported)
+	if err != nil {
+		zlog.Logger.Error().Err(err).Msgf("fail to save the outbound requests!!!")
+	}
+	zlog.Info().Msgf("we have saved the unprocessed outbound txs")
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr) {
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
@@ -314,6 +335,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 
 					pools := joltChain.GetPool()
+					if len(pools) < 2 {
+						//this is need once we resume the bridge to avoid the panic that the pool address has not been filled
+						zlog.Logger.Warn().Msgf("we do not have 2 pools to start the tx")
+						continue
+					}
 					zlog.Logger.Warn().Msgf("we feed the tx now %v", pools[1].PoolInfo.CreatePool.String())
 
 					found, err := joltChain.CheckWhetherSigner(pools[1].PoolInfo)
