@@ -67,7 +67,7 @@ func (tm *TssMock) Stop() {
 	return
 }
 
-type sortInboundReq []*common2.InboundReq
+type sortInboundReq []*common2.InBoundReq
 
 func (s sortInboundReq) Len() int {
 	return len(s)
@@ -79,12 +79,12 @@ func (s sortInboundReq) Less(i, j int) bool {
 	return hi.Cmp(hj) == 1
 }
 
-func createNreq(n int) ([]*common2.InboundReq, []*common2.InboundReq, error) {
+func createNreq(n int) ([]*common2.InBoundReq, []*common2.InBoundReq, error) {
 	accs, err := generateRandomPrivKey(n + 1)
 	if err != nil {
 		return nil, nil, err
 	}
-	reqs := make([]*common2.InboundReq, n)
+	reqs := make([]*common2.InBoundReq, n)
 	reqsSorted := make(sortInboundReq, n)
 	for i := 0; i < n; i++ {
 		req := common2.NewAccountInboundReq(accs[i].joltAddr, accs[n].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte(strconv.Itoa(i)), int64(i), int64(i)/ROUNDBLOCK)

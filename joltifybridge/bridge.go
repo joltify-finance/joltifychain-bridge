@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"strconv"
 	"sync"
 
@@ -484,7 +483,6 @@ func (jc *JoltifyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendert
 		switch eachMsg := msg.(type) {
 		case *banktypes.MsgSend:
 			txClient := cosTx.NewServiceClient(jc.grpcClient)
-			fmt.Printf(">>>>%v\n", hex.EncodeToString(rawTx.Hash()))
 			txquery := cosTx.GetTxRequest{Hash: hex.EncodeToString(rawTx.Hash())}
 			t, err := txClient.GetTx(ctx, &txquery)
 			if err != nil {

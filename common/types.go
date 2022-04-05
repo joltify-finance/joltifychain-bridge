@@ -71,13 +71,13 @@ func (o *OutBoundReq) GetOutBoundInfo() (common.Address, common.Address, *big.In
 	return o.OutReceiverAddress, o.FromPoolAddr, o.Coin.Amount.BigInt(), o.RoundBlockHeight, o.Nonce
 }
 
-func (i *InboundReq) Hash() common.Hash {
+func (i *InBoundReq) Hash() common.Hash {
 	hash := crypto.Keccak256Hash(i.Address.Bytes(), i.TxID)
 	return hash
 }
 
 // Index generate the index of a given inbound req
-func (i *InboundReq) Index() *big.Int {
+func (i *InBoundReq) Index() *big.Int {
 	hash := crypto.Keccak256Hash(i.Address.Bytes(), i.TxID)
 	lower := hash.Big().String()
 	higher := strconv.FormatInt(i.OriginalHeight, 10)
@@ -90,8 +90,8 @@ func (i *InboundReq) Index() *big.Int {
 	return ret
 }
 
-func NewAccountInboundReq(address types.AccAddress, toPoolAddr common.Address, coin types.Coin, txid []byte, blockHeight, roundBlockHeight int64) InboundReq {
-	return InboundReq{
+func NewAccountInboundReq(address types.AccAddress, toPoolAddr common.Address, coin types.Coin, txid []byte, blockHeight, roundBlockHeight int64) InBoundReq {
+	return InBoundReq{
 		address,
 		txid,
 		toPoolAddr,
@@ -106,8 +106,8 @@ func NewAccountInboundReq(address types.AccAddress, toPoolAddr common.Address, c
 	}
 }
 
-// InboundReq is the account that top up account info to joltify pub_chain
-type InboundReq struct {
+// InBoundReq is the account that top up account info to joltify pub_chain
+type InBoundReq struct {
 	Address            types.AccAddress `json:"address"`
 	TxID               []byte           `json:"tx_id"` // this indicates the identical inbound req
 	ToPoolAddr         common.Address   `json:"to_pool_addr"`
@@ -122,17 +122,17 @@ type InboundReq struct {
 }
 
 // GetInboundReqInfo returns the info of the inbound transaction
-func (acq *InboundReq) GetInboundReqInfo() (types.AccAddress, common.Address, types.Coin, int64) {
+func (acq *InBoundReq) GetInboundReqInfo() (types.AccAddress, common.Address, types.Coin, int64) {
 	return acq.Address, acq.ToPoolAddr, acq.Coin, acq.BlockHeight
 }
 
 // SetItemHeight sets the block height of the tx
-func (acq *InboundReq) SetItemHeight(blockHeight int64) {
+func (acq *InBoundReq) SetItemHeight(blockHeight int64) {
 	acq.BlockHeight = blockHeight
 }
 
 // SetAccountInfo sets the block height of the tx
-func (acq *InboundReq) SetAccountInfo(number, seq uint64, address types.AccAddress, pk string) {
+func (acq *InBoundReq) SetAccountInfo(number, seq uint64, address types.AccAddress, pk string) {
 	acq.AccNum = number
 	acq.AccSeq = seq
 	acq.PoolJoltifyAddress = address
@@ -140,6 +140,6 @@ func (acq *InboundReq) SetAccountInfo(number, seq uint64, address types.AccAddre
 }
 
 // GetAccountInfo returns the account number and seq
-func (acq *InboundReq) GetAccountInfo() (uint64, uint64, types.AccAddress, string) {
+func (acq *InBoundReq) GetAccountInfo() (uint64, uint64, types.AccAddress, string) {
 	return acq.AccSeq, acq.AccNum, acq.PoolJoltifyAddress, acq.PoolPk
 }

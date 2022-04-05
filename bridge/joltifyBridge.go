@@ -113,7 +113,7 @@ func NewBridgeService(config config.Config) {
 	}
 
 	// now we monitor the bsc transfer event
-	ci, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, config.PubChainConfig.TokenAddress, tssServer)
+	pi, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, config.PubChainConfig.TokenAddress, tssServer)
 	if err != nil {
 		fmt.Printf("fail to connect the public pub_chain with address %v\n", config.PubChainConfig.WsAddress)
 		cancel()
@@ -121,7 +121,7 @@ func NewBridgeService(config config.Config) {
 	}
 
 	fsm := storage.NewTxStateMgr(config.HomeDir)
-	//now we load the existing requests
+	//now we load the existing outbound requests
 	items, err := fsm.LoadOutBoundState()
 	if err != nil {
 		fmt.Printf("we do not need to have the items to be loaded")
@@ -130,10 +130,22 @@ func NewBridgeService(config config.Config) {
 		for _, el := range items {
 			joltifyBridge.AddItem(el)
 		}
-		fmt.Printf("we have loaded the unprocessed tx")
+		fmt.Printf("we have loaded the unprocessed outbound tx")
 	}
 
-	addEventLoop(ctx, &wg, joltifyBridge, ci, metrics, fsm)
+	//now we load the existing inbound requests
+	itemsIn, err := fsm.LoadInBoundState()
+	if err != nil {
+		fmt.Printf("we do not need to have the items to be loaded")
+	}
+	if itemsIn != nil {
+		for _, el := range itemsIn {
+			pi.AddItem(el)
+		}
+		fmt.Printf("we have loaded the unprocessed inbound tx")
+	}
+
+	addEventLoop(ctx, &wg, joltifyBridge, pi, metrics, fsm)
 	<-c
 	cancel()
 	wg.Wait()
@@ -143,6 +155,13 @@ func NewBridgeService(config config.Config) {
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to save the outbound requests!!!")
 	}
+
+	itemsInexported := pi.ExportItems()
+	err = fsm.SaveInBoundState(itemsInexported)
+	if err != nil {
+		zlog.Logger.Error().Err(err).Msgf("fail to save the outbound requests!!!")
+	}
+
 	zlog.Info().Msgf("we have saved the unprocessed outbound txs")
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
@@ -335,7 +354,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 
 					pools := joltChain.GetPool()
-					if len(pools) < 2 {
+					if len(pools) < 2 || pools[1] == nil {
 						//this is need once we resume the bridge to avoid the panic that the pool address has not been filled
 						zlog.Logger.Warn().Msgf("we do not have 2 pools to start the tx")
 						continue

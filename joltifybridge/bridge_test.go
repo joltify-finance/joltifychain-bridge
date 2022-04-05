@@ -184,7 +184,7 @@ func (b BridgeTestSuite) TestBridgeTx() {
 
 	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	b.Require().NoError(err)
-	_, _, err = jc.BroadcastTx(context.Background(), txBytes)
+	_, _, err = jc.BroadcastTx(context.Background(), txBytes, false)
 	b.Require().NoError(err)
 	_, err = b.network.WaitForHeightWithTimeout(10, time.Second*30)
 	b.Require().NoError(err)

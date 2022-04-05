@@ -36,11 +36,20 @@ const (
 	GroupSign         = 4
 )
 
-func (pi *Instance) AddItem(req *bcommon.InboundReq) {
+func (pi *Instance) AddItem(req *bcommon.InBoundReq) {
 	pi.RetryInboundReq.Store(req.Index(), req)
 }
 
-func (pi *Instance) PopItem(n int) []*bcommon.InboundReq {
+func (pi *Instance) ExportItems() []*bcommon.InBoundReq {
+	var items []*bcommon.InBoundReq
+	pi.RetryInboundReq.Range(func(_, value interface{}) bool {
+		items = append(items, value.(*bcommon.InBoundReq))
+		return true
+	})
+	return items
+}
+
+func (pi *Instance) PopItem(n int) []*bcommon.InBoundReq {
 	var allkeys []*big.Int
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
 		allkeys = append(allkeys, key.(*big.Int))
@@ -60,14 +69,14 @@ func (pi *Instance) PopItem(n int) []*bcommon.InboundReq {
 		returnNum = indexNum
 	}
 
-	inboundReqs := make([]*bcommon.InboundReq, returnNum)
+	inboundReqs := make([]*bcommon.InBoundReq, returnNum)
 
 	for i := 0; i < returnNum; i++ {
 		el, loaded := pi.RetryInboundReq.LoadAndDelete(allkeys[i])
 		if !loaded {
 			panic("should never fail")
 		}
-		inboundReqs[i] = el.(*bcommon.InboundReq)
+		inboundReqs[i] = el.(*bcommon.InBoundReq)
 	}
 
 	return inboundReqs
@@ -84,7 +93,7 @@ func (pi *Instance) Size() int {
 
 func (pi *Instance) ShowItems() {
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
-		el := value.(*bcommon.InboundReq)
+		el := value.(*bcommon.InBoundReq)
 		pi.logger.Warn().Msgf("tx in the prepare pool %v:%v\n", key, el.TxID)
 		return true
 	})
@@ -118,7 +127,7 @@ type Instance struct {
 	lastTwoPools       []*bcommon.PoolInfo
 	poolLocker         *sync.RWMutex
 	tssServer          tssclient.TssSign
-	InboundReqChan     chan *bcommon.InboundReq
+	InboundReqChan     chan *bcommon.InBoundReq
 	RetryInboundReq    *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq        *sync.Map
 	CurrentHeight      int64
@@ -165,7 +174,7 @@ func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssSign) (*Insta
 		poolLocker:         &sync.RWMutex{},
 		tssServer:          tssServer,
 		lastTwoPools:       make([]*bcommon.PoolInfo, 2),
-		InboundReqChan:     make(chan *bcommon.InboundReq, inboundprosSize),
+		InboundReqChan:     make(chan *bcommon.InBoundReq, inboundprosSize),
 		RetryInboundReq:    &sync.Map{},
 		moveFundReq:        &sync.Map{},
 	}, nil
