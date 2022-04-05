@@ -2,6 +2,7 @@ package joltifybridge
 
 import (
 	"context"
+	"github.com/cosmos/cosmos-sdk/client"
 	"strconv"
 	"testing"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
+	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	xauthsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/suite"
@@ -92,7 +95,7 @@ func (v *MintTestSuite) SetupSuite() {
 func (m MintTestSuite) TestPrepareIssueTokenRequest() {
 	accs, err := generateRandomPrivKey(3)
 	m.Require().NoError(err)
-	tx := common.NewAccountInboundReq(accs[0].joltAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100))
+	tx := common.NewAccountInboundReq(accs[0].joltAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(2), int64(100))
 	_, err = prepareIssueTokenRequest(&tx, accs[2].commAddr.String(), "1")
 	m.Require().EqualError(err, "decoding bech32 failed: string not all lowercase or all uppercase")
 
@@ -101,12 +104,79 @@ func (m MintTestSuite) TestPrepareIssueTokenRequest() {
 	m.Require().NoError(err)
 }
 
+func Gensigntx(jc *JoltifyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum, accSeq uint64, signkeyring keyring.Keyring) (client.TxBuilder, error) {
+	encCfg := *jc.encoding
+	// Create a new TxBuilder.
+	txBuilder := encCfg.TxConfig.NewTxBuilder()
+
+	err := txBuilder.SetMsgs(sdkMsg...)
+	if err != nil {
+		return nil, err
+	}
+
+	// we use the default here
+	txBuilder.SetGasLimit(500000)
+
+	var sigV2 signing.SignatureV2
+
+	sigV2 = signing.SignatureV2{
+		PubKey: key.GetPubKey(),
+		Data: &signing.SingleSignatureData{
+			SignMode:  encCfg.TxConfig.SignModeHandler().DefaultMode(),
+			Signature: nil,
+		},
+		Sequence: accSeq,
+	}
+
+	err = txBuilder.SetSignatures(sigV2)
+	if err != nil {
+		return nil, err
+	}
+
+	signerData := xauthsigning.SignerData{
+		ChainID:       chainID,
+		AccountNumber: accNum,
+		Sequence:      accSeq,
+	}
+
+	signMode := encCfg.TxConfig.SignModeHandler().DefaultMode()
+	// Generate the bytes to be signed.
+	signBytes, err := encCfg.TxConfig.SignModeHandler().GetSignBytes(signMode, signerData, txBuilder.GetTx())
+	if err != nil {
+		return nil, err
+	}
+
+	signature, pk, err := signkeyring.Sign("node0", signBytes)
+	if err != nil {
+		return nil, err
+	}
+	sigData := signing.SingleSignatureData{
+		SignMode:  signMode,
+		Signature: signature,
+	}
+
+	sigV2 = signing.SignatureV2{
+		PubKey:   pk,
+		Data:     &sigData,
+		Sequence: signerData.Sequence,
+	}
+	err = txBuilder.SetSignatures(sigV2)
+	if err != nil {
+		jc.logger.Error().Err(err).Msgf("fail to set the signature")
+		return nil, err
+	}
+
+	return txBuilder, nil
+}
+
 func (m MintTestSuite) TestProcessInbound() {
 	accs, err := generateRandomPrivKey(2)
 	m.Require().NoError(err)
 	tss := TssMock{
-		nil,
+		accs[0].sk,
+		// nil,
 		m.network.Validators[0].ClientCtx.Keyring,
+		// m.network.Validators[0].ClientCtx.Keyring,
 		true,
 		true,
 	}
@@ -127,28 +197,26 @@ func (m MintTestSuite) TestProcessInbound() {
 	m.Require().NoError(err)
 
 	info, _ := m.network.Validators[0].ClientCtx.Keyring.Key("node0")
-	// pk := m.network.Validators[0].PubKey
 	pk := info.GetPubKey()
 	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
 	valAddr, err := misc.PoolPubKeyToJoltAddress(pkstr)
 	m.Require().NoError(err)
-	tx := common.NewAccountInboundReq(m.network.Validators[0].Address, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100))
-	_, _, err = jc.ProcessInBound(&tx)
-	m.Require().EqualError(err, "not enough signer")
 
-	// need to be called twice
+	acc, err := queryAccount(valAddr.String(), jc.grpcClient)
+	m.Require().NoError(err)
+	tx := common.NewAccountInboundReq(valAddr, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100), int64(100))
 
-	// err = jc.CreatePoolAccInfo(m.network.Validators[0].Address.String())
-	// m.Require().NoError(err)
+	tx.SetAccountInfo(0, 0, accs[0].joltAddr, accs[0].pk)
+
 	send := banktypes.NewMsgSend(valAddr, accs[0].joltAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
-	acc, err := queryAccount(accs[0].joltAddr.String(), jc.grpcClient)
-	m.Require().NoError(err)
-	txBuilder, err := jc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, nil)
+	chainID = m.cfg.ChainID
+	//txBuilder, err := jc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
+	txBuilder, err := Gensigntx(jc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), m.network.Validators[0].ClientCtx.Keyring)
 	m.Require().NoError(err)
 	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	m.Require().NoError(err)
-	ret, _, err := jc.BroadcastTx(context.Background(), txBytes)
+	ret, _, err := jc.BroadcastTx(context.Background(), txBytes, false)
 	m.Require().NoError(err)
 	m.Require().True(ret)
 
@@ -161,8 +229,6 @@ func (m MintTestSuite) TestProcessInbound() {
 	jc.lastTwoPools[0] = &pool
 	jc.lastTwoPools[1] = &pool
 
-	// err = jc.CreatePoolAccInfo(accs[0].joltAddr.String())
-	// m.Require().NoError(err)
 	_, _, err = jc.ProcessInBound(&tx)
 	m.Require().Error(err)
 }

@@ -129,11 +129,9 @@ func (jc *JoltifyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSe
 		return errors.New("already passed")
 	}
 	return err
-
 }
 
 func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
-
 	gasWanted := jc.GetGasEstimation()
 	txBuilder, err := jc.genSendTx([]sdk.Msg{sendMsg}, accSeq, accNum, uint64(gasWanted), signMsg)
 	if err != nil {

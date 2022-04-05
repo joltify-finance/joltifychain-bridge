@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 
@@ -39,7 +40,7 @@ import (
 )
 
 // NewJoltifyBridge new the instance for the joltify pub_chain
-func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssSign) (*JoltifyChainInstance, error) {
+func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance) (*JoltifyChainInstance, error) {
 	var joltifyBridge JoltifyChainInstance
 	var err error
 	joltifyBridge.logger = zlog.With().Str("module", "joltifyChain").Logger()
@@ -216,6 +217,7 @@ func (jc *JoltifyChainInstance) signTx(txConfig client.TxConfig, txBuilder clien
 			jc.logger.Error().Msgf("fail to encode the signature")
 			return signing.SignatureV2{}, err
 		}
+		fmt.Printf("11>>>%v\n", hex.EncodeToString(signature))
 
 		pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, signMsg.Pk) // nolint
 		if err != nil {
@@ -327,18 +329,18 @@ func (jc *JoltifyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, t
 	return uint64(gasWanted), nil
 }
 
-//UpdateGas update the gas needed from the last tx
+// UpdateGas update the gas needed from the last tx
 func (jc *JoltifyChainInstance) UpdateGas(gasUsed int64) {
 	jc.inboundGas.Store(gasUsed)
 }
 
-//GetGasEstimation get the gas estimation
+// GetGasEstimation get the gas estimation
 func (jc *JoltifyChainInstance) GetGasEstimation() int64 {
 	previousGasUsed := jc.inboundGas.Load()
 	gasUsedDec := sdk.NewDecFromIntWithPrec(sdk.NewIntFromUint64(uint64(previousGasUsed)), 0)
 	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO)).RoundInt64()
 	_ = gasWanted
-	//todo we need to get the gas dynamically in future, if different node get different fee, tss will fail
+	// todo we need to get the gas dynamically in future, if different node get different fee, tss will fail
 	return 2500000
 }
 
@@ -359,7 +361,7 @@ func (jc *JoltifyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte,
 		return false, "", err
 	}
 
-	//this mean tx has been submitted by others
+	// this mean tx has been submitted by others
 	if grpcRes.GetTxResponse().Code == 19 {
 		return true, "", nil
 	}

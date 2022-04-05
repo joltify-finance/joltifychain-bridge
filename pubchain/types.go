@@ -126,7 +126,7 @@ type Instance struct {
 	pendingInboundsBnB *sync.Map
 	lastTwoPools       []*bcommon.PoolInfo
 	poolLocker         *sync.RWMutex
-	tssServer          tssclient.TssSign
+	tssServer          tssclient.TssInstance
 	InboundReqChan     chan *bcommon.InBoundReq
 	RetryInboundReq    *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq        *sync.Map
@@ -134,7 +134,7 @@ type Instance struct {
 }
 
 // NewChainInstance initialize the joltify_bridge entity
-func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssSign) (*Instance, error) {
+func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssInstance) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
 
 	ethClient, err := ethclient.Dial(ws)

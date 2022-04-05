@@ -153,7 +153,7 @@ func (jc *JoltifyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.P
 	return previousPool
 }
 
-func (jc *JoltifyChainInstance) MoveFunds(fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) (bool, error) {
+func (jc *JoltifyChainInstance) DoMoveFunds(fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) (bool, error) {
 	from := fromPool.JoltifyAddress
 	acc, err := queryAccount(from.String(), jc.grpcClient)
 	if err != nil {

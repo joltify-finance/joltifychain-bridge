@@ -21,7 +21,7 @@ type PubChainConfig struct {
 }
 
 type (
-	addrList  []maddr.Multiaddr
+	AddrList  []maddr.Multiaddr
 	TssConfig struct {
 		// Party Timeout defines how long do we wait for the party to form
 		PartyTimeout time.Duration
@@ -36,14 +36,14 @@ type (
 		// Config is configuration for Tss P2P
 		RendezvousString string
 		Port             int
-		BootstrapPeers   addrList
+		BootstrapPeers   AddrList
 		ExternalIP       string
 		HTTPAddr         string
 	}
 )
 
 // String implement fmt.Stringer
-func (al *addrList) String() string {
+func (al *AddrList) String() string {
 	addresses := make([]string, len(*al))
 	for i, addr := range *al {
 		addresses[i] = addr.String()
@@ -52,7 +52,7 @@ func (al *addrList) String() string {
 }
 
 // Set add the given value to addList
-func (al *addrList) Set(value string) error {
+func (al *AddrList) Set(value string) error {
 	addr, err := maddr.NewMultiaddr(value)
 	if err != nil {
 		return err

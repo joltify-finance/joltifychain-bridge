@@ -1,12 +1,13 @@
 package joltifybridge
 
 import (
+	"html"
+
 	"github.com/cosmos/cosmos-sdk/types"
 	zlog "github.com/rs/zerolog/log"
-	"html"
 )
 
-//MoveFound move all the funds for joltify chain
+// MoveFound move all the funds for joltify chain
 func (jc *JoltifyChainInstance) MoveFound(currentBlockHeight int64, toAddress types.AccAddress) bool {
 	moveFound := false
 	// we move fund if some pool retired
@@ -25,7 +26,7 @@ func (jc *JoltifyChainInstance) MoveFound(currentBlockHeight int64, toAddress ty
 		return moveFound
 	}
 	moveFound = true
-	emptyAcc, err := jc.MoveFunds(previousPool, toAddress, currentBlockHeight)
+	emptyAcc, err := jc.DoMoveFunds(previousPool, toAddress, currentBlockHeight)
 	if emptyAcc {
 		tick := html.UnescapeString("&#" + "127974" + ";")
 		zlog.Logger.Info().Msgf("%v successfully moved funds from %v to %v", tick, previousPool.JoltifyAddress.String(), toAddress.String())

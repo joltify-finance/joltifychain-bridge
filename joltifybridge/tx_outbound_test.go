@@ -1,6 +1,7 @@
 package joltifybridge
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -35,6 +36,8 @@ type OutBoundTestSuite struct {
 func (v *OutBoundTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
+	cfg.MinGasPrices = "0stake"
+	cfg.ChainID = chainID
 	v.cfg = cfg
 	v.validatorky = keyring.NewInMemory()
 	// now we put the mock pool list in the test
@@ -216,12 +219,12 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 func (o OutBoundTestSuite) TestOutBoundReq() {
 	accs, err := generateRandomPrivKey(2)
 	o.Require().NoError(err)
-	boundReq := common2.NewOutboundReq("testID", accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("testcoing", sdk.NewInt(1)), 101)
-	boundReq.SetItemHeightAndNonce(100)
-	a, b, _, h := boundReq.GetOutBoundInfo()
+	boundReq := common2.NewOutboundReq("testID", accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("testcoing", sdk.NewInt(1)), 101, 2)
+	boundReq.SetItemHeightAndNonce(2, 100, 10)
+	a, b, _, h, _ := boundReq.GetOutBoundInfo()
 	o.Require().Equal(a.String(), accs[0].commAddr.String())
 	o.Require().Equal(b.String(), accs[1].commAddr.String())
-	o.Require().Equal(h, int64(100))
+	o.Require().Equal(h, int64(2))
 }
 
 func (o OutBoundTestSuite) TestOutTx() {
@@ -310,6 +313,54 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	msg.FromAddress = accs[1].commAddr.String()
 	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "rpc error: code = InvalidArgument desc = decoding bech32 failed: string not all lowercase or all uppercase: invalid request")
+}
+
+func (o OutBoundTestSuite) TestMoveFunds() {
+	accs, err := generateRandomPrivKey(4)
+	o.Assert().NoError(err)
+	tss := TssMock{
+		accs[0].sk,
+		o.network.Validators[0].ClientCtx.Keyring,
+		true,
+		true,
+	}
+
+	jc, err := NewJoltifyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss)
+	o.Require().NoError(err)
+	defer func() {
+		err2 := jc.TerminateBridge()
+		if err2 != nil {
+			jc.logger.Error().Err(err2).Msgf("fail to terminate the bridge")
+		}
+	}()
+	o.network.WaitForNextBlock()
+
+	// we need to add this as it seems the rpcaddress is incorrect
+	jc.grpcClient = o.network.Validators[0].ClientCtx
+	jc.Keyring = o.validatorky
+
+	info, _ := o.network.Validators[0].ClientCtx.Keyring.Key("node0")
+	pk := info.GetPubKey()
+	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
+	valAddr, err := misc.PoolPubKeyToJoltAddress(pkstr)
+	o.Require().NoError(err)
+
+	poolinfo := common2.PoolInfo{
+		JoltifyAddress: valAddr,
+		Pk:             pkstr,
+	}
+	cid := o.network.Validators[0].ClientCtx.ChainID
+	fmt.Printf(">>>>%v\n", cid)
+
+	msg := banktypes.NewMsgSend(valAddr, accs[0].joltAddr, coins)
+	txBuilder, err := Gensigntx(jc, []sdk.Msg{send}, info, info.GetAccountNumber(), info.GetSequence(), m.network.Validators[0].ClientCtx.Keyring)
+	o.Require().NoError(err)
+	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	o.Require().NoError(err)
+	ret, _, err := jc.BroadcastTx(context.Background(), txBytes, false)
+	o.Require().NoError(err)
+
+	jc.DoMoveFunds(&poolinfo, accs[0].joltAddr, 10)
 }
 
 func TestTxOutBound(t *testing.T) {

@@ -3,7 +3,6 @@ package joltifybridge
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
 
 	"gitlab.com/joltify/joltifychain-bridge/common"
@@ -43,7 +42,6 @@ func (jc *JoltifyChainInstance) SubmitOutboundTx(requestID string, blockHeight i
 // GetPubChainSubmittedTx get the submitted mint tx
 func (jc *JoltifyChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (string, error) {
 	reqStr := req.Hash().Hex()
-	fmt.Println(req.Show())
 	jc.logger.Info().Msgf("we check the hash %v\n", reqStr)
 	vaultQuery := vaulttypes.NewQueryClient(jc.grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)

@@ -1,8 +1,11 @@
 package joltifybridge
 
 import (
+	"crypto/ecdsa"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
+	"fmt"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 
@@ -32,14 +35,18 @@ func (tm *TssMock) KeySign(pk string, msgs []string, blockHeight int64, signers 
 	if err != nil {
 		return keysign.Response{}, err
 	}
-
-	sk, err := crypto.ToECDSA(tm.sk.Bytes())
-	if err != nil {
-		return keysign.Response{}, err
+	var sk *ecdsa.PrivateKey
+	if tm.sk != nil {
+		sk, err = crypto.ToECDSA(tm.sk.Bytes())
+		if err != nil {
+			return keysign.Response{}, err
+		}
 	}
 	var signature []byte
 	if tm.keys != nil {
-		signature, _, err = tm.keys.Sign("node0", msg)
+		s, _, err := tm.keys.Sign("node0", msg)
+		signature = s
+		fmt.Printf(">>>%v\n", hex.EncodeToString(s))
 		if err != nil {
 			return keysign.Response{}, err
 		}
@@ -51,7 +58,12 @@ func (tm *TssMock) KeySign(pk string, msgs []string, blockHeight int64, signers 
 	}
 	r := signature[:32]
 	s := signature[32:64]
-	v := signature[64:65]
+	var v []byte
+	if len(signature) == 64 {
+		v = signature[63:]
+	} else {
+		v = signature[64:65]
+	}
 
 	rEncoded := base64.StdEncoding.EncodeToString(r)
 	sEncoded := base64.StdEncoding.EncodeToString(s)

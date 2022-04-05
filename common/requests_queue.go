@@ -1,7 +1,6 @@
 package common
 
 import (
-	"fmt"
 	"math/big"
 	"strconv"
 
@@ -10,26 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-// OutBoundReq is the entity for the outbound tx
-type OutBoundReq struct {
-	TxID               string         `json:"tx_id"`
-	OutReceiverAddress common.Address `json:"out_receiver_address"`
-	FromPoolAddr       common.Address `json:"from_pool_addr"`
-	Coin               types.Coin     `json:"Coin"`
-	RoundBlockHeight   int64          `json:"round_block_height"`
-	BlockHeight        int64          `json:"block_height"`
-	OriginalHeight     int64          `json:"original_height"`
-	Nonce              uint64         `json:"nonce"`
-}
-
 func (i *OutBoundReq) Hash() common.Hash {
 	hash := crypto.Keccak256Hash(i.OutReceiverAddress.Bytes(), []byte(i.TxID))
 	return hash
-}
-
-func (i *OutBoundReq) Show() string {
-	str := fmt.Sprintf("debvug >>>%v>>>%v>>>%v", i.OutReceiverAddress.Hex(), i.TxID, i.OriginalHeight)
-	return str
 }
 
 func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin types.Coin, blockHeight, roundBlockHeight int64) OutBoundReq {
@@ -104,21 +86,6 @@ func NewAccountInboundReq(address types.AccAddress, toPoolAddr common.Address, c
 		nil,
 		"",
 	}
-}
-
-// InBoundReq is the account that top up account info to joltify pub_chain
-type InBoundReq struct {
-	Address            types.AccAddress `json:"address"`
-	TxID               []byte           `json:"tx_id"` // this indicates the identical inbound req
-	ToPoolAddr         common.Address   `json:"to_pool_addr"`
-	Coin               types.Coin       `json:"coin"`
-	BlockHeight        int64            `json:"block_height"`
-	OriginalHeight     int64            `json:"original_height"`
-	RoundBlockHeight   int64            `json:"round_block_height"`
-	AccNum             uint64           `json:"acc_num"`
-	AccSeq             uint64           `json:"acc_seq"`
-	PoolJoltifyAddress types.AccAddress `json:"pool_joltify_address"`
-	PoolPk             string           `json:"pool_pk"`
 }
 
 // GetInboundReqInfo returns the info of the inbound transaction
