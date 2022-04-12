@@ -118,7 +118,6 @@ func (jc *JoltifyChainInstance) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum, gasW
 	// txBuilder.SetFeeAmount(...)
 	// txBuilder.SetMemo(...)
 	// txBuilder.SetTimeoutHeight(...)
-
 	key, err := jc.Keyring.Key("operator")
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to get the operator key")
@@ -159,7 +158,7 @@ func (jc *JoltifyChainInstance) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum, gasW
 	}
 
 	signerData := xauthsigning.SignerData{
-		ChainID:       chainID,
+		ChainID:       config.ChainID,
 		AccountNumber: accNum,
 		Sequence:      accSeq,
 	}

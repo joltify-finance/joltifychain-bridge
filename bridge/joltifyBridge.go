@@ -32,8 +32,6 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
-const blockCache = 512
-
 // NewBridgeService starts the new bridge service
 func NewBridgeService(config config.Config) {
 	wg := sync.WaitGroup{}

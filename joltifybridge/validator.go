@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cenkalti/backoff"
+	"gitlab.com/joltify/joltifychain-bridge/config"
 	"time"
 
 	"gitlab.com/joltify/joltifychain-bridge/validators"
@@ -44,7 +45,8 @@ func (jc *JoltifyChainInstance) InitValidators(addr string) error {
 	if err != nil {
 		return err
 	}
-	jc.logger.Info().Msgf(">>>>>>>>>>>>>>>>node %v attached>>>>>>>>\n", nodeInfo.GetDefaultNodeInfo().Moniker)
+	config.ChainID = nodeInfo.DefaultNodeInfo.Network
+	jc.logger.Info().Msgf(">>>>>>>>>>>>>>>>node %v attached>>>>>>>> network %v \n", nodeInfo.GetDefaultNodeInfo().Moniker, nodeInfo.DefaultNodeInfo.Network)
 
 	restRes, err := rest.GetRequest(fmt.Sprintf("%s/status", addr))
 	if err != nil {

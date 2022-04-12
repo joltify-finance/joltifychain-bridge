@@ -27,10 +27,7 @@ const (
 	ROUNDBLOCK    = 50
 	submitBackoff = time.Millisecond * 500
 	GroupBlockGap = 6
-	GroupSign     = 8
 )
-
-var chainID = "joltifyChain"
 
 // tssPoolMsg this is the pool pre-submit message for the given height
 type tssPoolMsg struct {

@@ -17,6 +17,8 @@ const (
 	MINCHECKBLOCKGAP = 6
 )
 
+var ChainID = "joltifyChain-1"
+
 const (
 	InBound = iota
 	OutBound

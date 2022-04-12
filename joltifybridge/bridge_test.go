@@ -236,7 +236,6 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	acc, err := queryAccount(valAddr.String(), jc.grpcClient)
 	b.Require().NoError(err)
 
-	chainID = b.cfg.ChainID
 	// txBuilder, err := jc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
 	txBuilder, err := Gensigntx(jc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), b.network.Validators[0].ClientCtx.Keyring)
 	b.Require().NoError(err)
