@@ -401,8 +401,9 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						defer wg.Done()
 						err := joltChain.CheckTxStatus(index)
 						if err != nil {
-							zlog.Logger.Error().Err(err).Msgf("the tx has not been successfully submitted retry")
+							zlog.Logger.Error().Err(err).Msgf("the tx index(%v) has not been successfully submitted retry", index)
 							pi.AddItem(item)
+							return
 						}
 						tick := html.UnescapeString("&#" + "128229" + ";")
 						if txHash == "" {

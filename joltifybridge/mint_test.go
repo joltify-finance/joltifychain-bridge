@@ -3,6 +3,7 @@ package joltifybridge
 import (
 	"context"
 	"github.com/cosmos/cosmos-sdk/client"
+	"gitlab.com/joltify/joltifychain-bridge/config"
 	"strconv"
 	"testing"
 	"time"
@@ -34,6 +35,7 @@ type MintTestSuite struct {
 func (v *MintTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
+	config.ChainID = cfg.ChainID
 	cfg.MinGasPrices = "0stake"
 	v.validatorky = keyring.NewInMemory()
 	// now we put the mock pool list in the test
@@ -134,7 +136,7 @@ func Gensigntx(jc *JoltifyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, acc
 	}
 
 	signerData := xauthsigning.SignerData{
-		ChainID:       chainID,
+		ChainID:       config.ChainID,
 		AccountNumber: accNum,
 		Sequence:      accSeq,
 	}
@@ -210,7 +212,6 @@ func (m MintTestSuite) TestProcessInbound() {
 
 	send := banktypes.NewMsgSend(valAddr, accs[0].joltAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
-	chainID = m.cfg.ChainID
 	//txBuilder, err := jc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
 	txBuilder, err := Gensigntx(jc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), m.network.Validators[0].ClientCtx.Keyring)
 	m.Require().NoError(err)

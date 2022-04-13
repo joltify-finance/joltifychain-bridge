@@ -328,22 +328,6 @@ func (pi *Instance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64) {
 	pi.moveFundReq.Store(height, pool)
 }
 
-func (pi *Instance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
-	min := int64(math.MaxInt64)
-	pi.moveFundReq.Range(func(key, value interface{}) bool {
-		h := key.(int64)
-		if h <= min {
-			min = h
-		}
-		return true
-	})
-	if min < math.MaxInt64 {
-		item, _ := pi.moveFundReq.LoadAndDelete(min)
-		return item.(*bcommon.PoolInfo), min
-	}
-	return nil, 0
-}
-
 // PopMoveFundItemAfterBlock pop up the item after the given block duration
 func (pi *Instance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
 	min := int64(math.MaxInt64)
@@ -390,6 +374,11 @@ func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *bi
 
 	moveFund := amount.Sub(amount, totalBnbDec.BigInt())
 	moveFundS := sdk.NewDecFromBigIntWithPrec(moveFund, sdk.Precision)
+	if moveFund.Cmp(big.NewInt(0)) != 1 {
+		pi.logger.Warn().Msgf("we do not have any bnb to move")
+		return "", nil
+	}
+
 	pi.logger.Info().Msgf("we need to move %v bnb", moveFundS.String())
 
 	dustBnb, err := sdk.NewDecFromStr(config.DUSTBNB)
@@ -447,7 +436,7 @@ func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, 
 	return txHash.Hex(), nil
 }
 
-func (pi *Instance) MoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, error) {
+func (pi *Instance) doMoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, error) {
 	tokenInstance := pi.tokenInstance
 	balance, err := tokenInstance.BalanceOf(&bind.CallOpts{}, previousPool.EthAddress)
 	if err != nil {
@@ -467,7 +456,7 @@ func (pi *Instance) MoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo
 	}
 
 	tick := html.UnescapeString("&#" + "9193" + ";")
-	pi.logger.Info().Msgf(" %v we move fund from %v to %v\n", tick, previousPool.EthAddress.String(), receiver.String())
+	pi.logger.Info().Msgf(" %v we move fund bnb:%v, JUSD %v from %v to %v", tick, balanceBnB, balance, previousPool.EthAddress.String(), receiver.String())
 
 	if balance.Cmp(big.NewInt(0)) == 0 && balanceBnB.Cmp(dustBnb.BigInt()) != 1 {
 		return true, nil

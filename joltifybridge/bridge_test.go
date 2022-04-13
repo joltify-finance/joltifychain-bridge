@@ -3,6 +3,7 @@ package joltifybridge
 import (
 	"context"
 	"encoding/base64"
+	"gitlab.com/joltify/joltifychain-bridge/config"
 	"strconv"
 	"testing"
 	"time"
@@ -37,6 +38,7 @@ func (b *BridgeTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
 	cfg.MinGasPrices = "0stake"
+	config.ChainID = cfg.ChainID
 	b.validatorKey = keyring.NewInMemory()
 
 	// now we put the mock pool list in the test

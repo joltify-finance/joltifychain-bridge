@@ -133,7 +133,6 @@ func (jc *JoltifyChainInstance) CheckTxStatus(index string) error {
 
 	err := backoff.Retry(op, bf)
 	return err
-
 }
 
 func (jc *JoltifyChainInstance) doInitValidator(i info, blockHeight int64, values []*tmservice.Validator) error {

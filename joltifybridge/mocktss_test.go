@@ -3,10 +3,7 @@ package joltifybridge
 import (
 	"crypto/ecdsa"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
-	"fmt"
-
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -46,7 +43,6 @@ func (tm *TssMock) KeySign(pk string, msgs []string, blockHeight int64, signers 
 	if tm.keys != nil {
 		s, _, err := tm.keys.Sign("node0", msg)
 		signature = s
-		fmt.Printf(">>>%v\n", hex.EncodeToString(s))
 		if err != nil {
 			return keysign.Response{}, err
 		}

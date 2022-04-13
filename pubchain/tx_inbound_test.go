@@ -291,7 +291,6 @@ func generateTestChain(testTx []*ethTypes.Transaction) []*ethTypes.Block {
 		g.OffsetTime(5)
 		g.SetExtra([]byte("test"))
 		if i == 1 {
-			fmt.Printf(">>222>>%v\n", testAddr)
 			for _, el := range testTx {
 				g.AddTx(el)
 			}
@@ -299,7 +298,7 @@ func generateTestChain(testTx []*ethTypes.Transaction) []*ethTypes.Block {
 	}
 	gblock := genesis.ToBlock(db)
 	engine := ethash.NewFaker()
-	blocks, _ := core.GenerateChain(genesis.Config, gblock, engine, db, 2, generate)
+	blocks, _ := core.GenerateChain(genesis.Config, gblock, engine, db, len(testTx), generate)
 	blocks = append([]*ethTypes.Block{gblock}, blocks...)
 	return blocks
 }
@@ -542,47 +541,48 @@ func TestProcessEachBlockErc20(t *testing.T) {
 
 	method, ok := tAbi.Methods["transfer"]
 	assert.True(t, ok)
-	dataRaw, err := method.Inputs.Pack(accs[2].commAddr, big.NewInt(10))
+	//this address should be the same as the pool address as ERC20 contract definition
+	dataRaw, err := method.Inputs.Pack(accs[1].commAddr, big.NewInt(10))
 	assert.Nil(t, err)
 	// we need to put 4 leading 0 to match the format in test
 	data := append([]byte("0000"), dataRaw...)
 
-	sk, err := crypto.ToECDSA(accs[0].sk.Bytes())
-	assert.Nil(t, err)
-
-	Eip2718Tx := ethTypes.MustSignNewTx(sk, ethTypes.LatestSigner(genesis.Config), &ethTypes.LegacyTx{
+	//sk, err := crypto.ToECDSA(accs[0].sk.Bytes())
+	//assert.Nil(t, err)
+	//data = nil
+	Eip2718Tx := ethTypes.MustSignNewTx(testKey, ethTypes.LatestSigner(genesis.Config), &ethTypes.LegacyTx{
 		Nonce:    0,
 		To:       &accs[2].commAddr,
 		Value:    big.NewInt(10),
-		Gas:      5,
+		Gas:      params.CallNewAccountGas,
 		GasPrice: big.NewInt(1),
 		Data:     data,
 	})
 
 	// though to the token addr but not to the pool, so we ignore this tx
-	Eip2718TxNotPool := ethTypes.MustSignNewTx(sk, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
+	Eip2718TxNotPool := ethTypes.MustSignNewTx(testKey, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
 		Nonce:    1,
 		To:       &accs[1].commAddr,
 		Value:    big.NewInt(10),
-		Gas:      2,
+		Gas:      params.CallNewAccountGas,
 		GasPrice: big.NewInt(1),
 		Data:     data,
 	})
 
 	dataToSign := []byte("hello")
 	hash := crypto.Keccak256Hash(dataToSign)
-	signature, err := crypto.Sign(hash.Bytes(), sk)
+	signature, err := crypto.Sign(hash.Bytes(), testKey)
 	assert.Nil(t, err)
 	r := signature[:32]
 	s := signature[32:64]
 	v := signature[64:65]
 
 	// though to the token addr but not to the pool, so we ignore this tx
-	Eip2718TxGoodPass := ethTypes.MustSignNewTx(sk, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
-		Nonce:    0,
+	Eip2718TxGoodPass := ethTypes.MustSignNewTx(testKey, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
+		Nonce:    2,
 		To:       &accs[1].commAddr,
 		Value:    big.NewInt(10),
-		Gas:      2,
+		Gas:      params.CallNewAccountGas,
 		GasPrice: big.NewInt(1),
 		Data:     data,
 		R:        new(big.Int).SetBytes(r),
@@ -629,6 +629,8 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	data = append([]byte("0000"), dataRaw...)
 
 	tBlock = ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718TxGoodPass}, nil, nil, newHasher())
+
+	// we test that the tx is not to the pool
 	pi.processEachBlock(tBlock, 10)
 
 	counter = 0
@@ -636,7 +638,21 @@ func TestProcessEachBlockErc20(t *testing.T) {
 		counter += 1
 		return true
 	})
+	assert.Equal(t, counter, 0)
+
+	mockPoolInfo := vaulttypes.PoolInfo{"10", &vaulttypes.PoolProposal{accs[1].pk, accs[1].joltAddr, nil}}
+	err = pi.UpdatePool(&mockPoolInfo)
+	assert.Nil(t, err)
+	err = pi.UpdatePool(&mockPoolInfo)
+	assert.Nil(t, err)
+	pi.processEachBlock(tBlock, 10)
+	counter = 0
+	pi.pendingInbounds.Range(func(key, value interface{}) bool {
+		counter += 1
+		return true
+	})
 	assert.Equal(t, counter, 1)
+
 }
 
 func TestDeleteExpire(t *testing.T) {

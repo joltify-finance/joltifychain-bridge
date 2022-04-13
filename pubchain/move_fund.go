@@ -12,7 +12,7 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPoo
 
 	// we get the latest pool address and move funds to the latest pool
 	currentPool := pi.GetPool()
-	emptyAccount, err := pi.MoveFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight)
+	emptyAccount, err := pi.doMoveFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight)
 	if err != nil {
 		zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
 		pi.AddMoveFundItem(previousPool, pi.CurrentHeight)

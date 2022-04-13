@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"strconv"
 	"sync"
 
@@ -216,7 +215,6 @@ func (jc *JoltifyChainInstance) signTx(txConfig client.TxConfig, txBuilder clien
 			jc.logger.Error().Msgf("fail to encode the signature")
 			return signing.SignatureV2{}, err
 		}
-		fmt.Printf("11>>>%v\n", hex.EncodeToString(signature))
 
 		pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, signMsg.Pk) // nolint
 		if err != nil {

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -35,70 +34,6 @@ const (
 	GroupBlockGap     = 8
 	GroupSign         = 4
 )
-
-func (pi *Instance) AddItem(req *bcommon.InBoundReq) {
-	pi.RetryInboundReq.Store(req.Index(), req)
-}
-
-func (pi *Instance) ExportItems() []*bcommon.InBoundReq {
-	var items []*bcommon.InBoundReq
-	pi.RetryInboundReq.Range(func(_, value interface{}) bool {
-		items = append(items, value.(*bcommon.InBoundReq))
-		return true
-	})
-	return items
-}
-
-func (pi *Instance) PopItem(n int) []*bcommon.InBoundReq {
-	var allkeys []*big.Int
-	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
-		allkeys = append(allkeys, key.(*big.Int))
-		return true
-	})
-
-	sort.Slice(allkeys, func(i, j int) bool {
-		return allkeys[i].Cmp(allkeys[j]) == -1
-	})
-	indexNum := len(allkeys)
-	if indexNum == 0 {
-		return nil
-	}
-
-	returnNum := n
-	if indexNum < n {
-		returnNum = indexNum
-	}
-
-	inboundReqs := make([]*bcommon.InBoundReq, returnNum)
-
-	for i := 0; i < returnNum; i++ {
-		el, loaded := pi.RetryInboundReq.LoadAndDelete(allkeys[i])
-		if !loaded {
-			panic("should never fail")
-		}
-		inboundReqs[i] = el.(*bcommon.InBoundReq)
-	}
-
-	return inboundReqs
-}
-
-func (pi *Instance) Size() int {
-	i := 0
-	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
-		i += 1
-		return true
-	})
-	return i
-}
-
-func (pi *Instance) ShowItems() {
-	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
-		el := value.(*bcommon.InBoundReq)
-		pi.logger.Warn().Msgf("tx in the prepare pool %v:%v\n", key, el.TxID)
-		return true
-	})
-	return
-}
 
 type inboundTx struct {
 	address        sdk.AccAddress

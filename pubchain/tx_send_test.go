@@ -2,9 +2,9 @@ package pubchain
 
 import (
 	"context"
+	"encoding/hex"
 	"github.com/stretchr/testify/require"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
-
 	"math/big"
 	"sync"
 	"testing"
@@ -96,19 +96,38 @@ func TestPubChainInstance_composeTx(t *testing.T) {
 func TestSendToken(t *testing.T) {
 	accs, err := generateRandomPrivKey(2)
 	assert.Nil(t, err)
+	acc991 := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
+
+	data, err := hex.DecodeString(acc991)
+	if err != nil {
+		panic(err)
+	}
+	sk := secp256k1.PrivKey{Key: data}
+	pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, sk.PubKey())
+	if err != nil {
+		panic(err)
+	}
+
+	fromAddress, err := misc.PoolPubKeyToJoltAddress(pk)
+	if err != nil {
+		panic(err)
+	}
+	fromAddrEth, err := misc.PoolPubKeyToEthAddress(pk)
+	assert.Nil(t, err)
+
 	tss := TssMock{
-		accs[0].sk,
+		sk: &sk,
 	}
 	websocketTest := "ws://10.2.118.8:8456/"
-	tokenAddrTest := "0x0cD80A18df1C5eAd4B5Fb549391d58B06EFfDBC4"
+	tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
 	pubChain, err := NewChainInstance(websocketTest, tokenAddrTest, &tss)
 	assert.Nil(t, err)
 
 	poolInfo := vaulttypes.PoolInfo{
 		BlockHeight: "100",
 		CreatePool: &vaulttypes.PoolProposal{
-			PoolPubKey: accs[0].pk,
-			PoolAddr:   accs[0].joltAddr,
+			PoolPubKey: pk,
+			PoolAddr:   fromAddress,
 		},
 	}
 
@@ -135,8 +154,19 @@ func TestSendToken(t *testing.T) {
 	cancel()
 	wg.Wait()
 
+	// now we test send the token with wrong nonce
+	wg2 := sync.WaitGroup{}
+	nonce, err := pubChain.EthClient.PendingNonceAt(context.Background(), accs[1].commAddr)
+	assert.Nil(t, err)
+	_, err = pubChain.ProcessOutBound(&wg2, accs[0].commAddr, fromAddrEth, big.NewInt(100), int64(10), nonce)
+	wg2.Wait()
+
 	// now we test send the token
-	_, err = pubChain.ProcessOutBound(accs[0].commAddr, accs[1].commAddr, big.NewInt(100), int64(10), 0)
+	nonce, err = pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
+	assert.Nil(t, err)
+
+	_, err = pubChain.ProcessOutBound(&wg2, accs[0].commAddr, fromAddrEth, big.NewInt(100), int64(10), nonce)
+	assert.Nil(t, err)
+
 	pubChain.tssServer.Stop()
-	assert.EqualError(t, err, "insufficient funds for transfer")
 }
