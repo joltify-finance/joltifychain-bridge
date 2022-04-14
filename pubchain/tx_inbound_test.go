@@ -3,6 +3,12 @@ package pubchain
 import (
 	"encoding/hex"
 	"fmt"
+	"hash"
+	"math/big"
+	"strings"
+	"sync"
+	"testing"
+
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -11,11 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
-	"hash"
-	"math/big"
-	"strings"
-	"sync"
-	"testing"
 
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 
@@ -541,15 +542,15 @@ func TestProcessEachBlockErc20(t *testing.T) {
 
 	method, ok := tAbi.Methods["transfer"]
 	assert.True(t, ok)
-	//this address should be the same as the pool address as ERC20 contract definition
+	// this address should be the same as the pool address as ERC20 contract definition
 	dataRaw, err := method.Inputs.Pack(accs[1].commAddr, big.NewInt(10))
 	assert.Nil(t, err)
 	// we need to put 4 leading 0 to match the format in test
 	data := append([]byte("0000"), dataRaw...)
 
-	//sk, err := crypto.ToECDSA(accs[0].sk.Bytes())
-	//assert.Nil(t, err)
-	//data = nil
+	// sk, err := crypto.ToECDSA(accs[0].sk.Bytes())
+	// assert.Nil(t, err)
+	// data = nil
 	Eip2718Tx := ethTypes.MustSignNewTx(testKey, ethTypes.LatestSigner(genesis.Config), &ethTypes.LegacyTx{
 		Nonce:    0,
 		To:       &accs[2].commAddr,
@@ -608,7 +609,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	pi.processEachBlock(tBlock, 10)
 	counter := 0
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
-		counter += 1
+		counter++
 		return true
 	})
 	assert.Equal(t, counter, 0)
@@ -617,16 +618,16 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	pi.processEachBlock(tBlock, 10)
 	counter = 0
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
-		counter += 1
+		counter++
 		return true
 	})
 	assert.Equal(t, counter, 0)
 
-	dataRaw, err = method.Inputs.Pack(accs[0].commAddr, big.NewInt(10))
-	assert.Nil(t, err)
+	// dataRaw, err = method.Inputs.Pack(accs[0].commAddr, big.NewInt(10))
+	// assert.Nil(t, err)
 
 	// we need to put 4 leading 0 to match the format in test
-	data = append([]byte("0000"), dataRaw...)
+	// data = append([]byte("0000"), dataRaw...)
 
 	tBlock = ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718TxGoodPass}, nil, nil, newHasher())
 
@@ -635,12 +636,12 @@ func TestProcessEachBlockErc20(t *testing.T) {
 
 	counter = 0
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
-		counter += 1
+		counter++
 		return true
 	})
 	assert.Equal(t, counter, 0)
 
-	mockPoolInfo := vaulttypes.PoolInfo{"10", &vaulttypes.PoolProposal{accs[1].pk, accs[1].joltAddr, nil}}
+	mockPoolInfo := vaulttypes.PoolInfo{BlockHeight: "10", CreatePool: &vaulttypes.PoolProposal{PoolPubKey: accs[1].pk, PoolAddr: accs[1].joltAddr}}
 	err = pi.UpdatePool(&mockPoolInfo)
 	assert.Nil(t, err)
 	err = pi.UpdatePool(&mockPoolInfo)
@@ -648,11 +649,10 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	pi.processEachBlock(tBlock, 10)
 	counter = 0
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
-		counter += 1
+		counter++
 		return true
 	})
 	assert.Equal(t, counter, 1)
-
 }
 
 func TestDeleteExpire(t *testing.T) {
@@ -854,17 +854,18 @@ func TestProcessBlockFeeAhead(t *testing.T) {
 	}
 
 	pi.pendingInboundsBnB.Store(hex.EncodeToString([]byte("test1")), &bnbTx)
-	pi.processInboundTx(hex.EncodeToString([]byte("test1")), uint64(10), accs[1].joltAddr, accs[2].commAddr, big.NewInt(11), accs[0].commAddr)
+	err = pi.processInboundTx(hex.EncodeToString([]byte("test1")), uint64(10), accs[1].joltAddr, accs[2].commAddr, big.NewInt(11), accs[0].commAddr)
+	assert.NoError(t, err)
 
 	counter := 0
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
-		counter += 1
+		counter++
 		return true
 	})
 
 	counter2 := 0
 	pi.pendingInboundsBnB.Range(func(key, value interface{}) bool {
-		counter2 += 1
+		counter2++
 		return true
 	})
 
@@ -879,18 +880,19 @@ func TestProcessBlockFeeAhead(t *testing.T) {
 	}
 
 	pi.pendingInboundsBnB.Store(hex.EncodeToString([]byte("test2")), &bnbTx2)
-	pi.processInboundTx(hex.EncodeToString([]byte("test2")), uint64(10), accs[1].joltAddr, accs[2].commAddr, big.NewInt(11), accs[0].commAddr)
+	err = pi.processInboundTx(hex.EncodeToString([]byte("test2")), uint64(10), accs[1].joltAddr, accs[2].commAddr, big.NewInt(11), accs[0].commAddr)
+	assert.NoError(t, err)
 
 	counter = 0
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
-		counter += 1
+		counter++
 		return true
 	})
 	assert.Equal(t, 0, counter)
 
 	counter2 = 0
 	pi.pendingInboundsBnB.Range(func(key, value interface{}) bool {
-		counter2 += 1
+		counter2++
 		return true
 	})
 

@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	retryCacheSize    = 128
 	inboundprosSize   = 512
 	sbchannelsize     = 20000
 	chainQueryTimeout = time.Second * 15

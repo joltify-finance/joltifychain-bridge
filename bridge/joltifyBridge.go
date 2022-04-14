@@ -29,7 +29,7 @@ import (
 
 	zlog "github.com/rs/zerolog/log"
 
-	tmtypes "github.com/tendermint/tendermint/types"
+	"github.com/tendermint/tendermint/types"
 )
 
 // NewBridgeService starts the new bridge service
@@ -214,7 +214,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				if err != nil {
 					continue
 				}
-				validatorUpdates := vals.Data.(tmtypes.EventDataValidatorSetUpdates).ValidatorUpdates
+				validatorUpdates := vals.Data.(types.EventDataValidatorSetUpdates).ValidatorUpdates
 				err = joltChain.HandleUpdateValidators(validatorUpdates, height)
 				if err != nil {
 					fmt.Printf("error in handle update validator")
@@ -223,7 +223,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 			// process the new joltify block, validator may need to submit the pool address
 			case block := <-newJoltifyBlock:
-				currentBlockHeight := block.Data.(tmtypes.EventDataNewBlock).Block.Height
+				currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
 				ok, _ := joltChain.CheckAndUpdatePool(currentBlockHeight)
 				if !ok {
 					// it is okay to fail to submit a pool address as other nodes can submit, as long as 2/3 nodes submit, it is fine.
@@ -238,8 +238,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				} else {
 					previousBlock := currentBlock[0]
 					currentBlock[0] = &block
-					preBlockHeight := previousBlock.Data.(tmtypes.EventDataNewBlock).Block.Height
-					for _, el := range previousBlock.Data.(tmtypes.EventDataNewBlock).Block.Txs {
+					preBlockHeight := previousBlock.Data.(types.EventDataNewBlock).Block.Height
+					for _, el := range previousBlock.Data.(types.EventDataNewBlock).Block.Txs {
 						joltChain.CheckOutBoundTx(preBlockHeight, el)
 					}
 				}

@@ -3,7 +3,7 @@ package pubchain
 import (
 	"encoding/hex"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	"github.com/stretchr/testify/suite"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
@@ -35,7 +35,7 @@ func (tn *TestNetTestSuite) SetupSuite() {
 		panic(err)
 	}
 	sk := secp256k1.PrivKey{Key: data}
-	pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, sk.PubKey())
+	pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, sk.PubKey()) //nolint
 	if err != nil {
 		panic(err)
 	}
@@ -47,7 +47,7 @@ func (tn *TestNetTestSuite) SetupSuite() {
 		panic(err)
 	}
 	sk2 := secp256k1.PrivKey{Key: data}
-	pk2, err := legacybech32.MarshalPubKey(legacybech32.AccPK, sk2.PubKey())
+	pk2, err := legacybech32.MarshalPubKey(legacybech32.AccPK, sk2.PubKey()) //nolint
 	if err != nil {
 		panic(err)
 	}
@@ -105,24 +105,6 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 		JoltifyAddress: ja2,
 		EthAddress:     ea2,
 	}
-	_ = pool2
-	_ = pool
-	//_, err = tn.pubChain.doMoveFunds(&wg, &pool, ea2, 100)
-	//tn.Require().NoError(err)
-	//time.Sleep(time.Second * 10)
-	//_, err = tn.pubChain.doMoveFunds(&wg, &pool, ea2, 101)
-	//tn.Require().NoError(err)
-	//// we transfer the money back
-	//tn.pubChain.tssServer = &TssMock{sk: tn.sk2}
-	//
-	//time.Sleep(time.Second * 10)
-	//_, err = tn.pubChain.doMoveFunds(&wg, &pool2, ea, 100)
-	//tn.Require().NoError(err)
-	//time.Sleep(time.Second * 10)
-	//_, err = tn.pubChain.doMoveFunds(&wg, &pool2, ea, 101)
-	//tn.Require().NoError(err)
-	//
-	//wg.Wait()
 
 	poolInfo1 := vaulttypes.PoolInfo{
 		BlockHeight: "100",
@@ -140,8 +122,10 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 		},
 	}
 
-	tn.pubChain.UpdatePool(&poolInfo2)
-	tn.pubChain.UpdatePool(&poolInfo2)
+	err = tn.pubChain.UpdatePool(&poolInfo2)
+	tn.Require().NoError(err)
+	err = tn.pubChain.UpdatePool(&poolInfo2)
+	tn.Require().NoError(err)
 
 	ret := tn.pubChain.MoveFound(&wg, 100, &pool)
 	time.Sleep(time.Second * 10)
@@ -155,8 +139,10 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	tn.Require().True(ret)
 
 	tn.pubChain.tssServer = &TssMock{sk: tn.sk2}
-	tn.pubChain.UpdatePool(&poolInfo1)
-	tn.pubChain.UpdatePool(&poolInfo1)
+	err = tn.pubChain.UpdatePool(&poolInfo1)
+	tn.Require().NoError(err)
+	err = tn.pubChain.UpdatePool(&poolInfo1)
+	tn.Require().NoError(err)
 
 	ret = tn.pubChain.MoveFound(&wg, 100, &pool2)
 	time.Sleep(time.Second * 10)

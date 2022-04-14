@@ -6,9 +6,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/suite"
 	"gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
-	. "gopkg.in/check.v1"
 	"math/rand"
 	"os"
 	"path"
@@ -16,13 +16,9 @@ import (
 	"time"
 )
 
-type FileStateMgrTestSuite struct{}
+type FileStateMgrTestSuite struct{ suite.Suite }
 
-var _ = Suite(&FileStateMgrTestSuite{})
-
-func TestPackage(t *testing.T) { TestingT(t) }
-
-func (s *FileStateMgrTestSuite) SetUpTest(c *C) {
+func (s *FileStateMgrTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 }
 
@@ -61,78 +57,82 @@ func createdTestInBoundReqs(n int) []*common.InBoundReq {
 	return retReq
 }
 
-func (s *FileStateMgrTestSuite) TestSaveOutBoundState(c *C) {
+func (s *FileStateMgrTestSuite) TestSaveOutBoundState() {
 	folder := os.TempDir()
 	fileName := path.Join(folder, "outboundtx.dat")
 	defer func() {
 		err := os.RemoveAll(fileName)
-		c.Assert(err, IsNil)
+		s.Require().NoError(err)
 	}()
 	fsm := NewTxStateMgr(folder)
-	c.Assert(fsm, NotNil)
+	s.Require().NotNil(fsm)
 
 	testReqs := createdTestOutBoundReqs(100)
 
 	err := fsm.SaveOutBoundState(testReqs[:50])
-	c.Assert(err, IsNil)
+	s.Require().NoError(err)
 
 	loaded, err := fsm.LoadOutBoundState()
-	c.Assert(err, IsNil)
+	s.Require().NoError(err)
 
 	for i := 0; i < 50; i++ {
 		loadedTx := loaded[i].TxID
 		expectedTx := testReqs[i].TxID
-		c.Assert(loadedTx, Equals, expectedTx)
+		s.Require().Equal(expectedTx, loadedTx)
 	}
 
 	err = fsm.SaveOutBoundState(testReqs[50:])
-	c.Assert(err, IsNil)
+	s.Require().NoError(err)
 
 	loaded, err = fsm.LoadOutBoundState()
-	c.Assert(err, IsNil)
+	s.Require().NoError(err)
 
 	for i := 0; i < 50; i++ {
 		loadedTx := loaded[i].TxID
 		expectedTx := testReqs[50+i].TxID
-		c.Assert(loadedTx, Equals, expectedTx)
+		s.Require().Equal(expectedTx, loadedTx)
 	}
 
 }
 
-func (s *FileStateMgrTestSuite) TestSaveInBoundState(c *C) {
+func (s *FileStateMgrTestSuite) TestSaveInBoundState() {
 	folder := os.TempDir()
 	fileName := path.Join(folder, "inboundtx.dat")
 	defer func() {
 		err := os.RemoveAll(fileName)
-		c.Assert(err, IsNil)
+		s.Require().NoError(err)
 	}()
 	fsm := NewTxStateMgr(folder)
-	c.Assert(fsm, NotNil)
+	s.Require().NotNil(fsm)
 
 	testReqs := createdTestInBoundReqs(100)
 
 	err := fsm.SaveInBoundState(testReqs[:50])
-	c.Assert(err, IsNil)
+	s.Require().NoError(err)
 
-	loaded, err := fsm.LoadInBoundState()
-	c.Assert(err, IsNil)
+	loaded, _ := fsm.LoadInBoundState()
+	s.Require().NotNil(loaded)
 
 	for i := 0; i < 50; i++ {
 		loadedTx := loaded[i].TxID
 		expectedTx := testReqs[i].TxID
-		c.Assert(bytes.Equal(loadedTx, expectedTx), Equals, true)
+		s.Require().True(bytes.Equal(loadedTx, expectedTx))
 	}
 
 	err = fsm.SaveInBoundState(testReqs[50:])
-	c.Assert(err, IsNil)
+	s.Require().NoError(err)
 
 	loaded, err = fsm.LoadInBoundState()
-	c.Assert(err, IsNil)
+	s.Require().NoError(err)
 
 	for i := 0; i < 50; i++ {
 		loadedTx := loaded[i].TxID
 		expectedTx := testReqs[50+i].TxID
-		c.Assert(bytes.Equal(loadedTx, expectedTx), Equals, true)
+		s.Require().True(bytes.Equal(loadedTx, expectedTx))
 	}
 
+}
+
+func TestEvent(t *testing.T) {
+	suite.Run(t, new(FileStateMgrTestSuite))
 }

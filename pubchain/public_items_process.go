@@ -1,9 +1,10 @@
 package pubchain
 
 import (
-	"gitlab.com/joltify/joltifychain-bridge/common"
 	"math/big"
 	"sort"
+
+	"gitlab.com/joltify/joltifychain-bridge/common"
 )
 
 func (pi *Instance) AddItem(req *common.InBoundReq) {
@@ -55,17 +56,8 @@ func (pi *Instance) PopItem(n int) []*common.InBoundReq {
 func (pi *Instance) Size() int {
 	i := 0
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
-		i += 1
+		i++
 		return true
 	})
 	return i
-}
-
-func (pi *Instance) ShowItems() {
-	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
-		el := value.(*common.InBoundReq)
-		pi.logger.Warn().Msgf("tx in the prepare pool %v:%v\n", key, el.TxID)
-		return true
-	})
-	return
 }

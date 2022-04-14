@@ -22,8 +22,8 @@ test-watch: clear
 	@gow -c test -tags testnet -mod=readonly ./...
 
 lint-pre:
-	@gofumpt -l cmd common keygen keysign messages p2p storage tss # for display
-	@test -z "$(shell gofumpt -l cmd common keygen keysign messages p2p storage tss)" # cause error
+	@gofumpt -l  cmd config joltifybridge monitor storage validators bridge common misc pubchain tssclient
+	#@test -z "$(shell gofumpt -l  cmd config joltifybridge monitor storage validators bridge common misc pubchain tssclient)" # cause error
 	@go mod verify
 
 lint: lint-pre

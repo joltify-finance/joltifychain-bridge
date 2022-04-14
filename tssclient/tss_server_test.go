@@ -6,12 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/joltify-finance/tss/keygen"
-	"github.com/joltify-finance/tss/keysign"
-	maddr "github.com/multiformats/go-multiaddr"
-	"github.com/rs/zerolog"
-	"gitlab.com/joltify/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
 	"io"
 	"os"
 	"path"
@@ -20,30 +14,34 @@ import (
 	"testing"
 	"time"
 
-	btsskeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
+	"github.com/joltify-finance/tss/keygen"
+	"github.com/joltify-finance/tss/keysign"
+	maddr "github.com/multiformats/go-multiaddr"
+	"github.com/rs/zerolog"
+	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
+
 	. "gopkg.in/check.v1"
 )
 
 const (
 	partyNum         = 4
 	testFileLocation = "../tss_test_data"
-	preParamTestFile = "preParam_test.data"
 )
 
-var testPubKeys = []string{"joltpub1zcjduepqfa9cy9w6sn5wkzfm0zm25e7u9nag55ev4vmasqp7xxhlj78xz7kq2zcl6h",
+var testPubKeys = []string{
+	"joltpub1zcjduepqfa9cy9w6sn5wkzfm0zm25e7u9nag55ev4vmasqp7xxhlj78xz7kq2zcl6h",
 	"joltpub1zcjduepqv4p9n26ss3djrnvwufjrs6v8gg5tr2fqpjv3av4n6tx4efclp2tqfxv5nm",
 	"joltpub1zcjduepq8sysqavl67rtytlezccjkq4dvnewtscnlck3ku5uac46rggkfe8qdwyv3u",
-	"joltpub1zcjduepqaxxpz2kfr939dlyhdvuhqvmg2rkv8enls663uegnfqaghp9tr32szlgtm2"}
+	"joltpub1zcjduepqaxxpz2kfr939dlyhdvuhqvmg2rkv8enls663uegnfqaghp9tr32szlgtm2",
+}
 
 func TestPackage(t *testing.T) {
 	TestingT(t)
 }
 
 type FourNodeTestSuite struct {
-	servers       []*BridgeTssServer
-	ports         []int
-	preParams     []*btsskeygen.LocalPreParams
-	bootstrapPeer string
+	servers []*BridgeTssServer
 }
 
 var _ = Suite(&FourNodeTestSuite{})
@@ -210,7 +208,6 @@ func copy(src, dst string) (int64, error) {
 }
 
 func (s *FourNodeTestSuite) getTssServer(c *C, index int, conf config.TssConfig) *BridgeTssServer {
-
 	baseHome := path.Join(os.TempDir(), "4nodes_test", strconv.Itoa(index))
 	if _, err := os.Stat(baseHome); os.IsNotExist(err) {
 		err := os.MkdirAll(baseHome, os.ModePerm)
@@ -233,7 +230,7 @@ func (s *FourNodeTestSuite) getTssServer(c *C, index int, conf config.TssConfig)
 	}
 
 	instance, _, err := StartTssServer(baseHome, conf)
-	//instance, err := NewTss(peerIDs, s.ports[index], priKey, "Asgard", baseHome, conf, s.preParams[index], "")
+	// instance, err := NewTss(peerIDs, s.ports[index], priKey, "Asgard", baseHome, conf, s.preParams[index], "")
 	c.Assert(err, IsNil)
 	str := instance.GetTssNodeID()
 	if len(str) == 0 {

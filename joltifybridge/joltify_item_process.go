@@ -1,11 +1,12 @@
 package joltifybridge
 
 import (
+	"math/big"
+	"sort"
+
 	"github.com/ethereum/go-ethereum/common/math"
 	"gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/config"
-	"math/big"
-	"sort"
 )
 
 func (jc *JoltifyChainInstance) AddMoveFundItem(pool *common.PoolInfo, height int64) {
@@ -51,10 +52,7 @@ func (jc *JoltifyChainInstance) PopItem(n int) []*common.OutBoundReq {
 	})
 
 	sort.Slice(allkeys, func(i, j int) bool {
-		if allkeys[i].Cmp(allkeys[j]) == -1 {
-			return true
-		}
-		return false
+		return allkeys[i].Cmp(allkeys[j]) == -1
 	})
 	indexNum := len(allkeys)
 	if indexNum == 0 {

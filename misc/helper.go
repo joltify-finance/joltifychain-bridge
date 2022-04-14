@@ -7,7 +7,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/joltify-finance/tss/keysign"
@@ -24,7 +24,7 @@ func SetupBech32Prefix() {
 
 // PoolPubKeyToJoltAddress return the jolt encoded pubkey
 func PoolPubKeyToJoltAddress(pk string) (types.AccAddress, error) {
-	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk)
+	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) //nolint
 	if err != nil {
 		return types.AccAddress{}, err
 	}
@@ -34,7 +34,7 @@ func PoolPubKeyToJoltAddress(pk string) (types.AccAddress, error) {
 
 // PoolPubKeyToEthAddress export the joltify pubkey to the ETH format address
 func PoolPubKeyToEthAddress(pk string) (common.Address, error) {
-	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk)
+	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) //nolint
 	if err != nil {
 		return common.Address{}, err
 	}

@@ -462,20 +462,20 @@ func (pi *Instance) doMoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolIn
 		return true, nil
 	}
 
-	var erc20TxHash, bnbTxHash string
+	var bnbTxHash string
 	if balance.Cmp(big.NewInt(0)) == 1 {
-		erc20TxHash, err = pi.moveERC20Token(wg, previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight)
+		erc20TxHash, err := pi.moveERC20Token(wg, previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight)
 		// if we fail erc20 token transfer, we should not transfer the bnb otherwise,we do not have enough fee to pay retry
 		if err != nil {
 			return false, errors.New("fail to transfer erc20 token")
-		} else {
-			// next round, we will handle bnb transfer
-			return false, nil
 		}
-	} else {
-		pi.logger.Warn().Msg("0 ERC20 balance do not need to move as")
-	}
+		tick = html.UnescapeString("&#" + "127974" + ";")
+		zlog.Logger.Info().Msgf(" %v we have moved the erc20 %v with hash %v", tick, balance.String(), erc20TxHash)
+		// next round, we will handle bnb transfer
+		return false, nil
 
+	}
+	pi.logger.Warn().Msg("0 ERC20 balance do not need to move")
 	// now we move the bnb
 
 	if balanceBnB.Cmp(big.NewInt(0)) == 1 {
@@ -491,7 +491,7 @@ func (pi *Instance) doMoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolIn
 	}
 
 	tick = html.UnescapeString("&#" + "127974" + ";")
-	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain with tx (ERC20): %v, (BNB): %v", tick, erc20TxHash, bnbTxHash)
+	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain (BNB): %v with hash %v", tick, bnbTxHash, balanceBnB.String())
 
 	return false, nil
 }

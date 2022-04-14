@@ -2,11 +2,14 @@ package joltifybridge
 
 import (
 	"context"
+	"strconv"
+	"testing"
+
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	"github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/suite"
@@ -15,8 +18,6 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 	"gitlab.com/joltify/joltifychain/testutil/network"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
-	"strconv"
-	"testing"
 )
 
 type MoveFundTestSuite struct {
@@ -111,7 +112,8 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 			jc.logger.Error().Err(err2).Msgf("fail to terminate the bridge")
 		}
 	}()
-	m.network.WaitForNextBlock()
+	err = m.network.WaitForNextBlock()
+	m.Require().NoError(err)
 
 	// we need to add this as it seems the rpcaddress is incorrect
 	jc.grpcClient = m.network.Validators[0].ClientCtx
@@ -165,5 +167,4 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 	// we are not the sisnger
 	ret = jc.MoveFound(300, accs[0].joltAddr)
 	m.Require().True(ret)
-
 }
