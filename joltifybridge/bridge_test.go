@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain/app"
+	"os"
+	"path"
 	"strconv"
 	"testing"
 	"time"
@@ -40,7 +43,13 @@ func (b *BridgeTestSuite) SetupSuite() {
 	cfg.MinGasPrices = "0stake"
 	config.ChainID = cfg.ChainID
 	b.validatorKey = keyring.NewInMemory()
+	current, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
 
+	homePath := path.Join(current, "../test_data/chain_config")
+	app.DefaultNodeHome = homePath
 	// now we put the mock pool list in the test
 	state := vaulttypes.GenesisState{}
 	stateStaking := stakingtypes.GenesisState{}
@@ -72,7 +81,6 @@ func (b *BridgeTestSuite) SetupSuite() {
 		Index: "testindex",
 	}
 	state.IssueTokenList = append(state.IssueTokenList, &testToken)
-
 	buf, err := cfg.Codec.MarshalJSON(&state)
 	b.Require().NoError(err)
 	cfg.GenesisState[vaulttypes.ModuleName] = buf
@@ -84,7 +92,6 @@ func (b *BridgeTestSuite) SetupSuite() {
 	buf, err = cfg.Codec.MarshalJSON(&stateVault)
 	b.Require().NoError(err)
 	cfg.GenesisState[stakingtypes.ModuleName] = buf
-
 	b.network = network.New(b.T(), cfg)
 	b.cfg = cfg
 

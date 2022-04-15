@@ -26,7 +26,7 @@ import (
 
 const (
 	partyNum         = 4
-	testFileLocation = "../tss_test_data"
+	testFileLocation = "../test_data"
 )
 
 var testPubKeys = []string{

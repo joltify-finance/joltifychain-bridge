@@ -1,0 +1,12 @@
+version: 0.2.0
+active_block_height: 10000
+mint:
+  minter:
+    annual_provisions: "0.000000000000000000"
+    inflation: "0.130000000000000000"
+  params:
+    blocks_per_year: "6311520"
+    goal_bonded: "0.570000000000000000"
+    inflation_max: "0.200000000000000000"
+    inflation_min: "0.070000000000000000"
+    inflation_rate_change: "0.130000000000000000"

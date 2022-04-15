@@ -39,7 +39,6 @@ func (jc *JoltifyChainInstance) FeedTx(lastPoolInfo *vaulttypes.PoolInfo, pi *pu
 			continue
 		}
 
-		zlog.Info().Msgf("the round block height is %v", roundBlockHeight)
 		el.SetAccountInfoAndHeight(accNum, accSeq, address, poolPubkey, roundBlockHeight)
 		accSeq += 1
 		pi.InboundReqChan <- el

@@ -159,7 +159,7 @@ func TestSendToken(t *testing.T) {
 
 	// now we test send the token with wrong nonce
 	wg2 := sync.WaitGroup{}
-	nonce, err := pubChain.EthClient.PendingNonceAt(context.Background(), accs[1].commAddr)
+	nonce, err := pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
 	assert.Nil(t, err)
 	_, err = pubChain.ProcessOutBound(&wg2, accs[0].commAddr, fromAddrEth, big.NewInt(100), int64(10), nonce)
 	assert.Nil(t, err)
