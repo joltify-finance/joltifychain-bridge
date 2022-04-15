@@ -223,7 +223,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 			// process the new joltify block, validator may need to submit the pool address
 			case block := <-newJoltifyBlock:
-				currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
+				//currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
+				currentBlockHeight, err := joltChain.GetLastBlockHeight()
+				if err != nil {
+					zlog.Error().Err(err).Msgf("fail to get the last block skip this round")
+					continue
+				}
 				ok, _ := joltChain.CheckAndUpdatePool(currentBlockHeight)
 				if !ok {
 					// it is okay to fail to submit a pool address as other nodes can submit, as long as 2/3 nodes submit, it is fine.
