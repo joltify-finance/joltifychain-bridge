@@ -338,7 +338,7 @@ func (jc *JoltifyChainInstance) GetGasEstimation() int64 {
 	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO)).RoundInt64()
 	_ = gasWanted
 	// todo we need to get the gas dynamically in future, if different node get different fee, tss will fail
-	return 2500000
+	return 5000000
 }
 
 // BroadcastTx broadcast the tx to the joltifyChain
