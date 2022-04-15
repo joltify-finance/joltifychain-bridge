@@ -2,16 +2,17 @@ package pubchain
 
 import (
 	"encoding/hex"
+	"math/big"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	"github.com/stretchr/testify/suite"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
-	"math/big"
-	"sync"
-	"testing"
-	"time"
 )
 
 type TestNetTestSuite struct {
@@ -25,7 +26,7 @@ type TestNetTestSuite struct {
 
 func (tn *TestNetTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
-	websocketTest := "ws://10.2.118.8:8456/"
+	websocketTest := "ws://rpc.joltify.io:8456/"
 	tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
 
 	a1 := "c225ac7cf268405670c004e0b8f6b7df5fefb80f3505aaf9619ea89c787a67e7"
@@ -62,17 +63,14 @@ func (tn *TestNetTestSuite) SetupSuite() {
 	}
 
 	tn.pubChain = pubChain
-
 }
 
 func (tn TestNetTestSuite) TestProcessNewBlock() {
-
 	err := tn.pubChain.ProcessNewBlock(big.NewInt(18427951), 100)
 	tn.Require().NoError(err)
 }
 
 func (tn TestNetTestSuite) TestCheckTxStatus() {
-
 	goodTx := "0xf579e87bbeba30dda2a183e9df0dde41df7f980bea861a340546b06ff17110d9"
 	err := tn.pubChain.CheckTxStatus(goodTx)
 	tn.Require().NoError(err)
@@ -82,7 +80,6 @@ func (tn TestNetTestSuite) TestCheckTxStatus() {
 }
 
 func (tn TestNetTestSuite) TestDoMoveFund() {
-
 	wg := sync.WaitGroup{}
 	ja, err := misc.PoolPubKeyToJoltAddress(tn.pk1)
 	tn.Require().NoError(err)

@@ -9,7 +9,7 @@ import (
 )
 
 func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string) (*vaulttypes.MsgCreateIssueToken, error) {
-	userAddr, _, coin, _ := item.GetInboundReqInfo()
+	userAddr, _, coin, _, _ := item.GetInboundReqInfo()
 
 	a, err := vaulttypes.NewMsgCreateIssueToken(creatorAddr, index, coin.String(), userAddr.String())
 	if err != nil {
@@ -36,12 +36,12 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *common.InBoundReq) (string,
 		return "", "", err
 	}
 
-	_, _, _, height := item.GetInboundReqInfo()
-	jc.logger.Info().Msgf("we do the top up for %v at height %v", issueReq.Receiver.String(), height)
+	_, _, _, _, roundBlockHeight := item.GetInboundReqInfo()
+	jc.logger.Info().Msgf("we do the top up for %v at height %v", issueReq.Receiver.String(), roundBlockHeight)
 	signMsg := tssclient.TssSignigMsg{
 		Pk:          poolPk,
 		Signers:     nil,
-		BlockHeight: height,
+		BlockHeight: roundBlockHeight,
 		Version:     tssclient.TssVersion,
 	}
 

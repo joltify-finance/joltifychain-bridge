@@ -122,7 +122,7 @@ func TestSendToken(t *testing.T) {
 	tss := TssMock{
 		sk: &sk,
 	}
-	websocketTest := "ws://10.2.118.8:8456/"
+	websocketTest := "ws://rpc.joltify.io:8456/"
 	tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
 	pubChain, err := NewChainInstance(websocketTest, tokenAddrTest, &tss)
 	assert.Nil(t, err)

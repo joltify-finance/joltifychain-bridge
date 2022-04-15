@@ -2,13 +2,14 @@ package common
 
 import (
 	"fmt"
+	"math/rand"
+	"testing"
+	"time"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
-	"math/rand"
-	"testing"
-	"time"
 )
 
 func createdTestOutBoundReqs(n int) []*OutBoundReq {
@@ -61,11 +62,10 @@ func TestInBoundTx(t *testing.T) {
 	outboundreqs := createdTestInBoundReqs(2)
 	index := outboundreqs[0].Index()
 	assert.NotNil(t, index)
-	outboundreqs[0].SetAccountInfo(2, 100, outboundreqs[1].PoolJoltifyAddress, "123")
+	outboundreqs[0].SetAccountInfoAndHeight(2, 100, outboundreqs[1].PoolJoltifyAddress, "123", 100)
 	seq, num, _, _ := outboundreqs[0].GetAccountInfo()
 	assert.Equal(t, seq, uint64(100))
 	assert.Equal(t, num, uint64(2))
-	outboundreqs[0].SetItemHeight(100)
-	_, _, _, blockHeight := outboundreqs[0].GetInboundReqInfo()
+	_, _, _, _, blockHeight := outboundreqs[0].GetInboundReqInfo()
 	assert.Equal(t, blockHeight, int64(100))
 }

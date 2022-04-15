@@ -214,7 +214,10 @@ func (s *FourNodeTestSuite) getTssServer(c *C, index int, conf config.TssConfig)
 		c.Assert(err, IsNil)
 	}
 
-	src := path.Join(testFileLocation, "keys", strconv.Itoa(index), "priv_validator_key.json")
+	p2, err1 := os.Getwd()
+	c.Assert(err1, IsNil)
+
+	src := path.Join(p2, testFileLocation, "keys", strconv.Itoa(index), "priv_validator_key.json")
 	dst := path.Join(baseHome, "priv_validator_key.json")
 
 	_, err := copy(src, dst)

@@ -2,11 +2,12 @@ package joltifybridge
 
 import (
 	"context"
-	"github.com/cosmos/cosmos-sdk/client"
-	"gitlab.com/joltify/joltifychain-bridge/config"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/cosmos/cosmos-sdk/client"
+	"gitlab.com/joltify/joltifychain-bridge/config"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -208,11 +209,11 @@ func (m MintTestSuite) TestProcessInbound() {
 	m.Require().NoError(err)
 	tx := common.NewAccountInboundReq(valAddr, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100), int64(100))
 
-	tx.SetAccountInfo(0, 0, accs[0].joltAddr, accs[0].pk)
+	tx.SetAccountInfoAndHeight(0, 0, accs[0].joltAddr, accs[0].pk, 0)
 
 	send := banktypes.NewMsgSend(valAddr, accs[0].joltAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
-	//txBuilder, err := jc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
+	// txBuilder, err := jc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
 	txBuilder, err := Gensigntx(jc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), m.network.Validators[0].ClientCtx.Keyring)
 	m.Require().NoError(err)
 	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())

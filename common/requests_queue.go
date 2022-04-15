@@ -89,21 +89,17 @@ func NewAccountInboundReq(address types.AccAddress, toPoolAddr common.Address, c
 }
 
 // GetInboundReqInfo returns the info of the inbound transaction
-func (acq *InBoundReq) GetInboundReqInfo() (types.AccAddress, common.Address, types.Coin, int64) {
-	return acq.Address, acq.ToPoolAddr, acq.Coin, acq.BlockHeight
+func (acq *InBoundReq) GetInboundReqInfo() (types.AccAddress, common.Address, types.Coin, int64, int64) {
+	return acq.Address, acq.ToPoolAddr, acq.Coin, acq.BlockHeight, acq.RoundBlockHeight
 }
 
-// SetItemHeight sets the block height of the tx
-func (acq *InBoundReq) SetItemHeight(blockHeight int64) {
-	acq.BlockHeight = blockHeight
-}
-
-// SetAccountInfo sets the block height of the tx
-func (acq *InBoundReq) SetAccountInfo(number, seq uint64, address types.AccAddress, pk string) {
+// SetAccountInfoAndHeight sets the block height of the tx
+func (acq *InBoundReq) SetAccountInfoAndHeight(number, seq uint64, address types.AccAddress, pk string, roundBlockHeight int64) {
 	acq.AccNum = number
 	acq.AccSeq = seq
 	acq.PoolJoltifyAddress = address
 	acq.PoolPk = pk
+	acq.RoundBlockHeight = roundBlockHeight
 }
 
 // GetAccountInfo returns the account number and seq
