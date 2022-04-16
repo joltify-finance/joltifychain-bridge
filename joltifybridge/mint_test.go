@@ -231,7 +231,7 @@ func (m MintTestSuite) TestProcessInbound() {
 	jc.lastTwoPools[0] = &pool
 	jc.lastTwoPools[1] = &pool
 
-	_, _, err = jc.ProcessInBound(&tx)
+	_, _, _, err = jc.ProcessInBound(&tx)
 	m.Require().Error(err)
 }
 

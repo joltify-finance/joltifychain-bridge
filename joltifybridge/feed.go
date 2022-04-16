@@ -2,14 +2,14 @@ package joltifybridge
 
 import (
 	"errors"
+
 	zlog "github.com/rs/zerolog/log"
 	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 )
 
-//FeedTx feed the tx with the given
+// FeedTx feed the tx with the given
 func (jc *JoltifyChainInstance) FeedTx(lastPoolInfo *vaulttypes.PoolInfo, pi *pubchain.Instance, currentBlockHeight int64) error {
-
 	// we always increase the account seq regardless the tx successful or not
 	currentPool := lastPoolInfo.CreatePool.PoolAddr
 	acc, err := queryAccount(currentPool.String(), jc.grpcClient)
@@ -40,7 +40,7 @@ func (jc *JoltifyChainInstance) FeedTx(lastPoolInfo *vaulttypes.PoolInfo, pi *pu
 		}
 
 		el.SetAccountInfoAndHeight(accNum, accSeq, address, poolPubkey, roundBlockHeight)
-		accSeq += 1
+		accSeq++
 		pi.InboundReqChan <- el
 	}
 	return nil

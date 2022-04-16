@@ -119,7 +119,7 @@ func NewBridgeService(config config.Config) {
 	}
 
 	fsm := storage.NewTxStateMgr(config.HomeDir)
-	//now we load the existing outbound requests
+	// now we load the existing outbound requests
 	items, err := fsm.LoadOutBoundState()
 	if err != nil {
 		fmt.Printf("we do not need to have the items to be loaded")
@@ -131,7 +131,7 @@ func NewBridgeService(config config.Config) {
 		fmt.Printf("we have loaded the unprocessed outbound tx")
 	}
 
-	//now we load the existing inbound requests
+	// now we load the existing inbound requests
 	itemsIn, err := fsm.LoadInBoundState()
 	if err != nil {
 		fmt.Printf("we do not need to have the items to be loaded")
@@ -223,7 +223,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 			// process the new joltify block, validator may need to submit the pool address
 			case block := <-newJoltifyBlock:
-				//currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
+				// currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
 				currentBlockHeight, err := joltChain.GetLastBlockHeight()
 				if err != nil {
 					zlog.Error().Err(err).Msgf("fail to get the last block skip this round")
@@ -358,7 +358,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 					pools := joltChain.GetPool()
 					if len(pools) < 2 || pools[1] == nil {
-						//this is need once we resume the bridge to avoid the panic that the pool address has not been filled
+						// this is need once we resume the bridge to avoid the panic that the pool address has not been filled
 						zlog.Logger.Warn().Msgf("we do not have 2 pools to start the tx")
 						continue
 					}
@@ -400,7 +400,10 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					txHash, index, _ := joltChain.ProcessInBound(item)
+					txHash, index, existed, _ := joltChain.ProcessInBound(item)
+					if existed {
+						return
+					}
 					wg.Add(1)
 					go func() {
 						defer wg.Done()

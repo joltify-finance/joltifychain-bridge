@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/cenkalti/backoff"
 	"gitlab.com/joltify/joltifychain-bridge/config"
-	"time"
 
 	"gitlab.com/joltify/joltifychain-bridge/validators"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
@@ -119,11 +120,12 @@ func (jc *JoltifyChainInstance) CheckWhetherAlreadyExist(index string) bool {
 
 // CheckTxStatus check whether the tx has been done successfully
 func (jc *JoltifyChainInstance) CheckTxStatus(index string) error {
-	bf := backoff.NewExponentialBackOff()
-	bf.InitialInterval = time.Second
-	bf.MaxInterval = time.Second * 10
-	bf.MaxElapsedTime = time.Minute
+	// bf := backoff.NewExponentialBackOff()
+	// bf.InitialInterval = time.Second
+	// bf.MaxInterval = time.Second * 10
+	// bf.MaxElapsedTime = time.Minute
 
+	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 30)
 	op := func() error {
 		if jc.CheckWhetherAlreadyExist(index) {
 			return nil

@@ -62,7 +62,7 @@ func (i *InBoundReq) Hash() common.Hash {
 func (i *InBoundReq) Index() *big.Int {
 	hash := crypto.Keccak256Hash(i.Address.Bytes(), i.TxID)
 	lower := hash.Big().String()
-	higher := strconv.FormatInt(i.OriginalHeight, 10)
+	higher := strconv.FormatInt(i.RoundBlockHeight, 10)
 	indexStr := higher + lower
 
 	ret, ok := new(big.Int).SetString(indexStr, 10)
