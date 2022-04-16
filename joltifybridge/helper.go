@@ -3,6 +3,7 @@ package joltifybridge
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/cenkalti/backoff"
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
@@ -105,7 +106,11 @@ func GetLastBlockHeight(grpcClient grpc1.ClientConn) (int64, error) {
 
 // CheckTxStatus check whether the tx has been done successfully
 func (jc *JoltifyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSeq uint64) error {
-	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
+	// bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
+
+	bf := backoff.NewExponentialBackOff()
+	bf.MaxElapsedTime = time.Minute * 2
+	bf.MaxInterval = time.Second * 20
 
 	alreadyPassed := false
 	op := func() error {

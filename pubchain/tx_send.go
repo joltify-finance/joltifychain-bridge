@@ -24,14 +24,13 @@ import (
 
 // CheckTxStatus check whether the tx has been done successfully
 func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) error {
-	//bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)\
+	// bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
 	bf := backoff.NewExponentialBackOff()
 	bf.MaxElapsedTime = time.Minute * 2
 	bf.MaxInterval = time.Second * 20
 
 	alreadyPassed := false
 	op := func() error {
-
 		ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 		defer cancel()
 
@@ -57,7 +56,6 @@ func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) 
 		return errors.New("already passed the seq")
 	}
 	return err
-
 }
 
 // SendToken sends the token to the public chain
@@ -94,7 +92,7 @@ func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, recei
 	}
 	err = pi.EthClient.SendTransaction(ctxSend, readyTx)
 	if err != nil {
-		//we reset the ethcliet
+		// we reset the ethcliet
 		fmt.Printf("error of the ethclient is %v\n", err)
 		wg.Add(1)
 		go func() {

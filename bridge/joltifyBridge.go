@@ -193,8 +193,15 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 		cancelsubscription()
 		return
 	}
-	previousTssBlockInbound := int64(0)
-	previousTssBlockOutBound := int64(0)
+	lastBlockHeight, err := joltChain.GetLastBlockHeight()
+	if err != nil {
+		fmt.Printf("fail to get the last joltify block height %v\n", err)
+		cancelsubscription()
+		return
+
+	}
+	previousTssBlockInbound := lastBlockHeight
+	previousTssBlockOutBound := lastBlockHeight
 	firstTimeInbound := true
 	firstTimeOutbound := true
 	localSubmitLocker := sync.Mutex{}
@@ -303,7 +310,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 
 					pools := joltChain.GetPool()
-					zlog.Logger.Warn().Msgf("we feed the tx now %v", pools[1].PoolInfo.CreatePool.String())
+					zlog.Logger.Warn().Msgf("we feed the inbound tx now %v", pools[1].PoolInfo.CreatePool.String())
 					err := joltChain.FeedTx(pools[1].PoolInfo, pi, currentBlockHeight)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
@@ -362,7 +369,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						zlog.Logger.Warn().Msgf("we do not have 2 pools to start the tx")
 						continue
 					}
-					zlog.Logger.Warn().Msgf("we feed the tx now %v", pools[1].PoolInfo.CreatePool.String())
+					zlog.Logger.Warn().Msgf("we feed the outbound tx now %v", pools[1].PoolInfo.CreatePool.String())
 
 					found, err := joltChain.CheckWhetherSigner(pools[1].PoolInfo)
 					if err != nil {
