@@ -301,6 +301,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 				// todo we need also to add the check to avoid send tx near the churn blocks
+				fmt.Printf(">>>>>>>>>>%v>>>>>>>>>>\n", currentBlockHeight-previousTssBlockInbound)
 				if currentBlockHeight-previousTssBlockInbound >= pubchain.GroupBlockGap && pi.Size() != 0 {
 					// if we do not have enough tx to process, we wait for another round
 					if pi.Size() < pubchain.GroupSign && firstTimeInbound {

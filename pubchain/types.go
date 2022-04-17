@@ -28,7 +28,7 @@ const (
 	chainQueryTimeout = time.Second * 15
 	GasLimit          = 2100000
 	GasPrice          = "0.00000001"
-	ROUNDBLOCK        = 8
+	ROUNDBLOCK        = 50
 	submitBackoff     = time.Second * 4
 	GroupBlockGap     = 8
 	GroupSign         = 4

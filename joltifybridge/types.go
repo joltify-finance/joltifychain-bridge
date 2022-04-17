@@ -24,7 +24,7 @@ import (
 const (
 	grpcTimeout   = time.Second * 30
 	reqCacheSize  = 1024
-	ROUNDBLOCK    = 50
+	ROUNDBLOCK    = 150
 	submitBackoff = time.Millisecond * 500
 	GroupBlockGap = 6
 )

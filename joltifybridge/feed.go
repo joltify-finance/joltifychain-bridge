@@ -38,7 +38,6 @@ func (jc *JoltifyChainInstance) FeedTx(lastPoolInfo *vaulttypes.PoolInfo, pi *pu
 		if !found {
 			continue
 		}
-
 		el.SetAccountInfoAndHeight(accNum, accSeq, address, poolPubkey, roundBlockHeight)
 		accSeq++
 		pi.InboundReqChan <- el
