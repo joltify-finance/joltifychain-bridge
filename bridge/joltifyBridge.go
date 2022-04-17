@@ -230,8 +230,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 			// process the new joltify block, validator may need to submit the pool address
 			case block := <-newJoltifyBlock:
-				// currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
-				currentBlockHeight, err := joltChain.GetLastBlockHeight()
+				currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
+				// currentBlockHeight, err := joltChain.GetLastBlockHeight()
 				if err != nil {
 					zlog.Error().Err(err).Msgf("fail to get the last block skip this round")
 					continue
