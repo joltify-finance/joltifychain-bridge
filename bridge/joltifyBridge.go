@@ -404,16 +404,16 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 			// process the in-bound top up event which will mint coin for users
-			case item := <-pi.InboundReqChan:
+			case itemRecv := <-pi.InboundReqChan:
 				wg.Add(1)
-				go func() {
+				go func(item *common2.InBoundReq) {
 					defer wg.Done()
-					txHash, index, existed, _ := joltChain.ProcessInBound(item)
+					txHash, indexRet, existed, _ := joltChain.ProcessInBound(item)
 					if existed {
 						return
 					}
 					wg.Add(1)
-					go func() {
+					go func(index string) {
 						defer wg.Done()
 						err := joltChain.CheckTxStatus(index)
 						if err != nil {
@@ -427,8 +427,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						} else {
 							zlog.Logger.Info().Msgf("%v txid(%v) have successfully top up", tick, txHash)
 						}
-					}()
-				}()
+					}(indexRet)
+				}(itemRecv)
 
 			case itemRecv := <-joltChain.OutboundReqChan:
 
