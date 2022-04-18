@@ -3,7 +3,6 @@ package joltifybridge
 import (
 	"context"
 	"errors"
-
 	"github.com/cenkalti/backoff"
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	sdk "github.com/cosmos/cosmos-sdk/types"

@@ -16,7 +16,7 @@ import (
 
 func TestFeedTx(t *testing.T) {
 	misc.SetupBech32Prefix()
-	websocketTest := "wss://apis-sj.ankr.com/wss/783303b49f7b4f988a67631cc709c8ce/a08ea9fddcad7113ac6454229b82c598/binance/full/test"
+	websocketTest := "ws://rpc.joltify.io:8456/"
 	acc, err := generateRandomPrivKey(3)
 	assert.NilError(t, err)
 	testTx := types.MustSignNewTx(testKey, types.LatestSigner(genesis.Config), &types.LegacyTx{
@@ -36,6 +36,7 @@ func TestFeedTx(t *testing.T) {
 	tssServer := TssMock{acc[0].sk}
 	cfg := config.DefaultConfig()
 	pi, err := NewChainInstance(websocketTest, cfg.PubChainConfig.TokenAddress, &tssServer)
+	assert.NilError(t, err)
 	c := ethclient.NewClient(client)
 	pi.EthClient = c
 	assert.NilError(t, err)
