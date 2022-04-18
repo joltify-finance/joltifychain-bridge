@@ -119,7 +119,7 @@ func NewBridgeService(config config.Config) {
 	}
 
 	fsm := storage.NewTxStateMgr(config.HomeDir)
-	//now we load the existing outbound requests
+	// now we load the existing outbound requests
 	items, err := fsm.LoadOutBoundState()
 	if err != nil {
 		fmt.Printf("we do not need to have the items to be loaded")
@@ -131,7 +131,7 @@ func NewBridgeService(config config.Config) {
 		fmt.Printf("we have loaded the unprocessed outbound tx")
 	}
 
-	//now we load the existing inbound requests
+	// now we load the existing inbound requests
 	itemsIn, err := fsm.LoadInBoundState()
 	if err != nil {
 		fmt.Printf("we do not need to have the items to be loaded")
@@ -182,7 +182,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 		return
 	}
 
-	currentBlock := make([]*ctypes.ResultEvent, 1)
+	var currentBlock *ctypes.ResultEvent
 
 	// pubNewBlockChan is the channel for the new blocks for the public chain
 	subscriptionCtx, cancelsubscription := context.WithCancel(context.Background())
@@ -230,11 +230,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 			// process the new joltify block, validator may need to submit the pool address
 			case block := <-newJoltifyBlock:
 				currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
-				//currentBlockHeight, err := joltChain.GetLastBlockHeight()
-				//if err != nil {
-				//	zlog.Error().Err(err).Msgf("fail to get the last block skip this round")
-				//	continue
-				//}
 				ok, _ := joltChain.CheckAndUpdatePool(currentBlockHeight)
 				if !ok {
 					// it is okay to fail to submit a pool address as other nodes can submit, as long as 2/3 nodes submit, it is fine.
@@ -244,11 +239,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				joltChain.CurrentHeight = currentBlockHeight
 
 				// we update the tx new, since the tx is committed in the next block, we need to handle the tx once the next block coms
-				if currentBlock[0] == nil {
-					currentBlock[0] = &block
+				if currentBlock == nil {
+					currentBlock = &block
 				} else {
-					previousBlock := currentBlock[0]
-					currentBlock[0] = &block
+					previousBlock := currentBlock
+					currentBlock = &block
 					preBlockHeight := previousBlock.Data.(types.EventDataNewBlock).Block.Height
 					for _, el := range previousBlock.Data.(types.EventDataNewBlock).Block.Txs {
 						joltChain.CheckOutBoundTx(preBlockHeight, el)
@@ -364,7 +359,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 					pools := joltChain.GetPool()
 					if len(pools) < 2 || pools[1] == nil {
-						//this is need once we resume the bridge to avoid the panic that the pool address has not been filled
+						// this is need once we resume the bridge to avoid the panic that the pool address has not been filled
 						zlog.Logger.Warn().Msgf("we do not have 2 pools to start the tx")
 						continue
 					}
