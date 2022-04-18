@@ -193,8 +193,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 		cancelsubscription()
 		return
 	}
-	previousTssBlockInbound := int64(0)
-	previousTssBlockOutBound := int64(0)
+	blockHeight, err := joltChain.GetLastBlockHeight()
+	if err != nil {
+		fmt.Printf("we fail to get the latest block height")
+		cancelsubscription()
+		return
+	}
+	previousTssBlockInbound := blockHeight
+	previousTssBlockOutBound := blockHeight
 	firstTimeInbound := true
 	firstTimeOutbound := true
 	localSubmitLocker := sync.Mutex{}
@@ -223,12 +229,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 			// process the new joltify block, validator may need to submit the pool address
 			case block := <-newJoltifyBlock:
-				//currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
-				currentBlockHeight, err := joltChain.GetLastBlockHeight()
-				if err != nil {
-					zlog.Error().Err(err).Msgf("fail to get the last block skip this round")
-					continue
-				}
+				currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
+				//currentBlockHeight, err := joltChain.GetLastBlockHeight()
+				//if err != nil {
+				//	zlog.Error().Err(err).Msgf("fail to get the last block skip this round")
+				//	continue
+				//}
 				ok, _ := joltChain.CheckAndUpdatePool(currentBlockHeight)
 				if !ok {
 					// it is okay to fail to submit a pool address as other nodes can submit, as long as 2/3 nodes submit, it is fine.
@@ -396,13 +402,16 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 			// process the in-bound top up event which will mint coin for users
-			case item := <-pi.InboundReqChan:
+			case itemRecv := <-pi.InboundReqChan:
 				wg.Add(1)
-				go func() {
+				go func(item *common2.InBoundReq) {
 					defer wg.Done()
-					txHash, index, _ := joltChain.ProcessInBound(item)
+					txHash, indexRet, err := joltChain.ProcessInBound(item)
+					if txHash == "" && indexRet == "" && err == nil {
+						return
+					}
 					wg.Add(1)
-					go func() {
+					go func(index string) {
 						defer wg.Done()
 						err := joltChain.CheckTxStatus(index)
 						if err != nil {
@@ -416,8 +425,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						} else {
 							zlog.Logger.Info().Msgf("%v txid(%v) have successfully top up", tick, txHash)
 						}
-					}()
-				}()
+					}(indexRet)
+				}(itemRecv)
 
 			case itemRecv := <-joltChain.OutboundReqChan:
 

@@ -26,7 +26,7 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *common.InBoundReq) (string,
 	index := item.Hash().Hex()
 	if jc.CheckWhetherAlreadyExist(index) {
 		jc.logger.Warn().Msg("already submitted by others")
-		return "", index, nil
+		return "", "", nil
 	}
 
 	jc.logger.Info().Msgf("we are about to prepare the tx with other nodes with index %v", index)

@@ -3,6 +3,7 @@ package joltifybridge
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/cenkalti/backoff"
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
@@ -114,6 +115,7 @@ func (jc *JoltifyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSe
 			jc.logger.Error().Err(err).Msgf("fail to query the account")
 			return errors.New("invalid account query")
 		}
+		fmt.Printf("our seq is %v and expected %v\n", acc.GetSequence(), targetSeq)
 		if acc.GetSequence() == targetSeq {
 			return nil
 		}
