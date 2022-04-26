@@ -19,7 +19,6 @@ import (
 
 	tsslib "github.com/joltify-finance/tss/tss"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 )
 
@@ -105,12 +104,7 @@ func (tc *BridgeTssServer) KeySign(pk string, msgs []string, blockHeight int64, 
 
 // GetTssNodeID get the tss node ID
 func (tc *BridgeTssServer) GetTssNodeID() string {
-	ret, err := peer.IDFromString(tc.ts.GetLocalPeerID())
-	if err != nil {
-		return ""
-	}
-	fmt.Printf(">>>>>>%v\n", ret)
-	return string(ret)
+	return tc.ts.GetLocalPeerID()
 }
 
 // Stop stop the tss server
