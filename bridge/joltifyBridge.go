@@ -365,6 +365,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 					zlog.Logger.Warn().Msgf("we feed the tx now %v", pools[1].PoolInfo.CreatePool.String())
 
+					outboundItems := joltChain.PopItem(pubchain.GroupSign)
+
+					if outboundItems == nil {
+						zlog.Logger.Info().Msgf("empty queue")
+						continue
+					}
+
 					found, err := joltChain.CheckWhetherSigner(pools[1].PoolInfo)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
@@ -372,13 +379,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					}
 					if !found {
 						zlog.Logger.Info().Msgf("we are not the signer")
-						continue
-					}
-
-					outboundItems := joltChain.PopItem(pubchain.GroupSign)
-
-					if outboundItems == nil {
-						zlog.Logger.Info().Msgf("empty queue")
 						continue
 					}
 
