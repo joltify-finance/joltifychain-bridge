@@ -30,7 +30,6 @@ func (pi *Instance) AddPendingTxBnb(pendingTxBnb *InboundTxBnb) {
 
 func (pi *Instance) ExportPendingItems() []*InboundTx {
 	var items []*InboundTx
-
 	pi.pendingInbounds.Range(func(_, value interface{}) bool {
 		items = append(items, value.(*InboundTx))
 		return true

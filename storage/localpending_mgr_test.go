@@ -22,7 +22,6 @@ func (s *PendingFileStateMgrTestSuite) SetupSuite() {
 }
 
 func createdTestPendingTxs(n int) []*pubchain.InboundTx {
-
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	accs := simulation.RandomAccounts(r, n)
 	pendingTxs := make([]*pubchain.InboundTx, n)
@@ -43,7 +42,6 @@ func createdTestPendingTxs(n int) []*pubchain.InboundTx {
 }
 
 func createdTestPendingBnbTxs(n int) []*pubchain.InboundTxBnb {
-
 	pendingTxs := make([]*pubchain.InboundTxBnb, n)
 	for i := 0; i < n; i++ {
 		txid := fmt.Sprintf("testTXID %v", i)
@@ -93,7 +91,6 @@ func (s *PendingFileStateMgrTestSuite) TestSavePendingItems() {
 		expectedTx := pendingTxs[50+i].TxID
 		s.Require().Equal(expectedTx, loadedTx)
 	}
-
 }
 
 func (s *PendingFileStateMgrTestSuite) TestSavePendingBnbItems() {
@@ -131,7 +128,6 @@ func (s *PendingFileStateMgrTestSuite) TestSavePendingBnbItems() {
 		expectedTx := pendingBnbTxs[50+i].TxID
 		s.Require().Equal(expectedTx, loadedTx)
 	}
-
 }
 
 func TestPendingEvent(t *testing.T) {

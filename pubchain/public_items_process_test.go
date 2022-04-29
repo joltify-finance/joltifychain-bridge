@@ -94,7 +94,6 @@ func TestConfig(t *testing.T) {
 }
 
 func createdTestPendingTxs(n int) []*InboundTx {
-
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	accs := simulation.RandomAccounts(r, n)
 	pendingTxs := make([]*InboundTx, n)
@@ -115,7 +114,6 @@ func createdTestPendingTxs(n int) []*InboundTx {
 }
 
 func createdTestPendingBnbTxs(n int) []*InboundTxBnb {
-
 	pendingTxs := make([]*InboundTxBnb, n)
 	for i := 0; i < n; i++ {
 		txid := fmt.Sprintf("testTXID %v", i)
