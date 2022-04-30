@@ -2,14 +2,18 @@ package pubchain
 
 import (
 	"fmt"
+	"math/big"
+	"math/rand"
+	"sync"
+	"testing"
+	"time"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"math/big"
-	"sync"
-	"testing"
 )
 
 func createdTestOutBoundReqs(n int) []*common.InBoundReq {
@@ -87,4 +91,77 @@ func TestConfig(t *testing.T) {
 
 	popedItem, _ = jc.PopMoveFundItemAfterBlock(20)
 	assert.Equal(t, popedItem.Pk, accs[0].pk)
+}
+
+func createdTestPendingTxs(n int) []*InboundTx {
+	r := rand.New(rand.NewSource(time.Now().Unix()))
+	accs := simulation.RandomAccounts(r, n)
+	pendingTxs := make([]*InboundTx, n)
+	for i := 0; i < n; i++ {
+		txid := fmt.Sprintf("testTXID %v", i)
+		testToken := sdk.NewCoin("testToken", sdk.NewInt(32))
+		testFee := sdk.NewCoin("testFee", sdk.NewInt(32))
+		tx := InboundTx{
+			TxID:           txid,
+			Address:        accs[i].Address,
+			PubBlockHeight: uint64(i),
+			Token:          testToken,
+			Fee:            testFee,
+		}
+		pendingTxs[i] = &tx
+	}
+	return pendingTxs
+}
+
+func createdTestPendingBnbTxs(n int) []*InboundTxBnb {
+	pendingTxs := make([]*InboundTxBnb, n)
+	for i := 0; i < n; i++ {
+		txid := fmt.Sprintf("testTXID %v", i)
+		testFee := sdk.NewCoin("testFee", sdk.NewInt(32))
+		bnbtx := InboundTxBnb{
+			TxID:        txid,
+			BlockHeight: uint64(i),
+			Fee:         testFee,
+		}
+		pendingTxs[i] = &bnbtx
+	}
+	return pendingTxs
+}
+
+func TestPendingConfig(t *testing.T) {
+	misc.SetupBech32Prefix()
+	pendingTxs := createdTestPendingTxs(100)
+	pendingBnbTxs := createdTestPendingBnbTxs(100)
+	pi := Instance{
+		pendingInbounds:    &sync.Map{},
+		pendingInboundsBnB: &sync.Map{},
+	}
+
+	// testing for pending tx
+	for _, el := range pendingTxs {
+		pi.AddPendingTx(el)
+	}
+	var beforeAddTxSize int
+	pi.pendingInbounds.Range(func(k, v interface{}) bool {
+		beforeAddTxSize++
+		return true
+	})
+	assert.Equal(t, beforeAddTxSize, 100)
+
+	exportedPendingTxs := pi.ExportPendingItems()
+	assert.Equal(t, len(exportedPendingTxs), 100)
+
+	// testing for pending bnb tx
+	for _, el := range pendingBnbTxs {
+		pi.AddPendingTxBnb(el)
+	}
+	var beforeAddBnbTxSize int
+	pi.pendingInboundsBnB.Range(func(k, v interface{}) bool {
+		beforeAddBnbTxSize++
+		return true
+	})
+	assert.Equal(t, beforeAddBnbTxSize, 100)
+
+	exportedPendingBnbTxs := pi.ExportPendingBnbItems()
+	assert.Equal(t, len(exportedPendingBnbTxs), 100)
 }

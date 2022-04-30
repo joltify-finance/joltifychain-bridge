@@ -206,7 +206,8 @@ func TestUpdateBridgeTx(t *testing.T) {
 		Denom:  config.InBoundDenomFee,
 		Amount: sdk.NewIntFromUint64(0),
 	}
-	btx := inboundTx{
+	btx := InboundTx{
+		"testTxID",
 		accs[1].joltAddr,
 		uint64(10),
 		coin,
@@ -215,7 +216,7 @@ func TestUpdateBridgeTx(t *testing.T) {
 	pi.pendingInbounds.Store("test1", &btx)
 	// now we should have successfully top up the token
 	ret := pi.updateInboundTx("test1", big.NewInt(10), uint64(11))
-	require.Equal(t, ret.address.String(), accs[1].joltAddr.String())
+	require.Equal(t, ret.Address.String(), accs[1].joltAddr.String())
 	// now we top up the tx that not exist, and we should store this tx in pending bnb pool
 	ret = pi.updateInboundTx("test2", big.NewInt(20), uint64(29))
 	require.Nil(t, ret)
@@ -232,7 +233,8 @@ func TestUpdateBridgeTx(t *testing.T) {
 		Denom:  config.InBoundDenomFee,
 		Amount: sdk.NewIntFromUint64(0),
 	}
-	btx = inboundTx{
+	btx = InboundTx{
+		"testTxID",
 		accs[1].joltAddr,
 		uint64(10),
 		coin,
@@ -248,7 +250,7 @@ func TestUpdateBridgeTx(t *testing.T) {
 	require.Nil(t, ret)
 
 	ret = pi.updateInboundTx("test2", big.NewInt(1), uint64(34))
-	require.Equal(t, ret.address.String(), accs[1].joltAddr.String())
+	require.Equal(t, ret.Address.String(), accs[1].joltAddr.String())
 }
 
 type testHasher struct {
@@ -420,7 +422,8 @@ func TestProcessEachBlock(t *testing.T) {
 		Amount: sdk.NewIntFromUint64(1),
 	}
 
-	btx := inboundTx{
+	btx := InboundTx{
+		"testTxID",
 		accs[0].joltAddr,
 		uint64(10),
 		coin,
@@ -442,8 +445,8 @@ func TestProcessEachBlock(t *testing.T) {
 	ret, exist := pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	// indicate nothing happens
 	require.True(t, exist)
-	storedInbound := ret.(*inboundTx)
-	require.Equal(t, storedInbound.address.String(), accs[0].joltAddr.String())
+	storedInbound := ret.(*InboundTx)
+	require.Equal(t, storedInbound.Address.String(), accs[0].joltAddr.String())
 
 	header := &ethTypes.Header{
 		Difficulty: math.BigPow(11, 11),
@@ -459,16 +462,16 @@ func TestProcessEachBlock(t *testing.T) {
 	pi.processEachBlock(tBlock1, 10)
 	ret, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	require.True(t, exist)
-	storedInbound = ret.(*inboundTx)
-	require.Equal(t, storedInbound.address.String(), accs[0].joltAddr.String())
+	storedInbound = ret.(*InboundTx)
+	require.Equal(t, storedInbound.Address.String(), accs[0].joltAddr.String())
 
 	// check not to bridge
 	tBlock2 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxNotToBridge}, nil, nil, newHasher())
 	pi.processEachBlock(tBlock2, 10)
 	ret, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	require.True(t, exist)
-	storedInbound = ret.(*inboundTx)
-	require.Equal(t, storedInbound.fee.Amount.String(), feeCoin.Amount.String())
+	storedInbound = ret.(*InboundTx)
+	require.Equal(t, storedInbound.Fee.Amount.String(), feeCoin.Amount.String())
 
 	//
 	//// now we top up the fee
@@ -477,17 +480,17 @@ func TestProcessEachBlock(t *testing.T) {
 
 	ret, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	require.True(t, exist)
-	storedInbound = ret.(*inboundTx)
+	storedInbound = ret.(*InboundTx)
 	topupFee := sdk.NewIntFromBigInt(emptyEip2718TxGoodTopUpFee.Value())
-	require.True(t, storedInbound.fee.Amount.Equal(topupFee.Add(feeCoin.Amount)))
+	require.True(t, storedInbound.Fee.Amount.Equal(topupFee.Add(feeCoin.Amount)))
 
 	tBlock3 = ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpEmptyData}, nil, nil, newHasher())
 	pi.processEachBlock(tBlock3, 10)
 
 	ret, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	require.True(t, exist)
-	storedInbound = ret.(*inboundTx)
-	require.True(t, storedInbound.fee.Amount.Equal(topupFee.Add(feeCoin.Amount)))
+	storedInbound = ret.(*InboundTx)
+	require.True(t, storedInbound.Fee.Amount.Equal(topupFee.Add(feeCoin.Amount)))
 	//
 	tBlock3 = ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFee}, nil, nil, newHasher())
 	pi.processEachBlock(tBlock3, 10)
@@ -500,8 +503,8 @@ func TestProcessEachBlock(t *testing.T) {
 	pi.processEachBlock(tBlock4, 10)
 	ret, ok := pi.pendingInboundsBnB.Load(hex.EncodeToString([]byte("ERC20NOTREADY")))
 	assert.True(t, ok)
-	data := ret.(*inboundTxBnb)
-	assert.Equal(t, data.fee.Amount.String(), emptyEip2718TxGoodTopUpFeeBeforeERC20.Value().String())
+	data := ret.(*InboundTxBnb)
+	assert.Equal(t, data.Fee.Amount.String(), emptyEip2718TxGoodTopUpFeeBeforeERC20.Value().String())
 }
 
 func TestProcessEachBlockErc20(t *testing.T) {
@@ -667,21 +670,24 @@ func TestDeleteExpire(t *testing.T) {
 	firstBlock := uint64(10)
 	secondBlock := uint64(20)
 	thirdBlock := uint64(30)
-	btx1 := inboundTx{
+	btx1 := InboundTx{
+		"testTxID1",
 		acc[0].joltAddr,
 		firstBlock,
 		coin,
 		coin,
 	}
 
-	btx2 := inboundTx{
+	btx2 := InboundTx{
+		"testTxID2",
 		acc[0].joltAddr,
 		secondBlock,
 		coin,
 		coin,
 	}
 
-	btx3 := inboundTx{
+	btx3 := InboundTx{
+		"testTxID3",
 		acc[0].joltAddr,
 		thirdBlock,
 		coin,
@@ -756,19 +762,19 @@ func TestDeleteExpireBnB(t *testing.T) {
 	firstBlock := uint64(10)
 	secondBlock := uint64(20)
 	thirdBlock := uint64(30)
-	btx1 := inboundTxBnb{
+	btx1 := InboundTxBnb{
 		firstBlock,
 		"bnb1",
 		coin,
 	}
 
-	btx2 := inboundTxBnb{
+	btx2 := InboundTxBnb{
 		secondBlock,
 		"bnb1",
 		coin,
 	}
 
-	btx3 := inboundTxBnb{
+	btx3 := InboundTxBnb{
 		thirdBlock,
 		"bnb1",
 		coin,
@@ -847,7 +853,7 @@ func TestProcessBlockFeeAhead(t *testing.T) {
 		InboundReqChan:     make(chan *common2.InBoundReq, 1),
 	}
 
-	bnbTx := inboundTxBnb{
+	bnbTx := InboundTxBnb{
 		uint64(11),
 		hex.EncodeToString([]byte("test1")),
 		sdk.NewCoin(config.InBoundDenomFee, sdk.NewIntFromUint64(8)),
@@ -873,7 +879,7 @@ func TestProcessBlockFeeAhead(t *testing.T) {
 
 	pi.pendingInbounds = &sync.Map{}
 	pi.pendingInboundsBnB = &sync.Map{}
-	bnbTx2 := inboundTxBnb{
+	bnbTx2 := InboundTxBnb{
 		uint64(11),
 		hex.EncodeToString([]byte("test2")),
 		sdk.NewCoin(config.InBoundDenomFee, sdk.NewIntFromUint64(18)),
@@ -957,10 +963,10 @@ func TestAccountVerify(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := &inboundTx{
-				address: tt.fields.address,
-				token:   tt.fields.token,
-				fee:     tt.fields.fee,
+			a := &InboundTx{
+				Address: tt.fields.address,
+				Token:   tt.fields.token,
+				Fee:     tt.fields.fee,
 			}
 			if err := a.Verify(); (err != nil) != tt.wantErr {
 				t.Errorf("Verify() error = %v, wantErr %v", err, tt.wantErr)

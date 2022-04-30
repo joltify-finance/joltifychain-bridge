@@ -67,21 +67,21 @@ func (pi *Instance) ProcessNewBlock(number *big.Int, joltifyBlockHeight int64) e
 }
 
 // updateInboundTx update the top-up token with fee
-func (pi *Instance) updateInboundTx(txID string, amount *big.Int, blockNum uint64) *inboundTx {
+func (pi *Instance) updateInboundTx(txID string, amount *big.Int, blockNum uint64) *InboundTx {
 	data, ok := pi.pendingInbounds.Load(txID)
 	if !ok {
 		pi.logger.Warn().Msgf("inbound fail to get the stored tx from pool with %v\n", pi.pendingInbounds)
-		inBnB := inboundTxBnb{
-			blockHeight: blockNum,
-			txID:        txID,
-			fee:         sdk.NewCoin(config.InBoundDenomFee, sdk.NewIntFromBigInt(amount)),
+		inBnB := InboundTxBnb{
+			BlockHeight: blockNum,
+			TxID:        txID,
+			Fee:         sdk.NewCoin(config.InBoundDenomFee, sdk.NewIntFromBigInt(amount)),
 		}
 		pi.pendingInboundsBnB.Store(txID, &inBnB)
 		return nil
 	}
 
-	thisAccount := data.(*inboundTx)
-	thisAccount.fee.Amount = thisAccount.fee.Amount.Add(types.NewIntFromBigInt(amount))
+	thisAccount := data.(*InboundTx)
+	thisAccount.Fee.Amount = thisAccount.Fee.Amount.Add(types.NewIntFromBigInt(amount))
 	err := thisAccount.Verify()
 	if err != nil {
 		pi.pendingInbounds.Store(txID, thisAccount)
@@ -117,18 +117,20 @@ func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types
 			Amount: types.NewInt(0),
 		}
 
-		tx := inboundTx{
+		tx := InboundTx{
+			txID,
 			from,
 			blockHeight,
 			token,
 			fee,
 		}
-		pi.logger.Info().Msgf("we add the tokens tx(%v):%v", txID, tx.token.String())
+		pi.logger.Info().Msgf("we add the tokens tx(%v):%v", txID, tx.Token.String())
 		pi.pendingInbounds.Store(txID, &tx)
 		return nil
 	}
-	fee := inTxBnB.(*inboundTxBnb).fee
-	tx := inboundTx{
+	fee := inTxBnB.(*InboundTxBnb).Fee
+	tx := InboundTx{
+		txID,
 		from,
 		blockHeight,
 		token,
@@ -146,7 +148,7 @@ func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types
 		return nil
 	}
 	roundBlockHeight := blockHeight / ROUNDBLOCK
-	item := bcommon.NewAccountInboundReq(tx.address, to, tx.token, txIDBytes, int64(blockHeight), int64(roundBlockHeight))
+	item := bcommon.NewAccountInboundReq(tx.Address, to, tx.Token, txIDBytes, int64(blockHeight), int64(roundBlockHeight))
 	pi.InboundReqChan <- &item
 	return nil
 }
@@ -215,7 +217,7 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, joltifyBlockHeight i
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
 				roundBlockHeight := joltifyBlockHeight / ROUNDBLOCK
-				item := bcommon.NewAccountInboundReq(account.address, *tx.To(), account.token, payTxID, joltifyBlockHeight, roundBlockHeight)
+				item := bcommon.NewAccountInboundReq(account.Address, *tx.To(), account.Token, payTxID, joltifyBlockHeight, roundBlockHeight)
 				// we add to the retry pool to  sort the tx
 				pi.AddItem(&item)
 			}
@@ -283,8 +285,8 @@ func (pi *Instance) DeleteExpired(currentHeight uint64) {
 	var expiredTx []string
 	var expiredTxBnb []string
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
-		el := value.(*inboundTx)
-		if currentHeight-el.pubBlockHeight > config.TxTimeout {
+		el := value.(*InboundTx)
+		if currentHeight-el.PubBlockHeight > config.TxTimeout {
 			expiredTx = append(expiredTx, key.(string))
 		}
 		return true
@@ -296,8 +298,8 @@ func (pi *Instance) DeleteExpired(currentHeight uint64) {
 	}
 
 	pi.pendingInboundsBnB.Range(func(key, value interface{}) bool {
-		el := value.(*inboundTxBnb)
-		if currentHeight-el.blockHeight > config.TxTimeout {
+		el := value.(*InboundTxBnb)
+		if currentHeight-el.BlockHeight > config.TxTimeout {
 			expiredTxBnb = append(expiredTxBnb, key.(string))
 		}
 		return true
@@ -310,15 +312,15 @@ func (pi *Instance) DeleteExpired(currentHeight uint64) {
 }
 
 // Verify is the function  to verify the correctness of the account on joltify_bridge
-func (a *inboundTx) Verify() error {
-	if a.fee.Denom != config.InBoundDenomFee {
-		return fmt.Errorf("invalid inbound fee denom with fee demo : %v and want %v", a.fee.Denom, config.InBoundDenom)
+func (a *InboundTx) Verify() error {
+	if a.Fee.Denom != config.InBoundDenomFee {
+		return fmt.Errorf("invalid inbound fee denom with fee demo : %v and want %v", a.Fee.Denom, config.InBoundDenom)
 	}
 	amount, err := sdk.NewDecFromStr(config.InBoundFeeMin)
 	if err != nil {
 		return errors.New("invalid minimal inbound fee")
 	}
-	if a.fee.Amount.LT(sdk.NewIntFromBigInt(amount.BigInt())) {
+	if a.Fee.Amount.LT(sdk.NewIntFromBigInt(amount.BigInt())) {
 		return errors.New("the fee is not enough")
 	}
 	return nil

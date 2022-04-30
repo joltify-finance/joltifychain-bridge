@@ -34,17 +34,18 @@ const (
 	GroupSign         = 4
 )
 
-type inboundTx struct {
-	address        sdk.AccAddress
-	pubBlockHeight uint64 // this variable is used to delete the expired tx
-	token          sdk.Coin
-	fee            sdk.Coin
+type InboundTx struct {
+	TxID           string         `json:"tx_id"` // this variable is used for locally saving and loading
+	Address        sdk.AccAddress `json:"address"`
+	PubBlockHeight uint64         `json:"pub_block_height"` // this variable is used to delete the expired tx
+	Token          sdk.Coin       `json:"token"`
+	Fee            sdk.Coin       `json:"fee"`
 }
 
-type inboundTxBnb struct {
-	blockHeight uint64
-	txID        string
-	fee         sdk.Coin
+type InboundTxBnb struct {
+	BlockHeight uint64   `json:"block_height"`
+	TxID        string   `json:"tx_id"`
+	Fee         sdk.Coin `json:"fee"`
 }
 
 // Instance hold the joltify_bridge entity
