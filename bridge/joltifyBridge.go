@@ -286,6 +286,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					for _, el := range processableBlock.Data.Txs {
 						joltChain.CheckOutBoundTx(processableBlockHeight, el)
 					}
+
 				}
 
 				// now we check whether we need to update the pool
