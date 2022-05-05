@@ -3,12 +3,14 @@ package joltifybridge
 import (
 	"context"
 	"errors"
+
 	"github.com/cenkalti/backoff"
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	grpc1 "github.com/gogo/protobuf/grpc"
+	types "github.com/tendermint/tendermint/proto/tendermint/types"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 )
@@ -100,6 +102,22 @@ func GetLastBlockHeight(grpcClient grpc1.ClientConn) (int64, error) {
 		return 0, err
 	}
 	return resp.Block.Header.Height, nil
+}
+
+// GetBlockByHeight get the block from jolt chain based on provided height
+func GetBlockByHeight(grpcClient grpc1.ClientConn, height int64) (*types.Block, error) {
+	ts := tmservice.NewServiceClient(grpcClient)
+
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
+	req := tmservice.GetBlockByHeightRequest{
+		Height: height,
+	}
+	resp, err := ts.GetBlockByHeight(ctx, &req)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Block, nil
 }
 
 // CheckTxStatus check whether the tx has been done successfully
