@@ -15,6 +15,7 @@ import (
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/config"
 
+	prototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	tendertypes "github.com/tendermint/tendermint/types"
 
 	coscrypto "github.com/cosmos/cosmos-sdk/crypto/types"
@@ -407,6 +408,12 @@ func (jc *JoltifyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, h
 func (jc *JoltifyChainInstance) GetLastBlockHeight() (int64, error) {
 	b, err := GetLastBlockHeight(jc.grpcClient)
 	return b, err
+}
+
+// GetBlockByHeight get the block based on the 'RollbackGapJolt'
+func (jc *JoltifyChainInstance) GetBlockByHeight(blockHeight int64) (*prototypes.Block, error) {
+	block, err := GetBlockByHeight(jc.grpcClient, blockHeight)
+	return block, err
 }
 
 // CheckAndUpdatePool send the tx to the joltify pub_chain, if the pool outReceiverAddress is updated, it returns true

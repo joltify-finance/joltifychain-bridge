@@ -6,6 +6,7 @@ import (
 	"html"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"os"
 	"os/signal"
 	"path"
@@ -16,7 +17,6 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/storage"
 
 	"github.com/ethereum/go-ethereum/common"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	common2 "gitlab.com/joltify/joltifychain-bridge/common"
 
@@ -167,7 +167,7 @@ func NewBridgeService(config config.Config) {
 		fmt.Printf("we have loaded the unprocessed inbound bnb pending tx")
 	}
 
-	addEventLoop(ctx, &wg, joltifyBridge, pi, metrics, fsm)
+	addEventLoop(ctx, &wg, joltifyBridge, pi, metrics, fsm, config)
 	<-c
 	cancel()
 	wg.Wait()
@@ -203,7 +203,7 @@ func NewBridgeService(config config.Config) {
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, providedConfig config.Config) {
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
@@ -220,8 +220,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 		fmt.Printf("fail to start the subscription")
 		return
 	}
-
-	var currentBlock *ctypes.ResultEvent
 
 	// pubNewBlockChan is the channel for the new blocks for the public chain
 	subscriptionCtx, cancelsubscription := context.WithCancel(context.Background())
@@ -277,17 +275,20 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 				joltChain.CurrentHeight = currentBlockHeight
 
-				// we update the tx new, since the tx is committed in the next block, we need to handle the tx once the next block coms
-				if currentBlock == nil {
-					currentBlock = &block
-				} else {
-					previousBlock := currentBlock
-					currentBlock = &block
-					preBlockHeight := previousBlock.Data.(types.EventDataNewBlock).Block.Height
-					for _, el := range previousBlock.Data.(types.EventDataNewBlock).Block.Txs {
-						joltChain.CheckOutBoundTx(preBlockHeight, el)
+				// we update the tx new, if there exits a processable block
+				if currentBlockHeight > int64(providedConfig.JoltifyChain.RollbackGap) {
+					processableBlockHeight := currentBlockHeight - int64(providedConfig.JoltifyChain.RollbackGap)
+					processableBlock, err := joltChain.GetBlockByHeight(processableBlockHeight)
+					if err != nil {
+						zlog.Logger.Error().Err(err).Msgf("error in get block to process %v", err)
+						continue
 					}
+					for _, el := range processableBlock.Data.Txs {
+						joltChain.CheckOutBoundTx(processableBlockHeight, el)
+					}
+
 				}
+
 				// now we check whether we need to update the pool
 				// we query the pool from the chain directly.
 				poolInfo, err := joltChain.QueryLastPoolAddress()
@@ -360,7 +361,9 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					zlog.Logger.Error().Err(err).Msg("fail to get the joltify chain block height for this round")
 					continue
 				}
-				err := pi.ProcessNewBlock(head.Number, joltifyBlockHeight)
+				// process block with rollback gap
+				var processableBlockHeight = big.NewInt(0).Sub(head.Number, big.NewInt(int64(providedConfig.PubChainConfig.RollbackGap)))
+				err := pi.ProcessNewBlock(processableBlockHeight, joltifyBlockHeight)
 				pi.CurrentHeight = head.Number.Int64()
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
