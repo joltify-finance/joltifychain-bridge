@@ -2,11 +2,11 @@ package validators
 
 import (
 	"github.com/cosmos/cosmos-sdk/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto/ed25519"
-	tmtypes "github.com/tendermint/tendermint/types"
-
-	//tmtypes "github.com/tendermint/tendermint/types"
+	cryptoenc "github.com/tendermint/tendermint/crypto/encoding"
+	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 	"testing"
 )
 
@@ -52,12 +52,17 @@ func TestNewValidator(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, v.Address, addr1)
 
-	//now we test update validators
+	// now we test update validators
+	pk4, err := cryptoenc.PubKeyToProto(sk4.PubKey())
+	assert.NoError(t, err)
 
-	uv1 := tmtypes.NewValidator(sk4.PubKey(), 10)
-	uv2 := tmtypes.NewValidator(sk2.PubKey(), 0)
+	pk2, err := cryptoenc.PubKeyToProto(sk2.PubKey())
+	assert.NoError(t, err)
 
-	err = validatorSet.UpdateValidatorSet([]*tmtypes.Validator{uv1, uv2}, 20)
+	uv1 := vaulttypes.Validator{Pubkey: pk4.GetEd25519(), Power: 10}
+	uv2 := vaulttypes.Validator{Pubkey: pk2.GetEd25519(), Power: 20}
+
+	err = validatorSet.UpdateValidatorSet([]*vaulttypes.Validator{&uv1, &uv2}, 20)
 	require.Nil(t, err)
 
 	validators, height := validatorSet.GetActiveValidators()

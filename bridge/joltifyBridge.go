@@ -204,7 +204,7 @@ func NewBridgeService(config config.Config) {
 }
 
 func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, joltRollbackGap int64, pubRollbackGap int64) {
-	query := "tm.event = 'ValidatorSetUpdates'"
+	query := "complete_churn.churn = 'joltify_churn'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
 
@@ -257,8 +257,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				if err != nil {
 					continue
 				}
-				validatorUpdates := vals.Data.(types.EventDataValidatorSetUpdates).ValidatorUpdates
-				err = joltChain.HandleUpdateValidators(validatorUpdates, height)
+
+				_, ok := vals.Data.(types.EventDataNewBlock)
+				if !ok {
+					continue
+				}
+
+				err = joltChain.HandleUpdateValidators(height)
 				if err != nil {
 					fmt.Printf("error in handle update validator")
 					continue
@@ -504,7 +509,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 								bf.MaxElapsedTime = time.Minute
 								bf.MaxInterval = time.Second * 10
 								op := func() error {
-									errInner := joltChain.SubmitOutboundTx(itemCheck.Hash().Hex(), itemCheck.OriginalHeight, txHash)
+									errInner := joltChain.SubmitOutboundTx(nil, itemCheck.Hash().Hex(), itemCheck.OriginalHeight, txHash)
 									return errInner
 								}
 								err := backoff.Retry(op, bf)

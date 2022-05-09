@@ -14,8 +14,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/suite"
-	"github.com/tendermint/tendermint/crypto/secp256k1"
-	tmtypes "github.com/tendermint/tendermint/types"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 	"gitlab.com/joltify/joltifychain/testutil/network"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
@@ -62,6 +60,19 @@ func (v *EventTestSuite) SetupSuite() {
 		}
 		state.CreatePoolList = append(state.CreatePoolList, &vaulttypes.CreatePool{BlockHeight: strconv.Itoa(i), Validators: validators, Proposal: []*vaulttypes.PoolProposal{&pro}})
 	}
+	// add the validators
+	var allV []*vaulttypes.Validator
+	for i := 0; i < 4; i++ {
+		sk := ed25519.GenPrivKey()
+		v := vaulttypes.Validator{Pubkey: sk.PubKey().Bytes(), Power: 10}
+		allV = append(allV, &v)
+	}
+
+	state.ValidatorinfoList = append(state.ValidatorinfoList, &vaulttypes.Validators{AllValidators: allV, Height: 100})
+	state.ValidatorinfoList = append(state.ValidatorinfoList, &vaulttypes.Validators{AllValidators: allV, Height: 200})
+	state.ValidatorinfoList = append(state.ValidatorinfoList, &vaulttypes.Validators{AllValidators: allV, Height: 300})
+	state.ValidatorinfoList = append(state.ValidatorinfoList, &vaulttypes.Validators{AllValidators: allV, Height: 400})
+
 	testToken := vaulttypes.IssueToken{
 		Index: "testindex",
 	}
@@ -136,9 +147,7 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 	data := base64.StdEncoding.EncodeToString(e.network.Validators[0].PubKey.Bytes())
 	jc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value = data
 
-	sk := secp256k1.GenPrivKey()
-	remoteValidator := tmtypes.NewValidator(sk.PubKey(), 100)
-	err = jc.HandleUpdateValidators([]*tmtypes.Validator{remoteValidator}, 10)
+	err = jc.HandleUpdateValidators(100)
 	e.Require().NoError(err)
 	e.Require().Equal(len(jc.msgSendCache), 0)
 	tss.keygenSuccess = true
@@ -147,7 +156,7 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 	info, err := jc.Keyring.Key("operator")
 	e.Require().NoError(err)
 	errorMSg := fmt.Sprintf("rpc error: code = NotFound desc = rpc error: code = NotFound desc = account %v not found: key not found", info.GetAddress().String())
-	err = jc.HandleUpdateValidators([]*tmtypes.Validator{remoteValidator}, 10)
+	err = jc.HandleUpdateValidators(100)
 	e.Require().EqualError(err, errorMSg)
 }
 

@@ -3,6 +3,7 @@ package joltifybridge
 import (
 	"context"
 	"errors"
+	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"strconv"
 
 	"gitlab.com/joltify/joltifychain-bridge/common"
@@ -11,12 +12,14 @@ import (
 )
 
 // SubmitOutboundTx submit the outbound record to joltify chain
-func (jc *JoltifyChainInstance) SubmitOutboundTx(requestID string, blockHeight int64, pubchainTx string) error {
-	operator, err := jc.Keyring.Key("operator")
-	if err != nil {
-		return err
+func (jc *JoltifyChainInstance) SubmitOutboundTx(operator keyring.Info, requestID string, blockHeight int64, pubchainTx string) error {
+	var err error
+	if operator == nil {
+		operator, err = jc.Keyring.Key("operator")
+		if err != nil {
+			return err
+		}
 	}
-
 	acc, err := queryAccount(operator.GetAddress().String(), jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to query the account")
@@ -31,7 +34,7 @@ func (jc *JoltifyChainInstance) SubmitOutboundTx(requestID string, blockHeight i
 		BlockHeight: strconv.FormatInt(blockHeight, 10),
 	}
 
-	ok, _, err := jc.composeAndSend(&outboundMsg, accSeq, accNum, nil, operator.GetAddress())
+	ok, _, err := jc.composeAndSend(operator, &outboundMsg, accSeq, accNum, nil, operator.GetAddress())
 	if !ok || err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to submit the outbound tx record")
 		return errors.New("fail to broadcast the outbound tx record")

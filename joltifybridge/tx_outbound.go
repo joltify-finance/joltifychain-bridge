@@ -179,7 +179,13 @@ func (jc *JoltifyChainInstance) DoMoveFunds(fromPool *bcommon.PoolInfo, to types
 		Version:     tssclient.TssVersion,
 	}
 
-	ok, resp, err := jc.composeAndSend(msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, acc.GetAddress())
+	key, err := jc.Keyring.Key("operator")
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to get the operator key")
+		return false, err
+	}
+
+	ok, resp, err := jc.composeAndSend(key, msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, acc.GetAddress())
 	if err != nil || !ok {
 		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
 		return false, errors.New("fail to process the inbound tx")

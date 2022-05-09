@@ -3,6 +3,7 @@ package joltifybridge
 import (
 	"context"
 	"errors"
+	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 
 	"github.com/cenkalti/backoff"
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
@@ -148,9 +149,9 @@ func (jc *JoltifyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSe
 	return err
 }
 
-func (jc *JoltifyChainInstance) composeAndSend(sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
+func (jc *JoltifyChainInstance) composeAndSend(operator keyring.Info, sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
 	gasWanted := jc.GetGasEstimation()
-	txBuilder, err := jc.genSendTx([]sdk.Msg{sendMsg}, accSeq, accNum, uint64(gasWanted), signMsg)
+	txBuilder, err := jc.genSendTx(operator, []sdk.Msg{sendMsg}, accSeq, accNum, uint64(gasWanted), signMsg)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the tx")
 		return false, "", err

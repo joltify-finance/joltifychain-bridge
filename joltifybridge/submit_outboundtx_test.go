@@ -13,9 +13,9 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/config"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/validators"
 	"gitlab.com/joltify/joltifychain/testutil/network"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
-	"strconv"
 	"testing"
 	"time"
 )
@@ -42,31 +42,23 @@ func (v *SubmitOutBoundTestSuite) SetupSuite() {
 	v.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[vaulttypes.ModuleName], &state))
 	v.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[stakingtypes.ModuleName], &stateStaking))
 
-	validators, err := genNValidator(3, v.validatorky)
-	v.Require().NoError(err)
-	for i := 1; i < 5; i++ {
-		randPoolSk := ed25519.GenPrivKey()
-		poolPubKey, err := legacybech32.MarshalPubKey(legacybech32.AccPK, randPoolSk.PubKey()) // nolint
-		v.Require().NoError(err)
-
-		var nodes []sdk.AccAddress
-		for _, el := range validators {
-			operator, err := sdk.ValAddressFromBech32(el.OperatorAddress)
-			if err != nil {
-				panic(err)
-			}
-			nodes = append(nodes, operator.Bytes())
-		}
-		pro := vaulttypes.PoolProposal{
-			PoolPubKey: poolPubKey,
-			Nodes:      nodes,
-		}
-		state.CreatePoolList = append(state.CreatePoolList, &vaulttypes.CreatePool{BlockHeight: strconv.Itoa(i), Validators: validators, Proposal: []*vaulttypes.PoolProposal{&pro}})
-	}
 	testToken := vaulttypes.IssueToken{
 		Index: "testindex",
 	}
 	state.IssueTokenList = append(state.IssueTokenList, &testToken)
+
+	// add the validators
+	var allV []*vaulttypes.Validator
+	for i := 0; i < 4; i++ {
+		sk := ed25519.GenPrivKey()
+		v := vaulttypes.Validator{Pubkey: sk.PubKey().Bytes(), Power: 10}
+		allV = append(allV, &v)
+	}
+
+	state.ValidatorinfoList = append(state.ValidatorinfoList, &vaulttypes.Validators{AllValidators: allV, Height: 20})
+	state.ValidatorinfoList = append(state.ValidatorinfoList, &vaulttypes.Validators{AllValidators: allV, Height: 40})
+	state.ValidatorinfoList = append(state.ValidatorinfoList, &vaulttypes.Validators{AllValidators: allV, Height: 60})
+	state.ValidatorinfoList = append(state.ValidatorinfoList, &vaulttypes.Validators{AllValidators: allV, Height: 80})
 
 	buf, err := cfg.Codec.MarshalJSON(&state)
 	v.Require().NoError(err)
@@ -87,11 +79,15 @@ func (v *SubmitOutBoundTestSuite) SetupSuite() {
 	_, err = v.network.WaitForHeight(1)
 	v.Require().Nil(err)
 
+	sk, err := v.network.Validators[0].ClientCtx.Keyring.ExportPrivKeyArmor("node0", "12345678")
+	v.Require().NoError(err)
+	err = v.validatorky.ImportPrivKey("operator", sk, "12345678")
+	v.Require().NoError(err)
+
 	v.queryClient = tmservice.NewServiceClient(v.network.Validators[0].ClientCtx)
 }
 
 func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
-
 	accs, err := generateRandomPrivKey(2)
 	s.Require().NoError(err)
 	tss := TssMock{
@@ -115,9 +111,12 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 		}
 	}()
 
-	_, err = s.network.WaitForHeightWithTimeout(10, time.Second*30)
+	_, err = s.network.WaitForHeightWithTimeout(11, time.Minute)
 	s.Require().NoError(err)
 
+	jc.validatorSet = validators.NewValidator()
+	err = jc.HandleUpdateValidators(20)
+	s.Require().NoError(err)
 	info, _ := s.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()
 	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
@@ -131,7 +130,6 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 
 	send := banktypes.NewMsgSend(valAddr, operatorInfo.GetAddress(), sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100))})
 
-	//txBuilder, err := jc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
 	txBuilder, err := Gensigntx(jc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), s.network.Validators[0].ClientCtx.Keyring)
 	s.Require().NoError(err)
 	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
@@ -146,12 +144,10 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 		OriginalHeight:     5,
 	}
 	s.Require().NoError(err)
-	err = jc.SubmitOutboundTx(req.Hash().Hex(), 10, "testpubtx")
+	err = jc.SubmitOutboundTx(info, req.Hash().Hex(), 10, "testpubtx")
 	s.Require().NoError(err)
 	_, err = jc.GetPubChainSubmittedTx(req)
-	//since the operator is not the validator, so its sbumition is expected to be rejected,
-	// and here it returns record not found
-	s.Require().Equal("rpc error: code = InvalidArgument desc = rpc error: code = InvalidArgument desc = not found: invalid request", err.Error())
+	s.Require().NoError(err)
 }
 
 func TestSubmitOutBound(t *testing.T) {
