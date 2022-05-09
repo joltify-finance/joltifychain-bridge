@@ -78,7 +78,6 @@ func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.Ac
 			roundBlockHeight := blockHeight / ROUNDBLOCK
 			itemReq := bcommon.NewOutboundReq(txID, item.outReceiverAddress, curEthAddr, item.token, blockHeight, roundBlockHeight)
 			jc.AddItem(&itemReq)
-			jc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, jc.CurrentHeight)
 			return nil
 		}
 		return errors.New("not enough fee")

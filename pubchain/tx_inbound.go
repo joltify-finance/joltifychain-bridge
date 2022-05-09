@@ -220,7 +220,6 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, joltifyBlockHeight i
 				item := bcommon.NewAccountInboundReq(account.Address, *tx.To(), account.Token, payTxID, joltifyBlockHeight, roundBlockHeight)
 				// we add to the retry pool to  sort the tx
 				pi.AddItem(&item)
-				pi.logger.Info().Msgf("Inbound Transaction in Block %v (Current Block %v)", block.NumberU64(), pi.CurrentHeight)
 			}
 		}
 	}
