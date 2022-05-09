@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cenkalti/backoff"
+	types2 "github.com/tendermint/tendermint/abci/types"
 	"gitlab.com/joltify/joltifychain-bridge/config"
 	"time"
 
@@ -18,8 +19,6 @@ import (
 
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	zlog "github.com/rs/zerolog/log"
-
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 // InitValidators initialize the validators
@@ -67,7 +66,7 @@ func (jc *JoltifyChainInstance) InitValidators(addr string) error {
 }
 
 // UpdateLatestValidator update the validator set
-func (jc *JoltifyChainInstance) UpdateLatestValidator(validators []*tmtypes.Validator, blockHeight int64) error {
+func (jc *JoltifyChainInstance) UpdateLatestValidator(validators []types2.ValidatorUpdate, blockHeight int64) error {
 	return jc.validatorSet.UpdateValidatorSet(validators, blockHeight)
 }
 

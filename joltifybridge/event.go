@@ -3,6 +3,7 @@ package joltifybridge
 import (
 	"context"
 	"encoding/base64"
+	"github.com/tendermint/tendermint/abci/types"
 	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
@@ -13,7 +14,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 const capacity = 10000
@@ -30,7 +30,7 @@ func (jc *JoltifyChainInstance) AddSubscribe(ctx context.Context, query string) 
 }
 
 // HandleUpdateValidators check whether we need to generate the new tss pool message
-func (jc *JoltifyChainInstance) HandleUpdateValidators(validatorUpdates []*tmtypes.Validator, height int64) error {
+func (jc *JoltifyChainInstance) HandleUpdateValidators(validatorUpdates []types.ValidatorUpdate, height int64) error {
 	err := jc.UpdateLatestValidator(validatorUpdates, height)
 	if err != nil {
 		jc.logger.Error().Msgf("fail to query the latest validator %v", err)

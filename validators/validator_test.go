@@ -2,11 +2,11 @@ package validators
 
 import (
 	"github.com/cosmos/cosmos-sdk/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	types2 "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto/ed25519"
-	tmtypes "github.com/tendermint/tendermint/types"
-
-	//tmtypes "github.com/tendermint/tendermint/types"
+	cryptoenc "github.com/tendermint/tendermint/crypto/encoding"
 	"testing"
 )
 
@@ -52,12 +52,23 @@ func TestNewValidator(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, v.Address, addr1)
 
-	//now we test update validators
+	// now we test update validators
+	pk4, err := cryptoenc.PubKeyToProto(sk4.PubKey())
+	assert.NoError(t, err)
 
-	uv1 := tmtypes.NewValidator(sk4.PubKey(), 10)
-	uv2 := tmtypes.NewValidator(sk2.PubKey(), 0)
+	uv1 := types2.ValidatorUpdate{
+		PubKey: pk4,
+		Power:  10,
+	}
 
-	err = validatorSet.UpdateValidatorSet([]*tmtypes.Validator{uv1, uv2}, 20)
+	pk2, err := cryptoenc.PubKeyToProto(sk2.PubKey())
+	assert.NoError(t, err)
+
+	uv2 := types2.ValidatorUpdate{
+		PubKey: pk2,
+	}
+
+	err = validatorSet.UpdateValidatorSet([]types2.ValidatorUpdate{uv1, uv2}, 20)
 	require.Nil(t, err)
 
 	validators, height := validatorSet.GetActiveValidators()

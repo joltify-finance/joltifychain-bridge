@@ -204,7 +204,7 @@ func NewBridgeService(config config.Config) {
 }
 
 func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, joltRollbackGap int64, pubRollbackGap int64) {
-	query := "tm.event = 'ValidatorSetUpdates'"
+	query := "complete_churn.churn = 'joltify_churn'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
 
@@ -257,7 +257,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				if err != nil {
 					continue
 				}
-				validatorUpdates := vals.Data.(types.EventDataValidatorSetUpdates).ValidatorUpdates
+
+				blockData, ok := vals.Data.(types.EventDataNewBlock)
+				if !ok {
+					continue
+				}
+				validatorUpdates := blockData.ResultEndBlock.ValidatorUpdates
 				err = joltChain.HandleUpdateValidators(validatorUpdates, height)
 				if err != nil {
 					fmt.Printf("error in handle update validator")
