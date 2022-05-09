@@ -3,13 +3,14 @@ package joltifybridge
 import (
 	"context"
 	"encoding/base64"
-	"gitlab.com/joltify/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain/app"
 	"os"
 	"path"
 	"strconv"
 	"testing"
 	"time"
+
+	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain/app"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -259,10 +260,9 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	txquery := cosTx.GetTxRequest{Hash: txHash}
 	resp, err := txClient.GetTx(context.Background(), &txquery, nil)
 	b.Require().NoError(err)
-	qService := tmservice.NewServiceClient(jc.grpcClient)
-	block, err := qService.GetBlockByHeight(context.Background(), &tmservice.GetBlockByHeightRequest{Height: resp.TxResponse.Height})
+	block, err := jc.GetBlockByHeight(resp.TxResponse.Height)
 	b.Require().NoError(err)
-	tx := block.Block.Data.Txs[0]
+	tx := block.Data.Txs[0]
 	jc.CheckOutBoundTx(1, tx)
 }
 
