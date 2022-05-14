@@ -19,6 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	common3 "github.com/joltify-finance/tss/common"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/generated"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
@@ -61,9 +63,7 @@ func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) 
 }
 
 // SendToken sends the token to the public chain
-func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int) (common.Hash, error) {
-	tokenInstance := pi.tokenInstance
-
+func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int, tokenInstance *generated.Token) (common.Hash, error) {
 	if signerPk == "" {
 		lastPool := pi.GetPool()[1]
 		signerPk = lastPool.Pk
@@ -124,9 +124,14 @@ func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, recei
 }
 
 // ProcessOutBound send the money to public chain
-func (pi *Instance) ProcessOutBound(wg *sync.WaitGroup, toAddr, fromAddr common.Address, amount *big.Int, blockHeight int64, nonce uint64) (string, error) {
-	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18))
-	txHash, err := pi.SendToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce))
+func (pi *Instance) ProcessOutBound(wg *sync.WaitGroup, toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, blockHeight int64, nonce uint64) (string, error) {
+	ret, exit := pi.tokenList.Load(tokenAddr)
+	if !exit {
+		pi.logger.Error().Msgf("The token is not exit in the token list")
+	}
+	tokenInfo := ret.(bcommon.TokenInfo)
+	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18), tokenInfo.Denom)
+	txHash, err := pi.SendToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce), tokenInfo.TokenInstance)
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")

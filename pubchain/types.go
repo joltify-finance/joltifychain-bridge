@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 	"gitlab.com/joltify/joltifychain-bridge/generated"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
@@ -53,8 +52,7 @@ type Instance struct {
 	EthClient          *ethclient.Client
 	configAddr         string
 	chainID            *big.Int
-	tokenAddr          string
-	tokenInstance      *generated.Token
+	tokenList          *sync.Map
 	tokenAbi           *abi.ABI
 	logger             zerolog.Logger
 	pendingInbounds    *sync.Map
@@ -68,8 +66,13 @@ type Instance struct {
 	CurrentHeight      int64
 }
 
+type TokenInfo struct {
+	Denom         string
+	TokenInstance *generated.Token
+}
+
 // NewChainInstance initialize the joltify_bridge entity
-func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssInstance) (*Instance, error) {
+func NewChainInstance(ws string, tssServer tssclient.TssInstance) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
 
 	ethClient, err := ethclient.Dial(ws)
@@ -86,9 +89,9 @@ func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssInstance) (*I
 		return nil, err
 	}
 
-	tokenIns, err := generated.NewToken(common.HexToAddress(tokenAddr), ethClient)
+	tokenList, err := bcommon.GetPubTokenList(ethClient)
 	if err != nil {
-		return nil, errors.New("fail to get the new token")
+		return nil, errors.New("fail to get the new token list")
 	}
 
 	tAbi, err := abi.JSON(strings.NewReader(generated.TokenMetaData.ABI))
@@ -101,8 +104,7 @@ func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssInstance) (*I
 		EthClient:          ethClient,
 		configAddr:         ws,
 		chainID:            chainID,
-		tokenAddr:          tokenAddr,
-		tokenInstance:      tokenIns,
+		tokenList:          tokenList,
 		tokenAbi:           &tAbi,
 		pendingInbounds:    new(sync.Map),
 		pendingInboundsBnB: new(sync.Map),

@@ -84,6 +84,11 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance
 	joltifyBridge.OutboundReqChan = make(chan *bcommon.OutBoundReq, reqCacheSize)
 	joltifyBridge.RetryOutboundReq = &sync.Map{}
 	joltifyBridge.moveFundReq = &sync.Map{}
+	tokenList, err := bcommon.GetJoltTokenList()
+	if err != nil {
+		return nil, err
+	}
+	joltifyBridge.tokenList = tokenList
 	return &joltifyBridge, nil
 }
 
