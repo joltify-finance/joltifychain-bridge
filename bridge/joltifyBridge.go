@@ -167,11 +167,7 @@ func NewBridgeService(config config.Config) {
 		fmt.Printf("we have loaded the unprocessed inbound bnb pending tx")
 	}
 
-<<<<<<< HEAD
 	addEventLoop(ctx, &wg, joltifyBridge, pi, metrics, fsm, int64(config.JoltifyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap))
-=======
-	addEventLoop(ctx, &wg, joltifyBridge, pi, metrics, fsm, config)
->>>>>>> c2d961c2d8dee6c44129cd4cefda5b430a923628
 	<-c
 	cancel()
 	wg.Wait()
@@ -207,11 +203,7 @@ func NewBridgeService(config config.Config) {
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-<<<<<<< HEAD
 func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, joltRollbackGap int64, pubRollbackGap int64) {
-=======
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, providedConfig config.Config) {
->>>>>>> c2d961c2d8dee6c44129cd4cefda5b430a923628
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
@@ -284,13 +276,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				joltChain.CurrentHeight = currentBlockHeight
 
 				// we update the tx new, if there exits a processable block
-<<<<<<< HEAD
 				if currentBlockHeight > joltRollbackGap {
 					processableBlockHeight := currentBlockHeight - joltRollbackGap
-=======
-				if currentBlockHeight > int64(providedConfig.JoltifyChain.RollbackGap) {
-					processableBlockHeight := currentBlockHeight - int64(providedConfig.JoltifyChain.RollbackGap)
->>>>>>> c2d961c2d8dee6c44129cd4cefda5b430a923628
 					processableBlock, err := joltChain.GetBlockByHeight(processableBlockHeight)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("error in get block to process %v", err)
@@ -375,11 +362,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					continue
 				}
 				// process block with rollback gap
-<<<<<<< HEAD
 				var processableBlockHeight = big.NewInt(0).Sub(head.Number, big.NewInt(pubRollbackGap))
-=======
-				var processableBlockHeight = big.NewInt(0).Sub(head.Number, big.NewInt(int64(providedConfig.PubChainConfig.RollbackGap)))
->>>>>>> c2d961c2d8dee6c44129cd4cefda5b430a923628
 				err := pi.ProcessNewBlock(processableBlockHeight, joltifyBlockHeight)
 				pi.CurrentHeight = head.Number.Int64()
 				if err != nil {
