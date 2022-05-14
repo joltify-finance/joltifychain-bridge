@@ -22,7 +22,7 @@ func createdTestOutBoundReqs(n int) []*OutBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := NewOutboundReq(txid, addr, addr, testCoin, int64(i), int64(i))
+		item := NewOutboundReq(txid, addr, addr, testCoin, addr.Hex(), int64(i), int64(i))
 		retReq[i] = &item
 	}
 	return retReq
@@ -53,7 +53,7 @@ func TestOutBoundTx(t *testing.T) {
 	outboundreqs[0].SetItemHeightAndNonce(2, 100, 23)
 	h := outboundreqs[0].Hash()
 	assert.NotNil(t, h.Bytes())
-	_, _, _, blockheight, nonce := outboundreqs[0].GetOutBoundInfo()
+	_, _, _, _, blockheight, nonce := outboundreqs[0].GetOutBoundInfo()
 	assert.Equal(t, blockheight, int64(2))
 	assert.Equal(t, nonce, uint64(23))
 }

@@ -27,7 +27,7 @@ type TestNetTestSuite struct {
 func (tn *TestNetTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	websocketTest := "ws://rpc.joltify.io:8456/"
-	tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
+	// tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
 
 	a1 := "c225ac7cf268405670c004e0b8f6b7df5fefb80f3505aaf9619ea89c787a67e7"
 	a2 := "481d305c7be328b6defd500209f9fdfb5447231f4c1f665324df951029506e12"
@@ -57,7 +57,7 @@ func (tn *TestNetTestSuite) SetupSuite() {
 	tn.sk2 = &sk2
 
 	tss := TssMock{sk: &sk}
-	pubChain, err := NewChainInstance(websocketTest, tokenAddrTest, &tss)
+	pubChain, err := NewChainInstance(websocketTest, &tss)
 	if err != nil {
 		panic(err)
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/generated"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
@@ -99,14 +100,16 @@ func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types
 		pi.logger.Error().Msgf("the tx already exist!!")
 		return errors.New("tx existed")
 	}
-
-	if addr.String() != pi.tokenAddr {
+	// this  is repeated check for tokenAddr which is cheked at function 'processEachBlock'
+	data, exit := pi.tokenList.Load(addr.Hex())
+	if !exit {
 		pi.logger.Error().Msgf("incorrect top up token")
 		return errors.New("incorrect top up token")
 	}
+	tokenInfo := data.(bcommon.TokenInfo)
 
 	token := types.Coin{
-		Denom:  config.InBoundDenom,
+		Denom:  tokenInfo.Denom,
 		Amount: types.NewIntFromBigInt(value),
 	}
 
@@ -191,8 +194,10 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, joltifyBlockHeight i
 
 		toAddr, amount, err := pi.checkErc20(tx.Data())
 		if err == nil {
-			if tx.To().Hex() != pi.tokenAddr {
+			_, exit := pi.tokenList.Load(tx.To().Hex())
+			if !exit {
 				// this indicates it is not to our smart contract
+				pi.logger.Info().Msgf("reached: %v", tx.To().Hex())
 				continue
 			}
 			// process the public chain inbound message to the channel
@@ -314,7 +319,7 @@ func (pi *Instance) DeleteExpired(currentHeight uint64) {
 // Verify is the function  to verify the correctness of the account on joltify_bridge
 func (a *InboundTx) Verify() error {
 	if a.Fee.Denom != config.InBoundDenomFee {
-		return fmt.Errorf("invalid inbound fee denom with fee demo : %v and want %v", a.Fee.Denom, config.InBoundDenom)
+		return fmt.Errorf("invalid inbound fee denom with fee demo : %v and want %v", a.Fee.Denom, a.Token.Denom)
 	}
 	amount, err := sdk.NewDecFromStr(config.InBoundFeeMin)
 	if err != nil {
@@ -425,8 +430,8 @@ func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *bi
 	return rawTx.Hash().Hex(), nil
 }
 
-func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64) (string, error) {
-	txHash, err := pi.SendToken(wg, senderPk, sender, receiver, balance, blockheight, nil)
+func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64, tokenInstance *generated.Token) (string, error) {
+	txHash, err := pi.SendToken(wg, senderPk, sender, receiver, balance, blockheight, nil, tokenInstance)
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")
@@ -438,8 +443,8 @@ func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, 
 	return txHash.Hex(), nil
 }
 
-func (pi *Instance) doMoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, error) {
-	tokenInstance := pi.tokenInstance
+func (pi *Instance) doMoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64, tokenInfo bcommon.TokenInfo) (bool, error) {
+	tokenInstance := tokenInfo.TokenInstance
 	balance, err := tokenInstance.BalanceOf(&bind.CallOpts{}, previousPool.EthAddress)
 	if err != nil {
 		return false, err
@@ -458,7 +463,7 @@ func (pi *Instance) doMoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolIn
 	}
 
 	tick := html.UnescapeString("&#" + "9193" + ";")
-	pi.logger.Info().Msgf(" %v we move fund bnb:%v, JUSD %v from %v to %v", tick, balanceBnB, balance, previousPool.EthAddress.String(), receiver.String())
+	pi.logger.Info().Msgf(" %v we move fund bnb:%v, %v %v from %v to %v", tick, balanceBnB, tokenInfo.Denom, balance, previousPool.EthAddress.String(), receiver.String())
 
 	if balance.Cmp(big.NewInt(0)) == 0 && balanceBnB.Cmp(dustBnb.BigInt()) != 1 {
 		return true, nil
@@ -466,7 +471,7 @@ func (pi *Instance) doMoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolIn
 
 	var bnbTxHash string
 	if balance.Cmp(big.NewInt(0)) == 1 {
-		erc20TxHash, err := pi.moveERC20Token(wg, previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight)
+		erc20TxHash, err := pi.moveERC20Token(wg, previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight, tokenInstance)
 		// if we fail erc20 token transfer, we should not transfer the bnb otherwise,we do not have enough fee to pay retry
 		if err != nil {
 			return false, errors.New("fail to transfer erc20 token")

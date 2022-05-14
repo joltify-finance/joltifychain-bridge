@@ -55,6 +55,7 @@ type JoltifyChainInstance struct {
 	moveFundReq      *sync.Map
 	CurrentHeight    int64
 	inboundGas       *atomic.Int64
+	tokenList        *sync.Map
 }
 
 // info the import structure of the cosmos validator info
@@ -75,5 +76,6 @@ type outboundTx struct {
 	outReceiverAddress common.Address
 	blockHeight        uint64
 	token              sdk.Coin
+	tokenAddr          string
 	fee                sdk.Coin
 }

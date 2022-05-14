@@ -17,9 +17,8 @@ type JoltifyChainConfig struct {
 }
 
 type PubChainConfig struct {
-	WsAddress    string
-	TokenAddress string
-	RollbackGap  int
+	WsAddress   string
+	RollbackGap int
 }
 
 type (
@@ -80,7 +79,6 @@ func DefaultConfig() Config {
 	flag.StringVar(&config.JoltifyChain.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for joltify pub_chain")
 	flag.IntVar(&config.JoltifyChain.RollbackGap, "joltify-rollback-gap", 10, "delay the transaction process to prevent chain rollback")
 	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://rpc.joltify.io:8456/", "endpoint for public pub_chain listener")
-	flag.StringVar(&config.PubChainConfig.TokenAddress, "pub-token-addr", "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79", "monitored token address")
 	flag.IntVar(&config.PubChainConfig.RollbackGap, "pubchain-rollback-gap", 10, "delay the transaction process to prevent chain rollback")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
 	flag.StringVar(&config.HomeDir, "home", "/root/.joltifyChain/config", "home director for joltify_bridge")

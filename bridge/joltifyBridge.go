@@ -111,7 +111,7 @@ func NewBridgeService(config config.Config) {
 	}
 
 	// now we monitor the bsc transfer event
-	pi, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, config.PubChainConfig.TokenAddress, tssServer)
+	pi, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, tssServer)
 	if err != nil {
 		fmt.Printf("fail to connect the public pub_chain with address %v\n", config.PubChainConfig.WsAddress)
 		cancel()
@@ -484,8 +484,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						}
 					}
 
-					toAddr, fromAddr, amount, roundBlockHeight, nonce := litem.GetOutBoundInfo()
-					txHashCheck, err := pi.ProcessOutBound(wg, toAddr, fromAddr, amount, roundBlockHeight, nonce)
+					toAddr, fromAddr, tokenAddr, amount, roundBlockHeight, nonce := litem.GetOutBoundInfo()
+					txHashCheck, err := pi.ProcessOutBound(wg, toAddr, fromAddr, tokenAddr, amount, roundBlockHeight, nonce)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
 					}

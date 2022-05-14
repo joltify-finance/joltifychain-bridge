@@ -32,6 +32,13 @@ type OutBoundTestSuite struct {
 	queryClient tmservice.ServiceClient
 }
 
+const (
+	AddrJUSD     = "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
+	AddrJoltBNB  = "0x15fb343d82cD1C22542261dF408dA8396A829F6B"
+	DenomJUSD    = "JUSD"
+	DenomJoltBNB = "JoltBNB"
+)
+
 func (v *OutBoundTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
@@ -218,9 +225,9 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 func (o OutBoundTestSuite) TestOutBoundReq() {
 	accs, err := generateRandomPrivKey(2)
 	o.Require().NoError(err)
-	boundReq := common2.NewOutboundReq("testID", accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("testcoing", sdk.NewInt(1)), 101, 2)
+	boundReq := common2.NewOutboundReq("testID", accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("JUSD", sdk.NewInt(1)), AddrJUSD, 101, 2)
 	boundReq.SetItemHeightAndNonce(2, 100, 10)
-	a, b, _, h, _ := boundReq.GetOutBoundInfo()
+	a, b, _, _, h, _ := boundReq.GetOutBoundInfo()
 	o.Require().Equal(a.String(), accs[0].commAddr.String())
 	o.Require().Equal(b.String(), accs[1].commAddr.String())
 	o.Require().Equal(h, int64(2))
@@ -233,6 +240,7 @@ func (o OutBoundTestSuite) TestOutTx() {
 		accs[0].commAddr,
 		100,
 		sdk.NewCoin("test", sdk.NewInt(1)),
+		AddrJoltBNB,
 		sdk.NewCoin("fee", sdk.NewInt(10)),
 	}
 	err = tx.Verify()
@@ -288,7 +296,7 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "we only allow fee and top up in one tx now")
 
-	coin1 := sdk.NewCoin(config.OutBoundDenom, sdk.NewInt(100))
+	coin1 := sdk.NewCoin(DenomJUSD, sdk.NewInt(100))
 	coin2 := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewInt(1))
 	coin3 := sdk.NewCoin(config.InBoundDenomFee, sdk.NewInt(100))
 	coin4 := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewInt(100))

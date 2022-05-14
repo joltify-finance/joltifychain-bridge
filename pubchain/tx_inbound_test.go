@@ -151,16 +151,17 @@ func TestCheckToBridge(t *testing.T) {
 }
 
 func TestProcessInBound(t *testing.T) {
+	websocketTest := "ws://rpc.joltify.io:8456/"
+	acc, err := generateRandomPrivKey(3)
+	assert.Nil(t, err)
+	tssServer := TssMock{acc[0].sk}
+	pi, err := NewChainInstance(websocketTest, &tssServer)
+	assert.Nil(t, err)
+
 	toStr := "FFcf8FDEE72ac11b5c542428B35EEF5769C409f0"
 	privkey991 := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
 	privateKey, err := crypto.HexToECDSA(privkey991)
 	assert.Nil(t, err)
-	pi := Instance{
-		lastTwoPools:       make([]*common2.PoolInfo, 2),
-		poolLocker:         &sync.RWMutex{},
-		pendingInbounds:    &sync.Map{},
-		pendingInboundsBnB: &sync.Map{},
-	}
 
 	testAmount := big.NewInt(100)
 	signer := ethTypes.NewEIP155Signer(big.NewInt(18))
@@ -172,18 +173,19 @@ func TestProcessInBound(t *testing.T) {
 	}
 
 	transferTo := common.HexToAddress(toStr)
-	tokenAddrStr := "0x33875278f7757f6b43abC223EeC4a9D6204186a0"
-	tokenAddr := common.HexToAddress(tokenAddrStr)
+	nonExistedTokenAddrStr := "0xthisisanonexitedtoken1234567890123456789"
+	nonExistedTokenAddr := common.HexToAddress(nonExistedTokenAddrStr)
 
-	err = pi.ProcessInBoundERC20(tx, tokenAddr, transferTo, testAmount, uint64(10))
+	err = pi.ProcessInBoundERC20(tx, nonExistedTokenAddr, transferTo, testAmount, uint64(10))
 	require.NotNil(t, err)
 	require.EqualError(t, err, "incorrect top up token")
 
-	pi.tokenAddr = tokenAddrStr
-	err = pi.ProcessInBoundERC20(tx, tokenAddr, transferTo, testAmount, uint64(10))
+	ExistedTokenAddrStr := "0x15fb343d82cD1C22542261dF408dA8396A829F6B"
+	ExistedTokenAddr := common.HexToAddress(ExistedTokenAddrStr)
+	err = pi.ProcessInBoundERC20(tx, ExistedTokenAddr, transferTo, testAmount, uint64(10))
 	require.Nil(t, err)
 
-	err = pi.ProcessInBoundERC20(tx, tokenAddr, transferTo, testAmount, uint64(10))
+	err = pi.ProcessInBoundERC20(tx, ExistedTokenAddr, transferTo, testAmount, uint64(10))
 	require.EqualError(t, err, "tx existed")
 }
 
@@ -194,11 +196,13 @@ func TestUpdateBridgeTx(t *testing.T) {
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
 	}
+	InBoundDenomTest1 := "JUSD"
+	InBoundDenomTest2 := "JoltBNB"
 	accs, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 
 	coin := sdk.Coin{
-		Denom:  config.InBoundDenom,
+		Denom:  InBoundDenomTest1,
 		Amount: sdk.NewIntFromUint64(32),
 	}
 
@@ -225,7 +229,7 @@ func TestUpdateBridgeTx(t *testing.T) {
 
 	// now we process the tx with two top-up
 	coin = sdk.Coin{
-		Denom:  config.InBoundDenom,
+		Denom:  InBoundDenomTest2,
 		Amount: sdk.NewIntFromUint64(32),
 	}
 
@@ -334,6 +338,7 @@ func newTestBackend(t *testing.T, txs []*ethTypes.Transaction) (*node.Node, []*e
 }
 
 func TestProcessEachBlock(t *testing.T) {
+	InBoundDenomTest := "JUSD"
 	misc.SetupBech32Prefix()
 	accs, err := generateRandomPrivKey(2)
 	assert.Nil(t, err)
@@ -413,7 +418,7 @@ func TestProcessEachBlock(t *testing.T) {
 	}
 
 	coin := sdk.Coin{
-		Denom:  config.InBoundDenom,
+		Denom:  InBoundDenomTest,
 		Amount: sdk.NewIntFromUint64(32),
 	}
 
@@ -509,10 +514,14 @@ func TestProcessEachBlock(t *testing.T) {
 
 func TestProcessEachBlockErc20(t *testing.T) {
 	accs, err := generateRandomPrivKey(3)
-
 	assert.Nil(t, err)
 	tAbi, err := abi.JSON(strings.NewReader(generated.TokenMetaData.ABI))
 	assert.Nil(t, err)
+	tokenInfo := common2.TokenInfo{
+		Denom: "test",
+	}
+	tokenList := new(sync.Map)
+	tokenList.Store(accs[1].commAddr.String(), tokenInfo)
 	pi := Instance{
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
@@ -520,7 +529,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 		pendingInboundsBnB: &sync.Map{},
 		tokenAbi:           &tAbi,
 		InboundReqChan:     make(chan *common2.InBoundReq, 1),
-		tokenAddr:          accs[1].commAddr.String(),
+		tokenList:          tokenList,
 	}
 
 	poolInfo := vaulttypes.PoolInfo{
@@ -843,13 +852,18 @@ func TestDeleteExpireBnB(t *testing.T) {
 func TestProcessBlockFeeAhead(t *testing.T) {
 	accs, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
+	tokenInfo := common2.TokenInfo{
+		Denom: "test",
+	}
+	tokenList := new(sync.Map)
+	tokenList.Store(accs[0].commAddr.String(), tokenInfo)
 
 	pi := Instance{
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
-		tokenAddr:          accs[0].commAddr.String(),
+		tokenList:          tokenList,
 		InboundReqChan:     make(chan *common2.InBoundReq, 1),
 	}
 

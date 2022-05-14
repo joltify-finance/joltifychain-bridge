@@ -2,14 +2,21 @@ package joltifybridge
 
 import (
 	"fmt"
+	"math/big"
+	"sync"
+	"testing"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/joltify/joltifychain-bridge/common"
-	"math/big"
-	"sync"
-	"testing"
 )
+
+func createdTestJoltTokenList() *sync.Map {
+	tokenList := new(sync.Map)
+	tokenList.Store("testDenom", "testAddr")
+	return tokenList
+}
 
 func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
 	retReq := make([]*common.OutBoundReq, n)
@@ -21,7 +28,7 @@ func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewOutboundReq(txid, addr, addr, testCoin, int64(i), int64(i))
+		item := common.NewOutboundReq(txid, addr, addr, testCoin, "testAddr", int64(i), int64(i))
 		retReq[i] = &item
 	}
 	return retReq
@@ -34,6 +41,7 @@ func TestConfig(t *testing.T) {
 		RetryOutboundReq: &sync.Map{},
 		OutboundReqChan:  make(chan *common.OutBoundReq, 10),
 		moveFundReq:      &sync.Map{},
+		tokenList:        createdTestJoltTokenList(),
 	}
 
 	for _, el := range reqs {
