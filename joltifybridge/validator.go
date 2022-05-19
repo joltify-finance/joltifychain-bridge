@@ -18,8 +18,6 @@ import (
 
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	zlog "github.com/rs/zerolog/log"
-
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 // InitValidators initialize the validators
@@ -67,7 +65,7 @@ func (jc *JoltifyChainInstance) InitValidators(addr string) error {
 }
 
 // UpdateLatestValidator update the validator set
-func (jc *JoltifyChainInstance) UpdateLatestValidator(validators []*tmtypes.Validator, blockHeight int64) error {
+func (jc *JoltifyChainInstance) UpdateLatestValidator(validators []*vaulttypes.Validator, blockHeight int64) error {
 	return jc.validatorSet.UpdateValidatorSet(validators, blockHeight)
 }
 
@@ -133,6 +131,20 @@ func (jc *JoltifyChainInstance) CheckTxStatus(index string) error {
 
 	err := backoff.Retry(op, bf)
 	return err
+}
+
+func (jc *JoltifyChainInstance) getValidators(height string) ([]*vaulttypes.Validator, error) {
+	vaultQuery := vaulttypes.NewQueryClient(jc.grpcClient)
+	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+	defer cancel()
+
+	q := vaulttypes.QueryGetValidatorsRequest{Height: height}
+	vaultResp, err := vaultQuery.GetValidators(ctx, &q)
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to query the validators")
+		return nil, err
+	}
+	return vaultResp.Validators.AllValidators, nil
 }
 
 func (jc *JoltifyChainInstance) doInitValidator(i info, blockHeight int64, values []*tmservice.Validator) error {

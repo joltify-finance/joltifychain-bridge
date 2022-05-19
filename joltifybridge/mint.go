@@ -45,7 +45,13 @@ func (jc *JoltifyChainInstance) ProcessInBound(item *common.InBoundReq) (string,
 		Version:     tssclient.TssVersion,
 	}
 
-	ok, txHash, err := jc.composeAndSend(issueReq, accSeq, accNum, &signMsg, poolAddress)
+	key, err := jc.Keyring.Key("operator")
+	if err != nil {
+		jc.logger.Error().Err(err).Msg("fail to get the operator key")
+		return "", "", err
+	}
+
+	ok, txHash, err := jc.composeAndSend(key, issueReq, accSeq, accNum, &signMsg, poolAddress)
 	if err != nil || !ok {
 		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", txHash)
 		return "", index, errors.New("fail to process the inbound tx")

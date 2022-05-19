@@ -101,7 +101,7 @@ func (jc *JoltifyChainInstance) TerminateBridge() error {
 	return nil
 }
 
-func (jc *JoltifyChainInstance) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (client.TxBuilder, error) {
+func (jc *JoltifyChainInstance) genSendTx(key keyring.Info, sdkMsg []sdk.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (client.TxBuilder, error) {
 	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
 	// following function.
 	encCfg := *jc.encoding
@@ -118,11 +118,6 @@ func (jc *JoltifyChainInstance) genSendTx(sdkMsg []sdk.Msg, accSeq, accNum, gasW
 	// txBuilder.SetFeeAmount(...)
 	// txBuilder.SetMemo(...)
 	// txBuilder.SetTimeoutHeight(...)
-	key, err := jc.Keyring.Key("operator")
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to get the operator key")
-		return nil, err
-	}
 
 	var sigV2 signing.SignatureV2
 	if tssSignMsg == nil {
@@ -436,7 +431,12 @@ func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, str
 			jc.logger.Error().Err(err).Msg("Fail to get the gas estimation")
 			return false, ""
 		}
-		txBuilder, err := jc.genSendTx([]sdk.Msg{el.msg}, el.acc.GetSequence(), el.acc.GetAccountNumber(), gasWanted, nil)
+		key, err := jc.Keyring.Key("operator")
+		if err != nil {
+			jc.logger.Error().Err(err).Msg("fail to get the operator key")
+			return false, ""
+		}
+		txBuilder, err := jc.genSendTx(key, []sdk.Msg{el.msg}, el.acc.GetSequence(), el.acc.GetAccountNumber(), gasWanted, nil)
 		if err != nil {
 			jc.logger.Error().Err(err).Msg("fail to generate the tx")
 			return false, ""

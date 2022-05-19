@@ -1,10 +1,11 @@
 package validators
 
 import (
+	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
+	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 	"sync"
 
 	"github.com/cosmos/cosmos-sdk/types"
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 //NewValidator initialize a validator set
@@ -34,23 +35,26 @@ func (v *ValidatorSet) SetupValidatorSet(validators []*Validator, blockHeight in
 	}
 }
 
-//UpdateValidatorSet updates the validator set
-func (v *ValidatorSet) UpdateValidatorSet(validatorUpdates []*tmtypes.Validator, blockHeight int64) error {
+// UpdateValidatorSet updates the validator set
+func (v *ValidatorSet) UpdateValidatorSet(validatorUpdates []*vaulttypes.Validator, blockHeight int64) error {
 	v.locker.Lock()
 	defer v.locker.Unlock()
 	v.blockHeight = blockHeight
 	for _, el := range validatorUpdates {
-		addr, err := types.ConsAddressFromHex(el.Address.String())
-		if err != nil {
-			return err
+
+		cosPubkey := ed25519.PubKey{
+			Key: el.GetPubkey(),
 		}
-		if el.VotingPower == 0 {
+
+		addr := types.GetConsAddress(&cosPubkey)
+
+		if el.Power == 0 {
 			delete(v.activeValidators, addr.String())
 		} else {
 			localVal := Validator{
 				addr,
-				el.PubKey.Bytes(),
-				el.VotingPower,
+				cosPubkey.Bytes(),
+				el.Power,
 			}
 			v.activeValidators[addr.String()] = &localVal
 		}

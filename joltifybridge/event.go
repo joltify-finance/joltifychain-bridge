@@ -13,7 +13,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 const capacity = 10000
@@ -30,13 +29,17 @@ func (jc *JoltifyChainInstance) AddSubscribe(ctx context.Context, query string) 
 }
 
 // HandleUpdateValidators check whether we need to generate the new tss pool message
-func (jc *JoltifyChainInstance) HandleUpdateValidators(validatorUpdates []*tmtypes.Validator, height int64) error {
-	err := jc.UpdateLatestValidator(validatorUpdates, height)
+func (jc *JoltifyChainInstance) HandleUpdateValidators(height int64) error {
+	v, err := jc.getValidators(strconv.FormatInt(height, 10))
+	if err != nil {
+		return err
+	}
+
+	err = jc.UpdateLatestValidator(v, height)
 	if err != nil {
 		jc.logger.Error().Msgf("fail to query the latest validator %v", err)
 		return err
 	}
-
 	lastValidators, blockHeight := jc.GetLastValidator()
 
 	jc.logger.Info().Msgf(">>>>>>>>>>>>>>>>at block height %v system do keygen>>>>>>>>>>>>>>>\n", blockHeight)
