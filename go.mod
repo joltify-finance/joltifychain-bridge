@@ -17,7 +17,7 @@ require (
 	github.com/stretchr/testify v1.7.1
 	github.com/tendermint/btcd v0.1.1
 	github.com/tendermint/tendermint v0.34.19
-	gitlab.com/joltify/joltifychain v0.0.0-20220516052518-8f5d48f54377
+	gitlab.com/joltify/joltifychain v0.0.0-20220518054150-6b85f76d3d78
 	go.uber.org/atomic v1.9.0
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	google.golang.org/grpc v1.45.0
