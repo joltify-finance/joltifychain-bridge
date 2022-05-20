@@ -1,2 +1,4 @@
 priv_validator_key.json
 keyring.key
+.idea
+cmd/alice.key
