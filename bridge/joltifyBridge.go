@@ -271,8 +271,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				if err != nil {
 					continue
 				}
-				validatorUpdates := vals.Data.(types.EventDataValidatorSetUpdates).ValidatorUpdates
-				err = joltChain.HandleUpdateValidators(validatorUpdates, height)
+
+				_, ok := vals.Data.(types.EventDataNewBlock)
+				if !ok {
+					continue
+				}
+
+				err = joltChain.HandleUpdateValidators(height)
 				if err != nil {
 					fmt.Printf("error in handle update validator")
 					continue
@@ -525,7 +530,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 								bf.MaxElapsedTime = time.Minute
 								bf.MaxInterval = time.Second * 10
 								op := func() error {
-									errInner := joltChain.SubmitOutboundTx(itemCheck.Hash().Hex(), itemCheck.OriginalHeight, txHash)
+									errInner := joltChain.SubmitOutboundTx(nil, itemCheck.Hash().Hex(), itemCheck.OriginalHeight, txHash)
 									return errInner
 								}
 								err := backoff.Retry(op, bf)

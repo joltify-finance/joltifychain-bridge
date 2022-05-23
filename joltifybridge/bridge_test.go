@@ -141,7 +141,10 @@ func (b BridgeTestSuite) TestBridgeTx() {
 	gas, err := jc.GasEstimation([]sdk.Msg{&tmsg}, seq, nil)
 	b.Require().NoError(err)
 	b.Require().Greater(gas, uint64(0))
-	_, err = jc.genSendTx([]sdk.Msg{&tmsg}, seq, num, gas, nil)
+
+	key, err := jc.Keyring.Key("operator")
+	b.Require().NoError(err)
+	_, err = jc.genSendTx(key, []sdk.Msg{&tmsg}, seq, num, gas, nil)
 	b.Require().NoError(err)
 
 	h := sha3.New256()
@@ -156,7 +159,7 @@ func (b BridgeTestSuite) TestBridgeTx() {
 	pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, &mpk) // nolint
 	b.Require().NoError(err)
 	tssMsg := tssclient.TssSignigMsg{Pk: pk, Msgs: []string{msg}, Signers: []string{"1", "2"}, BlockHeight: int64(2), Version: "0.15.6"}
-	txBuilder, err := jc.genSendTx([]sdk.Msg{&tmsg}, seq, num, gas, &tssMsg)
+	txBuilder, err := jc.genSendTx(key, []sdk.Msg{&tmsg}, seq, num, gas, &tssMsg)
 	b.Require().NoError(err)
 
 	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
