@@ -103,7 +103,6 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 		true,
 		true,
 	}
-
 	jc, err := NewJoltifyBridge(m.network.Validators[0].RPCAddress, m.network.Validators[0].RPCAddress, &tss)
 	m.Require().NoError(err)
 	defer func() {

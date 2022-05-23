@@ -52,7 +52,6 @@ type Instance struct {
 	EthClient          *ethclient.Client
 	configAddr         string
 	chainID            *big.Int
-	tokenList          *sync.Map
 	tokenAbi           *abi.ABI
 	logger             zerolog.Logger
 	pendingInbounds    *sync.Map
@@ -66,10 +65,10 @@ type Instance struct {
 	CurrentHeight      int64
 }
 
-type TokenInfo struct {
-	Denom         string
-	TokenInstance *generated.Token
-}
+// type TokenInfo struct {
+// 	Denom         string
+// 	TokenInstance *generated.Token
+// }
 
 // NewChainInstance initialize the joltify_bridge entity
 func NewChainInstance(ws string, tssServer tssclient.TssInstance) (*Instance, error) {
@@ -89,11 +88,6 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance) (*Instance, er
 		return nil, err
 	}
 
-	tokenList, err := bcommon.GetPubTokenList(ethClient)
-	if err != nil {
-		return nil, errors.New("fail to get the new token list")
-	}
-
 	tAbi, err := abi.JSON(strings.NewReader(generated.TokenMetaData.ABI))
 	if err != nil {
 		return nil, fmt.Errorf("fail to get the tokenABI with err %v", err)
@@ -104,7 +98,6 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance) (*Instance, er
 		EthClient:          ethClient,
 		configAddr:         ws,
 		chainID:            chainID,
-		tokenList:          tokenList,
 		tokenAbi:           &tAbi,
 		pendingInbounds:    new(sync.Map),
 		pendingInboundsBnB: new(sync.Map),

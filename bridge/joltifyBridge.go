@@ -15,6 +15,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"gitlab.com/joltify/joltifychain-bridge/storage"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -167,7 +168,15 @@ func NewBridgeService(config config.Config) {
 		fmt.Printf("we have loaded the unprocessed inbound bnb pending tx")
 	}
 
-	addEventLoop(ctx, &wg, joltifyBridge, pi, metrics, fsm, int64(config.JoltifyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap))
+	// now we load the token list
+	tl, err := tokenlist.NewTokenList(config.TokenListFolder, int64(config.TokenListUpdateGap))
+	if err != nil {
+		fmt.Printf("fail to load token list")
+		cancel()
+		return
+	}
+
+	addEventLoop(ctx, &wg, joltifyBridge, pi, metrics, fsm, int64(config.JoltifyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl)
 	<-c
 	cancel()
 	wg.Wait()
@@ -198,12 +207,17 @@ func NewBridgeService(config config.Config) {
 		zlog.Logger.Error().Err(err).Msgf("fail to save the pending bnb tx!!!")
 	}
 
+	err = tl.ExportHistoryTokenList()
+	if err != nil {
+		zlog.Logger.Error().Err(err).Msgf("fail to save the history tokenlist")
+	}
+
 	zlog.Info().Msgf("we have saved the unprocessed inbound pending txs")
 
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, joltRollbackGap int64, pubRollbackGap int64) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, joltRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList) {
 	query := "tm.event = 'ValidatorSetUpdates'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
@@ -275,6 +289,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 				joltChain.CurrentHeight = currentBlockHeight
 
+				// we update the token list, if the current block height refresh the update mark
+				err := tl.UpdateTokenList(joltChain.CurrentHeight)
+				if err != nil {
+					zlog.Logger.Error().Err(err).Msgf("error in update token list %v", err)
+					continue
+				}
+
 				// we update the tx new, if there exits a processable block
 				if currentBlockHeight > joltRollbackGap {
 					processableBlockHeight := currentBlockHeight - joltRollbackGap
@@ -284,9 +305,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						continue
 					}
 					for _, el := range processableBlock.Data.Txs {
-						joltChain.CheckOutBoundTx(processableBlockHeight, el)
+						joltChain.CheckOutBoundTx(processableBlockHeight, el, tl)
 					}
-
 				}
 
 				// now we check whether we need to update the pool
@@ -363,7 +383,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 				// process block with rollback gap
 				var processableBlockHeight = big.NewInt(0).Sub(head.Number, big.NewInt(pubRollbackGap))
-				err := pi.ProcessNewBlock(processableBlockHeight, joltifyBlockHeight)
+				err := pi.ProcessNewBlock(processableBlockHeight, joltifyBlockHeight, tl)
 				pi.CurrentHeight = head.Number.Int64()
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
@@ -383,7 +403,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 				if isSigner && previousPool != nil {
 					// we move fund in the public chain
-					isMoveFund = pi.MoveFound(wg, head.Number.Int64(), previousPool)
+					isMoveFund = pi.MoveFound(wg, head.Number.Int64(), previousPool, tl)
 				}
 				if isMoveFund {
 					// once we move fund, we do not send tx to be processed

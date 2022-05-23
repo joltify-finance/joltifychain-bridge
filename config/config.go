@@ -63,12 +63,14 @@ func (al *AddrList) Set(value string) error {
 }
 
 type Config struct {
-	JoltifyChain   JoltifyChainConfig
-	PubChainConfig PubChainConfig
-	TssConfig      TssConfig
-	KeyringAddress string
-	HomeDir        string
-	EnableMonitor  bool
+	JoltifyChain       JoltifyChainConfig
+	PubChainConfig     PubChainConfig
+	TssConfig          TssConfig
+	KeyringAddress     string
+	HomeDir            string
+	TokenListFolder    string
+	TokenListUpdateGap int
+	EnableMonitor      bool
 }
 
 func DefaultConfig() Config {
@@ -82,6 +84,8 @@ func DefaultConfig() Config {
 	flag.IntVar(&config.PubChainConfig.RollbackGap, "pubchain-rollback-gap", 10, "delay the transaction process to prevent chain rollback")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
 	flag.StringVar(&config.HomeDir, "home", "/root/.joltifyChain/config", "home director for joltify_bridge")
+	flag.StringVar(&config.TokenListFolder, "token-list", "/root/.joltifyChain/config/tokenlist", "file path to load token white list")
+	flag.IntVar(&config.TokenListUpdateGap, "tokenlist-update-gap", 100, "gap to update the token list")
 	flag.StringVar(&config.TssConfig.HTTPAddr, "tss-http-port", "0.0.0.0:8321", "tss http port for info only")
 
 	// we setup the Tss parameter configuration

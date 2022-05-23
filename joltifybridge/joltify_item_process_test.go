@@ -12,11 +12,13 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/common"
 )
 
-func createdTestJoltTokenList() *sync.Map {
-	tokenList := new(sync.Map)
-	tokenList.Store("testDenom", "testAddr")
-	return tokenList
-}
+// func createdTestJoltTokenList() JoltifyTokenList {
+// 	tokenList := new(sync.Map)
+// 	tokenList.Store("testDenom", "testAddr")
+// 	return JoltifyTokenList{
+// 		CurrentTokenlist: tokenList,
+// 	}
+// }
 
 func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
 	retReq := make([]*common.OutBoundReq, n)
@@ -41,7 +43,6 @@ func TestConfig(t *testing.T) {
 		RetryOutboundReq: &sync.Map{},
 		OutboundReqChan:  make(chan *common.OutBoundReq, 10),
 		moveFundReq:      &sync.Map{},
-		tokenList:        createdTestJoltTokenList(),
 	}
 
 	for _, el := range reqs {

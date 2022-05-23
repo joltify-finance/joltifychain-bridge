@@ -6,10 +6,12 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 	"gitlab.com/joltify/joltifychain/app"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
@@ -206,6 +208,18 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 	b.Require().False(ret)
 }
 
+func createMockTokenlist(tokenAddr string, tokenDenom string) *tokenlist.TokenList {
+	jolt_tl := new(sync.Map)
+	jolt_tl.Store(tokenDenom, tokenAddr)
+	pub_tl := new(sync.Map)
+	pub_tl.Store(tokenAddr, tokenDenom)
+	tl := &tokenlist.TokenList{
+		JoltTokenList: jolt_tl,
+		PubTokenList:  pub_tl,
+	}
+	return tl
+}
+
 func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	accs, err := generateRandomPrivKey(2)
 	b.Require().NoError(err)
@@ -243,6 +257,8 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 
 	send := banktypes.NewMsgSend(valAddr, accs[0].joltAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
+	tl := createMockTokenlist("test", "test")
+
 	acc, err := queryAccount(valAddr.String(), jc.grpcClient)
 	b.Require().NoError(err)
 
@@ -263,7 +279,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	block, err := jc.GetBlockByHeight(resp.TxResponse.Height)
 	b.Require().NoError(err)
 	tx := block.Data.Txs[0]
-	jc.CheckOutBoundTx(1, tx)
+	jc.CheckOutBoundTx(1, tx, tl)
 }
 
 func TestBridge(t *testing.T) {

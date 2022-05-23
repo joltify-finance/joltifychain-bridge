@@ -6,17 +6,18 @@ import (
 
 	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 )
 
 //MoveFound moves the fund for the public chain
-func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPool *bcommon.PoolInfo) bool {
-
+func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPool *bcommon.PoolInfo, tl *tokenlist.TokenList) bool {
 	// we get the latest pool address and move funds to the latest pool
 	currentPool := pi.GetPool()
 	successful := false
-	pi.tokenList.Range(func(k, v interface{}) bool {
-		tokenInfo := v.(bcommon.TokenInfo)
-		emptyAccount, err := pi.doMoveFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight, tokenInfo)
+
+	// movefund according to the history tokenlist
+	tl.PubTokenList.Range(func(tokenAddr, tokenDenom interface{}) bool {
+		emptyAccount, err := pi.doMoveFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight, tokenAddr.(string))
 		if err != nil {
 			zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
 			pi.AddMoveFundItem(previousPool, pi.CurrentHeight)
@@ -37,5 +38,4 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPoo
 	})
 
 	return successful
-
 }

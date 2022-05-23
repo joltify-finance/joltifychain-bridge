@@ -2,6 +2,10 @@ package joltifybridge
 
 import (
 	"context"
+	"strconv"
+	"testing"
+	"time"
+
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -15,9 +19,6 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 	"gitlab.com/joltify/joltifychain/testutil/network"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
-	"strconv"
-	"testing"
-	"time"
 )
 
 type SubmitOutBoundTestSuite struct {

@@ -14,6 +14,7 @@ import (
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 
 	prototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	tendertypes "github.com/tendermint/tendermint/types"
@@ -84,11 +85,6 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance
 	joltifyBridge.OutboundReqChan = make(chan *bcommon.OutBoundReq, reqCacheSize)
 	joltifyBridge.RetryOutboundReq = &sync.Map{}
 	joltifyBridge.moveFundReq = &sync.Map{}
-	tokenList, err := bcommon.GetJoltTokenList()
-	if err != nil {
-		return nil, err
-	}
-	joltifyBridge.tokenList = tokenList
 	return &joltifyBridge, nil
 }
 
@@ -470,7 +466,7 @@ func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, str
 }
 
 // CheckOutBoundTx checks
-func (jc *JoltifyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertypes.Tx) {
+func (jc *JoltifyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertypes.Tx, tl *tokenlist.TokenList) {
 	pools := jc.GetPool()
 	if pools[0] == nil || pools[1] == nil {
 		return
@@ -507,7 +503,7 @@ func (jc *JoltifyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendert
 				continue
 			}
 
-			err = jc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, rawTx.Hash())
+			err = jc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, rawTx.Hash(), tl)
 			if err != nil {
 				if err.Error() != "not a top up message to the pool" {
 					jc.logger.Error().Err(err).Msgf("fail to process the message, it is not a top up message")

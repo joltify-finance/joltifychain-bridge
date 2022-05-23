@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 
@@ -17,7 +18,7 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
-func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte) error {
+func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte, tl *tokenlist.TokenList) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 
 	toAddress, err := types.AccAddressFromBech32(msg.ToAddress)
@@ -59,14 +60,15 @@ func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.Ac
 		indexDemoFee := 0
 		var tokenExist bool
 		var tokenDenom string
-		_, tokenExist = jc.tokenList.Load(msg.Amount[0].GetDenom())
+		_, tokenExist = tl.JoltTokenList.Load(msg.Amount[0].GetDenom())
 		if tokenExist && msg.Amount[1].GetDenom() == config.OutBoundDenomFee {
 			tokenDenom = msg.Amount[0].GetDenom()
 			indexDemo = 0
 			indexDemoFee = 1
 			found = true
 		}
-		_, tokenExist = jc.tokenList.Load(msg.Amount[1].GetDenom())
+
+		_, tokenExist = tl.JoltTokenList.Load(msg.Amount[1].GetDenom())
 		if tokenExist && msg.Amount[0].GetDenom() == config.OutBoundDenomFee {
 			tokenDenom = msg.Amount[1].GetDenom()
 			indexDemo = 1
@@ -77,11 +79,11 @@ func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.Ac
 			return errors.New("invalid fee pair")
 		}
 
-		item := jc.processDemonAndFee(txID, blockHeight, wrapFromEthAddr, tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
+		item := jc.processDemonAndFee(txID, blockHeight, wrapFromEthAddr, tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount, tl)
 		// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 		if item != nil {
 			roundBlockHeight := blockHeight / ROUNDBLOCK
-			tokenAddr, _ := jc.tokenList.Load(tokenDenom)
+			tokenAddr, _ := tl.JoltTokenList.Load(tokenDenom)
 			itemReq := bcommon.NewOutboundReq(txID, item.outReceiverAddress, curEthAddr, item.token, tokenAddr.(string), blockHeight, roundBlockHeight)
 			jc.AddItem(&itemReq)
 			jc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, jc.CurrentHeight)
@@ -93,7 +95,7 @@ func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.Ac
 	return errors.New("we only allow fee and top up in one tx now")
 }
 
-func (jc *JoltifyChainInstance) processDemonAndFee(txID string, blockHeight int64, fromAddress types.AccAddress, DemonName string, DemonAmount, feeAmount types.Int) *outboundTx {
+func (jc *JoltifyChainInstance) processDemonAndFee(txID string, blockHeight int64, fromAddress types.AccAddress, DemonName string, DemonAmount, feeAmount types.Int, tl *tokenlist.TokenList) *outboundTx {
 	token := types.Coin{
 		Denom:  DemonName,
 		Amount: DemonAmount,
@@ -102,7 +104,7 @@ func (jc *JoltifyChainInstance) processDemonAndFee(txID string, blockHeight int6
 		Denom:  config.OutBoundDenomFee,
 		Amount: feeAmount,
 	}
-	tokenAddr, exit := jc.tokenList.Load(DemonName)
+	tokenAddr, exit := tl.JoltTokenList.Load(DemonName)
 	if !exit {
 		jc.logger.Error().Msgf("The token is not existed in the white list")
 		return nil

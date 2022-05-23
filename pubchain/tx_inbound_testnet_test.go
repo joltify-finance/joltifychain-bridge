@@ -66,7 +66,8 @@ func (tn *TestNetTestSuite) SetupSuite() {
 }
 
 func (tn TestNetTestSuite) TestProcessNewBlock() {
-	err := tn.pubChain.ProcessNewBlock(big.NewInt(18427951), 100)
+	tl := createMockTokenlist("test", "test")
+	err := tn.pubChain.ProcessNewBlock(big.NewInt(18427951), 100, tl)
 	tn.Require().NoError(err)
 }
 
@@ -119,19 +120,21 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 		},
 	}
 
+	tl := createMockTokenlist("0xeB42ff4cA651c91EB248f8923358b6144c6B4b79", "JUSD")
+
 	err = tn.pubChain.UpdatePool(&poolInfo2)
 	tn.Require().NoError(err)
 	err = tn.pubChain.UpdatePool(&poolInfo2)
 	tn.Require().NoError(err)
 
-	ret := tn.pubChain.MoveFound(&wg, 100, &pool)
+	ret := tn.pubChain.MoveFound(&wg, 100, &pool, tl)
 	time.Sleep(time.Second * 10)
 	tn.Require().True(ret)
-	tn.pubChain.MoveFound(&wg, 100, &pool)
+	tn.pubChain.MoveFound(&wg, 100, &pool, tl)
 	time.Sleep(time.Second * 10)
 	tn.Require().True(ret)
 
-	tn.pubChain.MoveFound(&wg, 100, &pool)
+	tn.pubChain.MoveFound(&wg, 100, &pool, tl)
 	time.Sleep(time.Second * 10)
 	tn.Require().True(ret)
 
@@ -141,10 +144,10 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	err = tn.pubChain.UpdatePool(&poolInfo1)
 	tn.Require().NoError(err)
 
-	ret = tn.pubChain.MoveFound(&wg, 100, &pool2)
+	ret = tn.pubChain.MoveFound(&wg, 100, &pool2, tl)
 	time.Sleep(time.Second * 10)
 	tn.Require().True(ret)
-	tn.pubChain.MoveFound(&wg, 100, &pool2)
+	tn.pubChain.MoveFound(&wg, 100, &pool2, tl)
 	time.Sleep(time.Second * 10)
 	tn.Require().True(ret)
 	wg.Wait()

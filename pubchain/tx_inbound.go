@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/types"
@@ -28,7 +29,7 @@ import (
 )
 
 // ProcessInBoundERC20 process the inbound contract token top-up
-func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, transferTo common.Address, amount *big.Int, blockHeight uint64) error {
+func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, transferTo common.Address, amount *big.Int, blockHeight uint64, tl *tokenlist.TokenList) error {
 	v, r, s := tx.RawSignatureValues()
 	signer := ethTypes.LatestSignerForChainID(tx.ChainId())
 	plainV := misc.RecoverRecID(tx.ChainId().Uint64(), v)
@@ -46,7 +47,7 @@ func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, tra
 		return err
 	}
 
-	err = pi.processInboundTx(tx.Hash().Hex()[2:], blockHeight, transferFrom, transferTo, amount, tokenAddr)
+	err = pi.processInboundTx(tx.Hash().Hex()[2:], blockHeight, transferFrom, transferTo, amount, tokenAddr, tl)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
 		return err
@@ -55,7 +56,7 @@ func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, tra
 }
 
 // ProcessNewBlock process the blocks received from the public pub_chain
-func (pi *Instance) ProcessNewBlock(number *big.Int, joltifyBlockHeight int64) error {
+func (pi *Instance) ProcessNewBlock(number *big.Int, joltifyBlockHeight int64, tl *tokenlist.TokenList) error {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
 	block, err := pi.EthClient.BlockByNumber(ctx, number)
@@ -63,7 +64,7 @@ func (pi *Instance) ProcessNewBlock(number *big.Int, joltifyBlockHeight int64) e
 		pi.logger.Error().Err(err).Msg("fail to retrieve the block")
 		return err
 	}
-	pi.processEachBlock(block, joltifyBlockHeight)
+	pi.processEachBlock(block, joltifyBlockHeight, tl)
 	return nil
 }
 
@@ -94,22 +95,22 @@ func (pi *Instance) updateInboundTx(txID string, amount *big.Int, blockNum uint6
 	return thisAccount
 }
 
-func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
+func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address, tl *tokenlist.TokenList) error {
 	_, ok := pi.pendingInbounds.Load(txID)
 	if ok {
 		pi.logger.Error().Msgf("the tx already exist!!")
 		return errors.New("tx existed")
 	}
-	// this  is repeated check for tokenAddr which is cheked at function 'processEachBlock'
-	data, exit := pi.tokenList.Load(addr.Hex())
+	// this is repeated check for tokenAddr which is cheked at function 'processEachBlock'
+	data, exit := tl.PubTokenList.Load(addr.Hex())
 	if !exit {
 		pi.logger.Error().Msgf("incorrect top up token")
 		return errors.New("incorrect top up token")
 	}
-	tokenInfo := data.(bcommon.TokenInfo)
+	tokenDenom := data.(string)
 
 	token := types.Coin{
-		Denom:  tokenInfo.Denom,
+		Denom:  tokenDenom,
 		Amount: types.NewIntFromBigInt(value),
 	}
 
@@ -182,7 +183,7 @@ func (pi *Instance) checkErc20(data []byte) (common.Address, *big.Int, error) {
 }
 
 // fixme we need to check timeout to remove the pending transactions
-func (pi *Instance) processEachBlock(block *ethTypes.Block, joltifyBlockHeight int64) {
+func (pi *Instance) processEachBlock(block *ethTypes.Block, joltifyBlockHeight int64, tl *tokenlist.TokenList) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
 			continue
@@ -194,18 +195,12 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, joltifyBlockHeight i
 
 		toAddr, amount, err := pi.checkErc20(tx.Data())
 		if err == nil {
-			_, exit := pi.tokenList.Load(tx.To().Hex())
-			if !exit {
-				// this indicates it is not to our smart contract
-				pi.logger.Info().Msgf("reached: %v", tx.To().Hex())
-				continue
-			}
 			// process the public chain inbound message to the channel
 			if !pi.checkToBridge(toAddr) {
 				pi.logger.Warn().Msg("the top up message is not to the bridge, ignored")
 				continue
 			}
-			err := pi.ProcessInBoundERC20(tx, *tx.To(), toAddr, amount, block.NumberU64())
+			err := pi.ProcessInBoundERC20(tx, *tx.To(), toAddr, amount, block.NumberU64(), tl)
 			if err != nil {
 				zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
 				continue
@@ -430,8 +425,8 @@ func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *bi
 	return rawTx.Hash().Hex(), nil
 }
 
-func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64, tokenInstance *generated.Token) (string, error) {
-	txHash, err := pi.SendToken(wg, senderPk, sender, receiver, balance, blockheight, nil, tokenInstance)
+func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64, tokenAddr string) (string, error) {
+	txHash, err := pi.SendToken(wg, senderPk, sender, receiver, balance, blockheight, nil, tokenAddr)
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")
@@ -443,8 +438,11 @@ func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, 
 	return txHash.Hex(), nil
 }
 
-func (pi *Instance) doMoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64, tokenInfo bcommon.TokenInfo) (bool, error) {
-	tokenInstance := tokenInfo.TokenInstance
+func (pi *Instance) doMoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64, tokenAddr string) (bool, error) {
+	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), pi.EthClient)
+	if err != nil {
+		return false, err
+	}
 	balance, err := tokenInstance.BalanceOf(&bind.CallOpts{}, previousPool.EthAddress)
 	if err != nil {
 		return false, err
@@ -463,7 +461,7 @@ func (pi *Instance) doMoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolIn
 	}
 
 	tick := html.UnescapeString("&#" + "9193" + ";")
-	pi.logger.Info().Msgf(" %v we move fund bnb:%v, %v %v from %v to %v", tick, balanceBnB, tokenInfo.Denom, balance, previousPool.EthAddress.String(), receiver.String())
+	pi.logger.Info().Msgf(" %v we move fund bnb:%v, %v %v from %v to %v", tick, balanceBnB, tokenAddr, balance, previousPool.EthAddress.String(), receiver.String())
 
 	if balance.Cmp(big.NewInt(0)) == 0 && balanceBnB.Cmp(dustBnb.BigInt()) != 1 {
 		return true, nil
@@ -471,7 +469,7 @@ func (pi *Instance) doMoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolIn
 
 	var bnbTxHash string
 	if balance.Cmp(big.NewInt(0)) == 1 {
-		erc20TxHash, err := pi.moveERC20Token(wg, previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight, tokenInstance)
+		erc20TxHash, err := pi.moveERC20Token(wg, previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight, tokenAddr)
 		// if we fail erc20 token transfer, we should not transfer the bnb otherwise,we do not have enough fee to pay retry
 		if err != nil {
 			return false, errors.New("fail to transfer erc20 token")

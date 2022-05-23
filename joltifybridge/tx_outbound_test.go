@@ -263,7 +263,6 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 		true,
 		true,
 	}
-
 	jc, err := NewJoltifyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss)
 	o.Require().NoError(err)
 	defer func() {
@@ -278,47 +277,50 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	baseBlockHeight := int64(100)
 	msg := banktypes.MsgSend{}
 
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	tl := createMockTokenlist("testAddr", "testDenom")
+
+	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"), tl)
 	o.Require().EqualError(err, "empty address string is not allowed")
 
 	msg.FromAddress = o.network.Validators[0].Address.String()
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"), tl)
 	o.Require().EqualError(err, "empty address string is not allowed")
 
 	ret := jc.CheckWhetherAlreadyExist("testindex")
 	o.Require().True(ret)
 
 	msg.ToAddress = accs[3].joltAddr.String()
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"), tl)
 	o.Require().EqualError(err, "not a top up message to the pool")
 
 	msg.ToAddress = accs[1].joltAddr.String()
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"), tl)
 	o.Require().EqualError(err, "we only allow fee and top up in one tx now")
 
 	coin1 := sdk.NewCoin(DenomJUSD, sdk.NewInt(100))
 	coin2 := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewInt(1))
 	coin3 := sdk.NewCoin(config.InBoundDenomFee, sdk.NewInt(100))
 	coin4 := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewInt(100))
+	tl = createMockTokenlist("testAddr", DenomJUSD)
 
 	msg.Amount = sdk.NewCoins(coin1, coin3)
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"), tl)
 	o.Require().EqualError(err, "invalid fee pair")
 	msg.Amount = sdk.NewCoins(coin2, coin3)
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"), tl)
 	o.Require().EqualError(err, "invalid fee pair")
 
 	msg.Amount = sdk.NewCoins(coin1, coin2)
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"), tl)
 	o.Require().EqualError(err, "not enough fee")
 
 	msg.Amount = sdk.NewCoins(coin1, coin4)
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"), tl)
 	o.Require().NoError(err)
 
 	// we set the wrong account
 	msg.FromAddress = accs[1].commAddr.String()
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"), tl)
 	o.Require().EqualError(err, "rpc error: code = InvalidArgument desc = decoding bech32 failed: string not all lowercase or all uppercase: invalid request")
 }
 

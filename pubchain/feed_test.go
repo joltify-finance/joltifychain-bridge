@@ -41,6 +41,11 @@ func TestFeedTx(t *testing.T) {
 
 	assert.NilError(t, err)
 	tssServer := TssMock{acc[0].sk}
+	// current, err := os.Getwd()
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// tokenlistPath := path.Join(current, "../test_data/tokenlist.json")
 	pi, err := NewChainInstance(websocketTest, &tssServer)
 	assert.NilError(t, err)
 	c := ethclient.NewClient(client)
