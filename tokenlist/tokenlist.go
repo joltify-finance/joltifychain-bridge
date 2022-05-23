@@ -45,7 +45,10 @@ func NewTokenList(folderPath string, updateGap int64) (*TokenList, error) {
 		return TL, err
 	}
 	var result map[string]interface{}
-	json.Unmarshal([]byte(dat), &result)
+	err = json.Unmarshal([]byte(dat), &result)
+	if err != nil {
+		TL.logger.Error().Err(err).Msgf("fail to unmarshal the tokenlist.json")
+	}
 	// if the tokenlist.json is empty, fail to create bridge service
 	if len(result) == 0 {
 		TL.logger.Error().Err(err).Msgf("%v is an empty", tokenlist_path)
@@ -82,7 +85,10 @@ func NewTokenList(folderPath string, updateGap int64) (*TokenList, error) {
 		return TL, err
 	}
 	var hist_result map[string]interface{}
-	json.Unmarshal([]byte(hist_dat), &hist_result)
+	err = json.Unmarshal([]byte(hist_dat), &hist_result)
+	if err != nil {
+		TL.logger.Error().Err(err).Msgf("fail to unmarshal the tokenlist_history.json")
+	}
 	// if the tokenlist_history.json is empty, fail to create bridge service
 	if len(hist_result) == 0 {
 		TL.logger.Error().Err(err).Msgf("%v is an empty", tokenlist_history_path)
@@ -113,7 +119,10 @@ func (tl *TokenList) UpdateTokenList(currentBlockHeight int64) error {
 		return err
 	}
 	var result map[string]interface{}
-	json.Unmarshal([]byte(dat), &result)
+	err = json.Unmarshal([]byte(dat), &result)
+	if err != nil {
+		tl.logger.Error().Err(err).Msgf("fail to unmarshal the tokenlist_history.json")
+	}
 	// if the tokenlist.json is empty, fail to create bridge service
 	if len(result) == 0 {
 		tl.logger.Error().Err(err).Msgf("%v is an empty", tokenlist_path)

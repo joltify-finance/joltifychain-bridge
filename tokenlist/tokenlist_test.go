@@ -11,76 +11,6 @@ import (
 	"gotest.tools/assert"
 )
 
-// var (
-// 	testKey, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-// 	testAddr    = crypto.PubkeyToAddress(testKey.PublicKey)
-// 	testBalance = big.NewInt(200e15)
-// )
-
-// var genesis = &core.Genesis{
-// 	Config:    params.AllEthashProtocolChanges,
-// 	Alloc:     core.GenesisAlloc{testAddr: {Balance: testBalance}},
-// 	ExtraData: []byte("test genesis"),
-// 	Timestamp: 9000,
-// 	BaseFee:   big.NewInt(1),
-// }
-
-// func generateTestChain(testTx []*ethTypes.Transaction) []*ethTypes.Block {
-// 	db := rawdb.NewMemoryDatabase()
-// 	generate := func(i int, g *core.BlockGen) {
-// 		g.OffsetTime(5)
-// 		g.SetExtra([]byte("test"))
-// 		if i == 1 {
-// 			for _, el := range testTx {
-// 				g.AddTx(el)
-// 			}
-// 		}
-// 	}
-// 	gblock := genesis.ToBlock(db)
-// 	engine := ethash.NewFaker()
-// 	blocks, _ := core.GenerateChain(genesis.Config, gblock, engine, db, len(testTx), generate)
-// 	blocks = append([]*ethTypes.Block{gblock}, blocks...)
-// 	return blocks
-// }
-
-// func newTestBackend(t *testing.T, txs []*ethTypes.Transaction) (*node.Node, []*ethTypes.Block) {
-// 	// Generate test chain.
-
-// 	blocks := generateTestChain(txs)
-
-// 	// Create node
-// 	n, err := node.New(&node.Config{})
-// 	if err != nil {
-// 		t.Fatalf("can't create new node: %v", err)
-// 	}
-// 	// Create Ethereum Service
-// 	config := &ethconfig.Config{Genesis: genesis}
-// 	config.Ethash.PowMode = ethash.ModeFake
-// 	ethservice, err := eth.New(n, config)
-// 	if err != nil {
-// 		t.Fatalf("can't create new ethereum service: %v", err)
-// 	}
-// 	// Import the test chain.
-// 	if err := n.Start(); err != nil {
-// 		t.Fatalf("can't start test node: %v", err)
-// 	}
-// 	if _, err := ethservice.BlockChain().InsertChain(blocks[1:]); err != nil {
-// 		t.Fatalf("can't import test blocks: %v", err)
-// 	}
-// 	return n, blocks
-// }
-
-// func createMockEthClient(t *testing.T) *ethclient.Client {
-// 	backend, _ := newTestBackend(t, []*ethTypes.Transaction{})
-// 	defer backend.Close()
-// 	client, err := backend.Attach()
-// 	assert.NilError(t, err)
-// 	defer client.Close()
-
-// 	c := ethclient.NewClient(client)
-// 	return c
-// }
-
 func getTokenListFolderPath() string {
 	current, err := os.Getwd()
 	if err != nil {
@@ -101,8 +31,6 @@ func getTestUpdateTokenListFolderPath() string {
 
 func TestNewTokenList(t *testing.T) {
 	tokenlistPath := getTokenListFolderPath()
-	// client := createMockEthClient(t)
-	// tl, err := NewTokenList(tokenlistPath, 100, client)
 	tl, err := NewTokenList(tokenlistPath, 100)
 	assert.NilError(t, err)
 	assert.Equal(t, tl.UpdateGap, int64(100))
@@ -152,15 +80,14 @@ func TestNewTokenList(t *testing.T) {
 
 func TestUpdateTokenList(t *testing.T) {
 	tokenlistPath := getTokenListFolderPath()
-	// client := createMockEthClient(t)
-	// tl, err := NewTokenList(tokenlistPath, 100, client)
 	tl, err := NewTokenList(tokenlistPath, 100)
 	assert.NilError(t, err)
 	assert.Equal(t, tl.UpdateGap, int64(100))
 
 	tokenlistPathUpdate := getTestUpdateTokenListFolderPath()
 	tl.FolderPath = tokenlistPathUpdate
-	tl.UpdateTokenList(int64(100))
+	err = tl.UpdateTokenList(int64(100))
+	assert.NilError(t, err)
 	assert.Equal(t, tl.UpdateMark, int64(1))
 
 	var exit bool
@@ -230,7 +157,8 @@ func TestExportHistoryTokenList(t *testing.T) {
 	dat, err := ioutil.ReadFile(filePath)
 	assert.NilError(t, err)
 	result := make(map[string]string)
-	json.Unmarshal([]byte(dat), &result)
+	err = json.Unmarshal([]byte(dat), &result)
+	assert.NilError(t, err)
 	assert.Equal(t, len(result), 1)
 	assert.Equal(t, result["testAddr"], "testDenom")
 
