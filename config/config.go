@@ -85,7 +85,7 @@ func DefaultConfig() Config {
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
 	flag.StringVar(&config.HomeDir, "home", "/root/.joltifyChain/config", "home director for joltify_bridge")
 	flag.StringVar(&config.TokenListFolder, "token-list", "/root/.joltifyChain/config/tokenlist", "file path to load token white list")
-	flag.IntVar(&config.TokenListUpdateGap, "tokenlist-update-gap", 100, "gap to update the token list")
+	flag.IntVar(&config.TokenListUpdateGap, "tokenlist-update-gap", 30, "gap to update the token list")
 	flag.StringVar(&config.TssConfig.HTTPAddr, "tss-http-port", "0.0.0.0:8321", "tss http port for info only")
 
 	// we setup the Tss parameter configuration

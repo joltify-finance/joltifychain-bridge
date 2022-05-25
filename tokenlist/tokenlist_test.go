@@ -141,28 +141,28 @@ func TestUpdateTokenList(t *testing.T) {
 	assert.Equal(t, tokenDenom, "JoltBNB")
 }
 
-func TestExportHistoryTokenList(t *testing.T) {
-	tokenlistPathUpdate := getTestUpdateTokenListFolderPath()
-	tokenlist_history := make(map[string]string)
-	tokenlist_history["testAddr"] = "testDenom"
-	tl := TokenList{
-		FolderPath:       tokenlistPathUpdate,
-		HistoryTokenList: tokenlist_history,
-	}
-	err := tl.ExportHistoryTokenList()
-	assert.NilError(t, err)
+// func TestExportHistoryTokenList(t *testing.T) {
+// 	tokenlistPathUpdate := getTestUpdateTokenListFolderPath()
+// 	tokenlist_history := make(map[string]string)
+// 	tokenlist_history["testAddr"] = "testDenom"
+// 	tl := TokenList{
+// 		FolderPath:       tokenlistPathUpdate,
+// 		HistoryTokenList: tokenlist_history,
+// 	}
+// 	err := tl.ExportHistoryTokenList()
+// 	assert.NilError(t, err)
 
-	//
-	filePath := filepath.Join(tokenlistPathUpdate, "tokenlist_history.json")
-	dat, err := ioutil.ReadFile(filePath)
-	assert.NilError(t, err)
-	result := make(map[string]string)
-	err = json.Unmarshal([]byte(dat), &result)
-	assert.NilError(t, err)
-	assert.Equal(t, len(result), 1)
-	assert.Equal(t, result["testAddr"], "testDenom")
+// 	//
+// 	filePath := filepath.Join(tokenlistPathUpdate, "tokenlist_history.json")
+// 	dat, err := ioutil.ReadFile(filePath)
+// 	assert.NilError(t, err)
+// 	result := make(map[string]string)
+// 	err = json.Unmarshal([]byte(dat), &result)
+// 	assert.NilError(t, err)
+// 	assert.Equal(t, len(result), 1)
+// 	assert.Equal(t, result["testAddr"], "testDenom")
 
-	// remove the test tokenlist_history.json file
-	e := os.Remove(filePath)
-	assert.NilError(t, e)
-}
+// 	// remove the test tokenlist_history.json file
+// 	e := os.Remove(filePath)
+// 	assert.NilError(t, e)
+// }

@@ -195,6 +195,11 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, joltifyBlockHeight i
 
 		toAddr, amount, err := pi.checkErc20(tx.Data())
 		if err == nil {
+			_, exit := tl.PubTokenList.Load(tx.To().Hex())
+			if !exit {
+				// this indicates it is not to our smart contract
+				continue
+			}
 			// process the public chain inbound message to the channel
 			if !pi.checkToBridge(toAddr) {
 				pi.logger.Warn().Msg("the top up message is not to the bridge, ignored")

@@ -207,10 +207,10 @@ func NewBridgeService(config config.Config) {
 		zlog.Logger.Error().Err(err).Msgf("fail to save the pending bnb tx!!!")
 	}
 
-	err = tl.ExportHistoryTokenList()
-	if err != nil {
-		zlog.Logger.Error().Err(err).Msgf("fail to save the history tokenlist")
-	}
+	// err = tl.ExportHistoryTokenList()
+	// if err != nil {
+	// 	zlog.Logger.Error().Err(err).Msgf("fail to save the history tokenlist")
+	// }
 
 	zlog.Info().Msgf("we have saved the unprocessed inbound pending txs")
 
@@ -218,7 +218,7 @@ func NewBridgeService(config config.Config) {
 }
 
 func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, joltRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList) {
-	query := "tm.event = 'ValidatorSetUpdates'"
+	query := "complete_churn.churn = 'joltify_churn'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
 
