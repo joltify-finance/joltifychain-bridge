@@ -2,9 +2,13 @@ package pubchain
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"hash"
+	"io/ioutil"
 	"math/big"
+	"os"
+	"path"
 	"strings"
 	"sync"
 	"testing"
@@ -33,6 +37,7 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/config"
 	"gitlab.com/joltify/joltifychain-bridge/generated"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -41,6 +46,32 @@ type account struct {
 	pk       string
 	joltAddr sdk.AccAddress
 	commAddr common.Address
+}
+
+func createMockTokenlist(tokenAddr string, tokenDenom string) (*tokenlist.TokenList, error) {
+	// init the token list file path
+	current, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	// write the temp file for mockTokenlist
+	tokenlistPath := path.Join(current, "../test_data/tokenlist/tokenlist_mock.json")
+	tempTL := map[string]string{}
+	tempTL[tokenAddr] = tokenDenom
+	buf, err := json.Marshal(&tempTL)
+	if err != nil {
+		return nil, err
+	}
+	err = ioutil.WriteFile(tokenlistPath, buf, 0o655)
+	if err != nil {
+		return nil, err
+	}
+	// init the tokenlist with provided tokenAddress,tokenDenom pair
+	tl, err := tokenlist.NewTokenList(tokenlistPath, 100)
+	if err != nil {
+		return nil, err
+	}
+	return tl, nil
 }
 
 func TestUpdatePoolAndGetPool(t *testing.T) {
@@ -151,16 +182,19 @@ func TestCheckToBridge(t *testing.T) {
 }
 
 func TestProcessInBound(t *testing.T) {
+	websocketTest := "ws://rpc.joltify.io:8456/"
+	acc, err := generateRandomPrivKey(3)
+	assert.Nil(t, err)
+	tssServer := TssMock{acc[0].sk}
+	tl, err := createMockTokenlist("testDenom", "testAddr")
+	assert.Nil(t, err)
+	pi, err := NewChainInstance(websocketTest, &tssServer, tl)
+	assert.Nil(t, err)
+
 	toStr := "FFcf8FDEE72ac11b5c542428B35EEF5769C409f0"
 	privkey991 := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
 	privateKey, err := crypto.HexToECDSA(privkey991)
 	assert.Nil(t, err)
-	pi := Instance{
-		lastTwoPools:       make([]*common2.PoolInfo, 2),
-		poolLocker:         &sync.RWMutex{},
-		pendingInbounds:    &sync.Map{},
-		pendingInboundsBnB: &sync.Map{},
-	}
 
 	testAmount := big.NewInt(100)
 	signer := ethTypes.NewEIP155Signer(big.NewInt(18))
@@ -172,18 +206,22 @@ func TestProcessInBound(t *testing.T) {
 	}
 
 	transferTo := common.HexToAddress(toStr)
-	tokenAddrStr := "0x33875278f7757f6b43abC223EeC4a9D6204186a0"
-	tokenAddr := common.HexToAddress(tokenAddrStr)
+	nonExistedTokenAddrStr := "0xthisisanonexitedtoken1234567890123456789"
+	nonExistedTokenAddr := common.HexToAddress(nonExistedTokenAddrStr)
 
-	err = pi.ProcessInBoundERC20(tx, tokenAddr, transferTo, testAmount, uint64(10))
+	err = pi.ProcessInBoundERC20(tx, nonExistedTokenAddr, transferTo, testAmount, uint64(10))
 	require.NotNil(t, err)
 	require.EqualError(t, err, "incorrect top up token")
 
-	pi.tokenAddr = tokenAddrStr
-	err = pi.ProcessInBoundERC20(tx, tokenAddr, transferTo, testAmount, uint64(10))
+	ExistedTokenAddrStr := "0x15fb343d82cD1C22542261dF408dA8396A829F6B"
+	ExistedTokenAddr := common.HexToAddress(ExistedTokenAddrStr)
+	pi.TokenList, err = createMockTokenlist(ExistedTokenAddrStr, "testDenom")
+	assert.Nil(t, err)
+
+	err = pi.ProcessInBoundERC20(tx, ExistedTokenAddr, transferTo, testAmount, uint64(10))
 	require.Nil(t, err)
 
-	err = pi.ProcessInBoundERC20(tx, tokenAddr, transferTo, testAmount, uint64(10))
+	err = pi.ProcessInBoundERC20(tx, ExistedTokenAddr, transferTo, testAmount, uint64(10))
 	require.EqualError(t, err, "tx existed")
 }
 
@@ -194,11 +232,13 @@ func TestUpdateBridgeTx(t *testing.T) {
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
 	}
+	InBoundDenomTest1 := "JUSD"
+	InBoundDenomTest2 := "JoltBNB"
 	accs, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 
 	coin := sdk.Coin{
-		Denom:  config.InBoundDenom,
+		Denom:  InBoundDenomTest1,
 		Amount: sdk.NewIntFromUint64(32),
 	}
 
@@ -225,7 +265,7 @@ func TestUpdateBridgeTx(t *testing.T) {
 
 	// now we process the tx with two top-up
 	coin = sdk.Coin{
-		Denom:  config.InBoundDenom,
+		Denom:  InBoundDenomTest2,
 		Amount: sdk.NewIntFromUint64(32),
 	}
 
@@ -245,7 +285,7 @@ func TestUpdateBridgeTx(t *testing.T) {
 	ret = pi.updateInboundTx("test2", big.NewInt(1), uint64(32))
 	require.Nil(t, ret)
 	//
-	//// if we do not have enough fee paid
+	// if we do not have enough fee paid
 	ret = pi.updateInboundTx("test2", big.NewInt(8), uint64(33))
 	require.Nil(t, ret)
 
@@ -334,6 +374,9 @@ func newTestBackend(t *testing.T, txs []*ethTypes.Transaction) (*node.Node, []*e
 }
 
 func TestProcessEachBlock(t *testing.T) {
+	InBoundDenomTest := "JUSD"
+	tl, err := createMockTokenlist("testJUSDAddr", "JUSD")
+	assert.Nil(t, err)
 	misc.SetupBech32Prefix()
 	accs, err := generateRandomPrivKey(2)
 	assert.Nil(t, err)
@@ -410,10 +453,11 @@ func TestProcessEachBlock(t *testing.T) {
 		tokenAbi:           &tAbi,
 		RetryInboundReq:    &sync.Map{},
 		InboundReqChan:     make(chan *common2.InBoundReq, 1),
+		TokenList:          tl,
 	}
 
 	coin := sdk.Coin{
-		Denom:  config.InBoundDenom,
+		Denom:  InBoundDenomTest,
 		Amount: sdk.NewIntFromUint64(32),
 	}
 
@@ -474,7 +518,7 @@ func TestProcessEachBlock(t *testing.T) {
 	require.Equal(t, storedInbound.Fee.Amount.String(), feeCoin.Amount.String())
 
 	//
-	//// now we top up the fee
+	// now we top up the fee
 	tBlock3 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFee}, nil, nil, newHasher())
 	pi.processEachBlock(tBlock3, 10)
 
@@ -509,9 +553,10 @@ func TestProcessEachBlock(t *testing.T) {
 
 func TestProcessEachBlockErc20(t *testing.T) {
 	accs, err := generateRandomPrivKey(3)
-
 	assert.Nil(t, err)
 	tAbi, err := abi.JSON(strings.NewReader(generated.TokenMetaData.ABI))
+	assert.Nil(t, err)
+	tl, err := createMockTokenlist(accs[1].commAddr.String(), "test")
 	assert.Nil(t, err)
 	pi := Instance{
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
@@ -520,7 +565,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 		pendingInboundsBnB: &sync.Map{},
 		tokenAbi:           &tAbi,
 		InboundReqChan:     make(chan *common2.InBoundReq, 1),
-		tokenAddr:          accs[1].commAddr.String(),
+		TokenList:          tl,
 	}
 
 	poolInfo := vaulttypes.PoolInfo{
@@ -843,14 +888,15 @@ func TestDeleteExpireBnB(t *testing.T) {
 func TestProcessBlockFeeAhead(t *testing.T) {
 	accs, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
-
+	tl, err := createMockTokenlist(accs[0].commAddr.String(), "test")
+	assert.Nil(t, err)
 	pi := Instance{
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
-		tokenAddr:          accs[0].commAddr.String(),
 		InboundReqChan:     make(chan *common2.InBoundReq, 1),
+		TokenList:          tl,
 	}
 
 	bnbTx := InboundTxBnb{

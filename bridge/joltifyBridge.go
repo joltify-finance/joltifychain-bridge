@@ -15,6 +15,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"gitlab.com/joltify/joltifychain-bridge/storage"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -57,6 +58,14 @@ func NewBridgeService(config config.Config) {
 		metrics.Enable()
 	}
 
+	// now we load the token list
+	tl, err := tokenlist.NewTokenList(config.TokenListPath, int64(config.TokenListUpdateGap))
+	if err != nil {
+		fmt.Printf("fail to load token list")
+		cancel()
+		return
+	}
+
 	// fixme, in docker it needs to be changed to basehome
 	tssServer, _, err := tssclient.StartTssServer(config.HomeDir, config.TssConfig)
 	if err != nil {
@@ -65,7 +74,7 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.JoltifyChain.GrpcAddress, config.JoltifyChain.WsAddress, tssServer)
+	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.JoltifyChain.GrpcAddress, config.JoltifyChain.WsAddress, tssServer, tl)
 	if err != nil {
 		log.Fatalln("fail to create the invoice joltify_bridge", err)
 		cancel()
@@ -111,7 +120,7 @@ func NewBridgeService(config config.Config) {
 	}
 
 	// now we monitor the bsc transfer event
-	pi, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, config.PubChainConfig.TokenAddress, tssServer)
+	pi, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, tssServer, tl)
 	if err != nil {
 		fmt.Printf("fail to connect the public pub_chain with address %v\n", config.PubChainConfig.WsAddress)
 		cancel()
@@ -167,7 +176,7 @@ func NewBridgeService(config config.Config) {
 		fmt.Printf("we have loaded the unprocessed inbound bnb pending tx")
 	}
 
-	addEventLoop(ctx, &wg, joltifyBridge, pi, metrics, fsm, int64(config.JoltifyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap))
+	addEventLoop(ctx, &wg, joltifyBridge, pi, metrics, fsm, int64(config.JoltifyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl)
 	<-c
 	cancel()
 	wg.Wait()
@@ -203,7 +212,7 @@ func NewBridgeService(config config.Config) {
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, joltRollbackGap int64, pubRollbackGap int64) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, joltRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList) {
 	query := "complete_churn.churn = 'joltify_churn'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
@@ -279,6 +288,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 				joltChain.CurrentHeight = currentBlockHeight
+
+				// we update the token list, if the current block height refresh the update mark
+				err := tl.UpdateTokenList(joltChain.CurrentHeight)
+				if err != nil {
+					zlog.Logger.Warn().Msgf("error in updating token list %v", err)
+				}
 
 				// we update the tx new, if there exits a processable block
 				if currentBlockHeight > joltRollbackGap {
@@ -488,8 +503,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						}
 					}
 
-					toAddr, fromAddr, amount, roundBlockHeight, nonce := litem.GetOutBoundInfo()
-					txHashCheck, err := pi.ProcessOutBound(wg, toAddr, fromAddr, amount, roundBlockHeight, nonce)
+					toAddr, fromAddr, tokenAddr, amount, roundBlockHeight, nonce := litem.GetOutBoundInfo()
+					txHashCheck, err := pi.ProcessOutBound(wg, toAddr, fromAddr, tokenAddr, amount, roundBlockHeight, nonce)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
 					}

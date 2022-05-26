@@ -14,12 +14,13 @@ func (i *OutBoundReq) Hash() common.Hash {
 	return hash
 }
 
-func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin types.Coin, blockHeight, roundBlockHeight int64) OutBoundReq {
+func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin types.Coin, coinAddr string, blockHeight, roundBlockHeight int64) OutBoundReq {
 	return OutBoundReq{
 		txID,
 		address,
 		fromPoolAddr,
 		coin,
+		coinAddr,
 		roundBlockHeight,
 		blockHeight,
 		blockHeight,
@@ -49,8 +50,8 @@ func (o *OutBoundReq) SetItemHeightAndNonce(roundBlockHeight, blockHeight int64,
 }
 
 // GetOutBoundInfo return the outbound tx info
-func (o *OutBoundReq) GetOutBoundInfo() (common.Address, common.Address, *big.Int, int64, uint64) {
-	return o.OutReceiverAddress, o.FromPoolAddr, o.Coin.Amount.BigInt(), o.RoundBlockHeight, o.Nonce
+func (o *OutBoundReq) GetOutBoundInfo() (common.Address, common.Address, string, *big.Int, int64, uint64) {
+	return o.OutReceiverAddress, o.FromPoolAddr, o.TokenAddr, o.Coin.Amount.BigInt(), o.RoundBlockHeight, o.Nonce
 }
 
 func (i *InBoundReq) Hash() common.Hash {

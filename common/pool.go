@@ -20,6 +20,7 @@ type OutBoundReq struct {
 	OutReceiverAddress common.Address `json:"out_receiver_address"`
 	FromPoolAddr       common.Address `json:"from_pool_addr"`
 	Coin               types.Coin     `json:"Coin"`
+	TokenAddr          string         `json:"coin_address"`
 	RoundBlockHeight   int64          `json:"round_block_height"`
 	BlockHeight        int64          `json:"block_height"`
 	OriginalHeight     int64          `json:"original_height"`

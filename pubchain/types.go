@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 	"math/big"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 	"gitlab.com/joltify/joltifychain-bridge/generated"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
@@ -53,8 +53,6 @@ type Instance struct {
 	EthClient          *ethclient.Client
 	configAddr         string
 	chainID            *big.Int
-	tokenAddr          string
-	tokenInstance      *generated.Token
 	tokenAbi           *abi.ABI
 	logger             zerolog.Logger
 	pendingInbounds    *sync.Map
@@ -66,10 +64,11 @@ type Instance struct {
 	RetryInboundReq    *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq        *sync.Map
 	CurrentHeight      int64
+	TokenList          *tokenlist.TokenList
 }
 
 // NewChainInstance initialize the joltify_bridge entity
-func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssInstance) (*Instance, error) {
+func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl *tokenlist.TokenList) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
 
 	ethClient, err := ethclient.Dial(ws)
@@ -86,11 +85,6 @@ func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssInstance) (*I
 		return nil, err
 	}
 
-	tokenIns, err := generated.NewToken(common.HexToAddress(tokenAddr), ethClient)
-	if err != nil {
-		return nil, errors.New("fail to get the new token")
-	}
-
 	tAbi, err := abi.JSON(strings.NewReader(generated.TokenMetaData.ABI))
 	if err != nil {
 		return nil, fmt.Errorf("fail to get the tokenABI with err %v", err)
@@ -101,8 +95,6 @@ func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssInstance) (*I
 		EthClient:          ethClient,
 		configAddr:         ws,
 		chainID:            chainID,
-		tokenAddr:          tokenAddr,
-		tokenInstance:      tokenIns,
 		tokenAbi:           &tAbi,
 		pendingInbounds:    new(sync.Map),
 		pendingInboundsBnB: new(sync.Map),
@@ -112,5 +104,6 @@ func NewChainInstance(ws, tokenAddr string, tssServer tssclient.TssInstance) (*I
 		InboundReqChan:     make(chan *bcommon.InBoundReq, inboundprosSize),
 		RetryInboundReq:    &sync.Map{},
 		moveFundReq:        &sync.Map{},
+		TokenList:          tl,
 	}, nil
 }

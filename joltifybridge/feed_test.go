@@ -2,15 +2,16 @@ package joltifybridge
 
 import (
 	"fmt"
-	"github.com/cosmos/cosmos-sdk/types/simulation"
-	"github.com/ethereum/go-ethereum/crypto"
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 	"math/rand"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/cosmos/cosmos-sdk/types/simulation"
+	"github.com/ethereum/go-ethereum/crypto"
+	"gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -121,7 +122,9 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		true,
 		true,
 	}
-	jc, err := NewJoltifyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss)
+	tl, err := createMockTokenlist("testAddr", "testDenom")
+	f.Require().NoError(err)
+	jc, err := NewJoltifyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl)
 	f.Require().NoError(err)
 	jc.Keyring = f.validatorky
 	jc.grpcClient = f.network.Validators[0].ClientCtx

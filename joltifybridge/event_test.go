@@ -109,7 +109,9 @@ func (e EventTestSuite) TestSubscribe() {
 		true,
 		true,
 	}
-	jc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss)
+	tl, err := createMockTokenlist("testAddr", "testDenom")
+	e.Require().NoError(err)
+	jc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
 	e.Require().NoError(err)
 	defer func() {
 		err := jc.TerminateBridge()
@@ -133,7 +135,9 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 		false,
 		true,
 	}
-	jc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss)
+	tl, err := createMockTokenlist("testAddr", "testDenom")
+	e.Require().NoError(err)
+	jc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
 	e.Require().NoError(err)
 	defer func() {
 		err := jc.TerminateBridge()
