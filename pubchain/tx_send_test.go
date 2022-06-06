@@ -53,7 +53,6 @@ func TestPubChainInstance_composeTx(t *testing.T) {
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
-		tokenAddr:          accs[0].commAddr.String(),
 		InboundReqChan:     make(chan *common.InBoundReq, 1),
 		tssServer:          &tssServer,
 	}
@@ -124,7 +123,9 @@ func TestSendToken(t *testing.T) {
 	}
 	websocketTest := "ws://rpc.joltify.io:8456/"
 	tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
-	pubChain, err := NewChainInstance(websocketTest, tokenAddrTest, &tss)
+	tl, err := createMockTokenlist("testAddr", "testDenom")
+	assert.Nil(t, err)
+	pubChain, err := NewChainInstance(websocketTest, &tss, tl)
 	assert.Nil(t, err)
 
 	poolInfo := vaulttypes.PoolInfo{
@@ -161,7 +162,7 @@ func TestSendToken(t *testing.T) {
 	wg2 := sync.WaitGroup{}
 	nonce, err := pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
 	assert.Nil(t, err)
-	_, err = pubChain.ProcessOutBound(&wg2, accs[0].commAddr, fromAddrEth, big.NewInt(100), int64(10), nonce)
+	_, err = pubChain.ProcessOutBound(&wg2, accs[0].commAddr, fromAddrEth, tokenAddrTest, big.NewInt(100), int64(10), nonce)
 	assert.Nil(t, err)
 	wg2.Wait()
 
@@ -169,7 +170,7 @@ func TestSendToken(t *testing.T) {
 	nonce, err = pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
 	assert.Nil(t, err)
 
-	_, err = pubChain.ProcessOutBound(&wg2, accs[0].commAddr, fromAddrEth, big.NewInt(100), int64(10), nonce)
+	_, err = pubChain.ProcessOutBound(&wg2, accs[0].commAddr, fromAddrEth, tokenAddrTest, big.NewInt(100), int64(10), nonce)
 	assert.Nil(t, err)
 
 	pubChain.tssServer.Stop()

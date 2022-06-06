@@ -3,17 +3,18 @@ package storage
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
+	"os"
+	"path"
+	"testing"
+	"time"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"math/rand"
-	"os"
-	"path"
-	"testing"
-	"time"
 )
 
 type FileStateMgrTestSuite struct{ suite.Suite }
@@ -32,7 +33,7 @@ func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewOutboundReq(txid, addr, addr, testCoin, int64(i), int64(i))
+		item := common.NewOutboundReq(txid, addr, addr, testCoin, "testTokenAddr", int64(i), int64(i))
 		retReq[i] = &item
 	}
 	return retReq

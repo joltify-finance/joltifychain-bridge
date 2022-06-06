@@ -183,7 +183,9 @@ func (m MintTestSuite) TestProcessInbound() {
 		true,
 		true,
 	}
-	jc, err := NewJoltifyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, &tss)
+	tl, err := createMockTokenlist("testAddr", "testDenom")
+	m.Require().NoError(err)
+	jc, err := NewJoltifyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, &tss, tl)
 	m.Require().NoError(err)
 	jc.Keyring = m.validatorky
 

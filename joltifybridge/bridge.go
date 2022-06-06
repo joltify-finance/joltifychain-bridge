@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 	"strconv"
 	"sync"
 
@@ -12,11 +13,10 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/config"
-
 	prototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	tendertypes "github.com/tendermint/tendermint/types"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/config"
 
 	coscrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -40,7 +40,7 @@ import (
 )
 
 // NewJoltifyBridge new the instance for the joltify pub_chain
-func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance) (*JoltifyChainInstance, error) {
+func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl *tokenlist.TokenList) (*JoltifyChainInstance, error) {
 	var joltifyBridge JoltifyChainInstance
 	var err error
 	joltifyBridge.logger = zlog.With().Str("module", "joltifyChain").Logger()
@@ -84,6 +84,7 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance
 	joltifyBridge.OutboundReqChan = make(chan *bcommon.OutBoundReq, reqCacheSize)
 	joltifyBridge.RetryOutboundReq = &sync.Map{}
 	joltifyBridge.moveFundReq = &sync.Map{}
+	joltifyBridge.TokenList = tl
 	return &joltifyBridge, nil
 }
 

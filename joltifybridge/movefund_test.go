@@ -103,8 +103,9 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 		true,
 		true,
 	}
-
-	jc, err := NewJoltifyBridge(m.network.Validators[0].RPCAddress, m.network.Validators[0].RPCAddress, &tss)
+	tl, err := createMockTokenlist("testAddr", "testDenom")
+	m.Require().NoError(err)
+	jc, err := NewJoltifyBridge(m.network.Validators[0].RPCAddress, m.network.Validators[0].RPCAddress, &tss, tl)
 	m.Require().NoError(err)
 	defer func() {
 		err2 := jc.TerminateBridge()

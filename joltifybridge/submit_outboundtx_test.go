@@ -2,6 +2,9 @@ package joltifybridge
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -16,8 +19,6 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/validators"
 	"gitlab.com/joltify/joltifychain/testutil/network"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
-	"testing"
-	"time"
 )
 
 type SubmitOutBoundTestSuite struct {
@@ -98,7 +99,9 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 		true,
 		true,
 	}
-	jc, err := NewJoltifyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, &tss)
+	tl, err := createMockTokenlist("testAddr", "testDenom")
+	s.Require().NoError(err)
+	jc, err := NewJoltifyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, &tss, tl)
 	s.Require().NoError(err)
 	jc.Keyring = s.validatorky
 

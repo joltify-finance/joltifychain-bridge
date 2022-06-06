@@ -2,13 +2,14 @@ package joltifybridge
 
 import (
 	"fmt"
+	"math/big"
+	"sync"
+	"testing"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/joltify/joltifychain-bridge/common"
-	"math/big"
-	"sync"
-	"testing"
 )
 
 func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
@@ -21,7 +22,7 @@ func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewOutboundReq(txid, addr, addr, testCoin, int64(i), int64(i))
+		item := common.NewOutboundReq(txid, addr, addr, testCoin, "testAddr", int64(i), int64(i))
 		retReq[i] = &item
 	}
 	return retReq
