@@ -16,7 +16,7 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPoo
 	// movefund according to the history tokenlist
 	existedTokenAddresses := pi.TokenList.GetAllExistedTokenAddresses()
 	for _, tokenAddr := range existedTokenAddresses {
-		emptyAccount, err := pi.doMoveFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight, tokenAddr)
+		emptyAccount, err := pi.doMoveTokenFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight, tokenAddr)
 		// once there exists one token in the current pool, then we need to addMoveFundItem
 		if err != nil {
 			zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v for token %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String(), tokenAddr)
@@ -31,6 +31,11 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPoo
 	if !emptyAccountForAllTokens {
 		// we add this account to "retry" to ensure it is the empty account in the next balance check
 		pi.AddMoveFundItem(previousPool, pi.CurrentHeight)
+	} else {
+		_, err := pi.doMoveBNBFunds(previousPool, currentPool[1].EthAddress, blockHeight)
+		if err != nil {
+			zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v for bnb", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
+		}
 	}
 	return !emptyAccountForAllTokens
 }

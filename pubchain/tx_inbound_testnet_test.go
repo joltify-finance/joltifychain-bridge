@@ -2,7 +2,10 @@ package pubchain
 
 import (
 	"encoding/hex"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 	"math/big"
+	"os"
+	"path"
 	"sync"
 	"testing"
 	"time"
@@ -24,6 +27,22 @@ type TestNetTestSuite struct {
 	sk2      *secp256k1.PrivKey
 }
 
+func loadMockTokenlist() (*tokenlist.TokenList, error) {
+	// init the token list file path
+	current, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	// write the temp file for mockTokenlist
+	tokenlistPath := path.Join(current, "../test_data/tokenlist/tokenlist.json")
+	// init the tokenlist with provided tokenAddress,tokenDenom pair
+	tl, err := tokenlist.NewTokenList(tokenlistPath, 100)
+	if err != nil {
+		return nil, err
+	}
+	return tl, nil
+}
+
 func (tn *TestNetTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	websocketTest := "ws://rpc.joltify.io:8456/"
@@ -32,39 +51,27 @@ func (tn *TestNetTestSuite) SetupSuite() {
 	a1 := "c225ac7cf268405670c004e0b8f6b7df5fefb80f3505aaf9619ea89c787a67e7"
 	a2 := "481d305c7be328b6defd500209f9fdfb5447231f4c1f665324df951029506e12"
 	data, err := hex.DecodeString(a1)
-	if err != nil {
-		panic(err)
-	}
+	tn.Require().NoError(err)
 	sk := secp256k1.PrivKey{Key: data}
 	pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, sk.PubKey()) //nolint
-	if err != nil {
-		panic(err)
-	}
+	tn.Require().NoError(err)
 	tn.pk1 = pk
 	tn.sk1 = &sk
 
 	data, err = hex.DecodeString(a2)
-	if err != nil {
-		panic(err)
-	}
+	tn.Require().NoError(err)
 	sk2 := secp256k1.PrivKey{Key: data}
 	pk2, err := legacybech32.MarshalPubKey(legacybech32.AccPK, sk2.PubKey()) //nolint
-	if err != nil {
-		panic(err)
-	}
+	tn.Require().NoError(err)
 
 	tn.pk2 = pk2
 	tn.sk2 = &sk2
 
 	tss := TssMock{sk: &sk}
-	tl, err := createMockTokenlist("0xeB42ff4cA651c91EB248f8923358b6144c6B4b79", "JUSD")
-	if err != nil {
-		panic(err)
-	}
+	tl, err := loadMockTokenlist()
+	tn.Require().NoError(err)
 	pubChain, err := NewChainInstance(websocketTest, &tss, tl)
-	if err != nil {
-		panic(err)
-	}
+	tn.Require().NoError(err)
 
 	tn.pubChain = pubChain
 }
