@@ -59,7 +59,9 @@ func NewBridgeService(config config.Config) {
 	}
 
 	// now we load the token list
-	tl, err := tokenlist.NewTokenList(config.TokenListPath, int64(config.TokenListUpdateGap))
+
+	tokenPath := path.Join(config.HomeDir, config.TokenListPath)
+	tl, err := tokenlist.NewTokenList(tokenPath, int64(config.TokenListUpdateGap))
 	if err != nil {
 		fmt.Printf("fail to load token list")
 		cancel()
@@ -381,7 +383,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					continue
 				}
 				// process block with rollback gap
-				var processableBlockHeight = big.NewInt(0).Sub(head.Number, big.NewInt(pubRollbackGap))
+				processableBlockHeight := big.NewInt(0).Sub(head.Number, big.NewInt(pubRollbackGap))
 				err := pi.ProcessNewBlock(processableBlockHeight, joltifyBlockHeight)
 				pi.CurrentHeight = head.Number.Int64()
 				if err != nil {
