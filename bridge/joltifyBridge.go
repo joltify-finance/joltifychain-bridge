@@ -10,10 +10,12 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff"
+	"github.com/tendermint/tendermint/types"
 	"gitlab.com/joltify/joltifychain-bridge/storage"
 	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 
@@ -29,8 +31,6 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 
 	zlog "github.com/rs/zerolog/log"
-
-	"github.com/tendermint/tendermint/types"
 )
 
 // NewBridgeService starts the new bridge service
@@ -526,7 +526,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 								bf.MaxElapsedTime = time.Minute
 								bf.MaxInterval = time.Second * 10
 								op := func() error {
-									errInner := joltChain.SubmitOutboundTx(nil, itemCheck.Hash().Hex(), itemCheck.OriginalHeight, txHash)
+									// we need to submit the pool created height as the validator may change in chain cosmos staking module
+									// since we have started process the block, it is confirmed we have two pools
+									pools := pi.GetPool()
+									poolCreateHeight, err := strconv.ParseInt(pools[1].PoolInfo.BlockHeight, 10, 64)
+									if err != nil {
+										panic("blockheigh convert should never fail")
+									}
+									errInner := joltChain.SubmitOutboundTx(nil, itemCheck.Hash().Hex(), poolCreateHeight, txHash)
 									return errInner
 								}
 								err := backoff.Retry(op, bf)
