@@ -22,7 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
 
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -33,11 +33,11 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	common2 "gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain-bridge/generated"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
+	common2 "gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/generated"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -182,7 +182,7 @@ func TestCheckToBridge(t *testing.T) {
 }
 
 func TestProcessInBound(t *testing.T) {
-	websocketTest := "ws://rpc.joltify.io:8456/"
+	websocketTest := "ws://rpc.test.oppy.zone:8456/"
 	acc, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 	tssServer := TssMock{acc[0].sk}

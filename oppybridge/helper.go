@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"context"
@@ -12,8 +12,8 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	grpc1 "github.com/gogo/protobuf/grpc"
 	types "github.com/tendermint/tendermint/proto/tendermint/types"
-	"gitlab.com/joltify/joltifychain-bridge/tssclient"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 // queryAccount get the current sender account info
@@ -92,7 +92,7 @@ func QueryTipValidator(grpcClient grpc1.ClientConn) (int64, []*tmservice.Validat
 	return resp.BlockHeight, resp.Validators, nil
 }
 
-// GetLastBlockHeight get the last height of the joltify chain
+// GetLastBlockHeight get the last height of the oppy chain
 func GetLastBlockHeight(grpcClient grpc1.ClientConn) (int64, error) {
 	ts := tmservice.NewServiceClient(grpcClient)
 
@@ -122,7 +122,7 @@ func GetBlockByHeight(grpcClient grpc1.ClientConn, height int64) (*types.Block, 
 }
 
 // CheckTxStatus check whether the tx has been done successfully
-func (jc *JoltifyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSeq uint64) error {
+func (jc *OppyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSeq uint64) error {
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
 
 	alreadyPassed := false
@@ -149,7 +149,7 @@ func (jc *JoltifyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSe
 	return err
 }
 
-func (jc *JoltifyChainInstance) composeAndSend(operator keyring.Info, sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
+func (jc *OppyChainInstance) composeAndSend(operator keyring.Info, sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
 	gasWanted := jc.GetGasEstimation()
 	txBuilder, err := jc.genSendTx(operator, []sdk.Msg{sendMsg}, accSeq, accNum, uint64(gasWanted), signMsg)
 	if err != nil {

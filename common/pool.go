@@ -3,15 +3,15 @@ package common
 import (
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
-// PoolInfo stores the pool and pk of the joltify pool
+// PoolInfo stores the pool and pk of the oppy pool
 type PoolInfo struct {
-	Pk             string
-	JoltifyAddress types.AccAddress
-	EthAddress     common.Address
-	PoolInfo       *vaulttypes.PoolInfo
+	Pk          string
+	OppyAddress types.AccAddress
+	EthAddress  common.Address
+	PoolInfo    *vaulttypes.PoolInfo
 }
 
 // OutBoundReq is the entity for the outbound tx
@@ -27,17 +27,17 @@ type OutBoundReq struct {
 	Nonce              uint64         `json:"nonce"`
 }
 
-// InBoundReq is the account that top up account info to joltify pub_chain
+// InBoundReq is the account that top up account info to oppy pub_chain
 type InBoundReq struct {
-	Address            types.AccAddress `json:"address"`
-	TxID               []byte           `json:"tx_id"` // this indicates the identical inbound req
-	ToPoolAddr         common.Address   `json:"to_pool_addr"`
-	Coin               types.Coin       `json:"coin"`
-	BlockHeight        int64            `json:"block_height"`
-	OriginalHeight     int64            `json:"original_height"`
-	RoundBlockHeight   int64            `json:"round_block_height"`
-	AccNum             uint64           `json:"acc_num"`
-	AccSeq             uint64           `json:"acc_seq"`
-	PoolJoltifyAddress types.AccAddress `json:"pool_joltify_address"`
-	PoolPk             string           `json:"pool_pk"`
+	Address          types.AccAddress `json:"address"`
+	TxID             []byte           `json:"tx_id"` // this indicates the identical inbound req
+	ToPoolAddr       common.Address   `json:"to_pool_addr"`
+	Coin             types.Coin       `json:"coin"`
+	BlockHeight      int64            `json:"block_height"`
+	OriginalHeight   int64            `json:"original_height"`
+	RoundBlockHeight int64            `json:"round_block_height"`
+	AccNum           uint64           `json:"acc_num"`
+	AccSeq           uint64           `json:"acc_seq"`
+	PoolOppyAddress  types.AccAddress `json:"pool_oppy_address"`
+	PoolPk           string           `json:"pool_pk"`
 }

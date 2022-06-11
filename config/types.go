@@ -15,7 +15,7 @@ const (
 	MINCHECKBLOCKGAP = 6
 )
 
-var ChainID = "joltifyChain-1"
+var ChainID = "oppyChain-1"
 
 const (
 	InBound = iota
@@ -23,5 +23,5 @@ const (
 	QueryTimeOut = time.Second * 6
 )
 
-// direction is the direction of the joltify_bridge
+// direction is the direction of the oppy_bridge
 type Direction int

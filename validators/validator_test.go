@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	cryptoenc "github.com/tendermint/tendermint/crypto/encoding"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 	"testing"
 )
 

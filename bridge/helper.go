@@ -1,9 +1,9 @@
 package bridge
 
 import (
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 func NeedUpdate(qcPools []*vaulttypes.PoolInfo, curPools []*common.PoolInfo) bool {
@@ -23,13 +23,13 @@ func NeedUpdate(qcPools []*vaulttypes.PoolInfo, curPools []*common.PoolInfo) boo
 			return false
 		}
 		v1 := common.PoolInfo{
-			Pk:             pk,
-			JoltifyAddress: addr,
-			EthAddress:     ethAddr,
+			Pk:          pk,
+			OppyAddress: addr,
+			EthAddress:  ethAddr,
 		}
 		qPools = append(qPools, v1)
 	}
-	if qPools[0].JoltifyAddress.Equals(curPools[1].JoltifyAddress) && qPools[1].JoltifyAddress.Equals(curPools[0].JoltifyAddress) {
+	if qPools[0].OppyAddress.Equals(curPools[1].OppyAddress) && qPools[1].OppyAddress.Equals(curPools[0].OppyAddress) {
 		return false
 	}
 	return true

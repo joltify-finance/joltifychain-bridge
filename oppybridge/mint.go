@@ -1,11 +1,11 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"errors"
-	"gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
 
-	"gitlab.com/joltify/joltifychain-bridge/tssclient"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string) (*vaulttypes.MsgCreateIssueToken, error) {
@@ -18,8 +18,8 @@ func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string
 	return a, nil
 }
 
-// ProcessInBound mint the token in joltify chain
-func (jc *JoltifyChainInstance) ProcessInBound(item *common.InBoundReq) (string, string, error) {
+// ProcessInBound mint the token in oppy chain
+func (jc *OppyChainInstance) ProcessInBound(item *common.InBoundReq) (string, string, error) {
 
 	accSeq, accNum, poolAddress, poolPk := item.GetAccountInfo()
 	// we need to check against the previous account sequence

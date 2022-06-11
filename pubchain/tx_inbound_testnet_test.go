@@ -10,9 +10,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	"github.com/stretchr/testify/suite"
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 type TestNetTestSuite struct {
@@ -26,7 +26,7 @@ type TestNetTestSuite struct {
 
 func (tn *TestNetTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
-	websocketTest := "ws://rpc.joltify.io:8456/"
+	websocketTest := "ws://rpc.test.oppy.zone:8456/"
 	// tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
 
 	a1 := "c225ac7cf268405670c004e0b8f6b7df5fefb80f3505aaf9619ea89c787a67e7"
@@ -91,9 +91,9 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	tn.Require().NoError(err)
 
 	pool := bcommon.PoolInfo{
-		Pk:             tn.pk1,
-		JoltifyAddress: ja,
-		EthAddress:     ea,
+		Pk:          tn.pk1,
+		OppyAddress: ja,
+		EthAddress:  ea,
 	}
 
 	ja2, err := misc.PoolPubKeyToJoltAddress(tn.pk2)
@@ -102,9 +102,9 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	tn.Require().NoError(err)
 
 	pool2 := bcommon.PoolInfo{
-		Pk:             tn.pk2,
-		JoltifyAddress: ja2,
-		EthAddress:     ea2,
+		Pk:          tn.pk2,
+		OppyAddress: ja2,
+		EthAddress:  ea2,
 	}
 
 	poolInfo1 := vaulttypes.PoolInfo{

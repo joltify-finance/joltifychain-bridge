@@ -8,9 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 	"gotest.tools/assert"
 )
 
@@ -23,7 +23,7 @@ const (
 
 func TestFeedTx(t *testing.T) {
 	misc.SetupBech32Prefix()
-	websocketTest := "ws://rpc.joltify.io:8456/"
+	websocketTest := "ws://rpc.test.oppy.zone:8456/"
 	acc, err := generateRandomPrivKey(3)
 	assert.NilError(t, err)
 	testTx := types.MustSignNewTx(testKey, types.LatestSigner(genesis.Config), &types.LegacyTx{

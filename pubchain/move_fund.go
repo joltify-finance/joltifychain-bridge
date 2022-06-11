@@ -4,7 +4,7 @@ import (
 	zlog "github.com/rs/zerolog/log"
 	"sync"
 
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 )
 
 //MoveFound moves the fund for the public chain

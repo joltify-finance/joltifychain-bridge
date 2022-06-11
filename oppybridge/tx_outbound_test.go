@@ -1,11 +1,11 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"strconv"
 	"testing"
 	"time"
 
-	common2 "gitlab.com/joltify/joltifychain-bridge/common"
+	common2 "gitlab.com/oppy-finance/oppy-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
@@ -18,10 +18,10 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/joltify/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain/testutil/network"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppychain/testutil/network"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 type OutBoundTestSuite struct {
@@ -146,7 +146,7 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 	//
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	o.Require().NoError(err)
-	jc, err := NewJoltifyBridge(o.network.Validators[0].APIAddress, o.network.Validators[0].RPCAddress, &tss, tl)
+	jc, err := NewOppyBridge(o.network.Validators[0].APIAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
 	defer func() {
 		err := jc.TerminateBridge()
@@ -180,7 +180,7 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 	o.Require().NoError(err)
 	pools := jc.GetPool()
 	o.Require().Nil(pools[0])
-	addr2 := pools[1].JoltifyAddress
+	addr2 := pools[1].OppyAddress
 	o.Require().True(pk.Equals(addr2))
 	// now we add another pool
 	cospk = legacybech32.MustMarshalPubKey(legacybech32.AccPK, key2.GetPubKey()) // nolint
@@ -197,9 +197,9 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 	pubkeyStr = key2.GetPubKey().Address().String()
 	pk2, err := sdk.AccAddressFromHex(pubkeyStr)
 	o.Require().NoError(err)
-	o.Require().True(pk.Equals(pools[0].JoltifyAddress))
+	o.Require().True(pk.Equals(pools[0].OppyAddress))
 
-	pool1 := jc.lastTwoPools[1].JoltifyAddress
+	pool1 := jc.lastTwoPools[1].OppyAddress
 	o.Require().True(pk2.Equals(pool1))
 
 	// now we add another pool and pop out the firt one
@@ -219,7 +219,7 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 	pubkeyStr = key3.GetPubKey().Address().String()
 	pk3, err := sdk.AccAddressFromHex(pubkeyStr)
 	o.Require().NoError(err)
-	o.Require().True(pk3.Equals(pools[1].JoltifyAddress))
+	o.Require().True(pk3.Equals(pools[1].OppyAddress))
 
 	time.Sleep(time.Second)
 }
@@ -267,7 +267,7 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	}
 	tl, err := createMockTokenlist("testAddr", DenomJUSD)
 	o.Require().NoError(err)
-	jc, err := NewJoltifyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
+	jc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
 	defer func() {
 		err2 := jc.TerminateBridge()

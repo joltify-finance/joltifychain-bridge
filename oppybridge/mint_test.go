@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -19,10 +19,10 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain/testutil/network"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppychain/testutil/network"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 type MintTestSuite struct {
@@ -107,7 +107,7 @@ func (m MintTestSuite) TestPrepareIssueTokenRequest() {
 	m.Require().NoError(err)
 }
 
-func Gensigntx(jc *JoltifyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum, accSeq uint64, signkeyring keyring.Keyring) (client.TxBuilder, error) {
+func Gensigntx(jc *OppyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum, accSeq uint64, signkeyring keyring.Keyring) (client.TxBuilder, error) {
 	encCfg := *jc.encoding
 	// Create a new TxBuilder.
 	txBuilder := encCfg.TxConfig.NewTxBuilder()
@@ -185,7 +185,7 @@ func (m MintTestSuite) TestProcessInbound() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	m.Require().NoError(err)
-	jc, err := NewJoltifyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, &tss, tl)
+	jc, err := NewOppyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, &tss, tl)
 	m.Require().NoError(err)
 	jc.Keyring = m.validatorky
 
@@ -225,9 +225,9 @@ func (m MintTestSuite) TestProcessInbound() {
 	m.Require().True(ret)
 
 	pool := common.PoolInfo{
-		Pk:             accs[0].pk,
-		JoltifyAddress: accs[0].joltAddr,
-		EthAddress:     accs[0].commAddr,
+		Pk:          accs[0].pk,
+		OppyAddress: accs[0].joltAddr,
+		EthAddress:  accs[0].commAddr,
 	}
 
 	jc.lastTwoPools[0] = &pool

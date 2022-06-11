@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"encoding/hex"
@@ -6,18 +6,18 @@ import (
 	"fmt"
 	"strings"
 
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/tssclient"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	"gitlab.com/joltify/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
-func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte) error {
+func (jc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 
 	toAddress, err := types.AccAddressFromBech32(msg.ToAddress)
@@ -26,7 +26,7 @@ func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.Ac
 		return err
 	}
 
-	// here we need to calculate the node's eth address from public key rather than the joltify chain address
+	// here we need to calculate the node's eth address from public key rather than the oppy chain address
 	acc, err := queryAccount(msg.FromAddress, jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("Fail to query the account")
@@ -38,7 +38,7 @@ func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.Ac
 		jc.logger.Error().Err(err).Msg("Fail to get the eth address")
 		return err
 	}
-	// now we wrap the fromEthAddress with joltify hex address
+	// now we wrap the fromEthAddress with oppy hex address
 	wrapFromEthAddr, err := types.AccAddressFromHex(fromEthAddr.Hex()[2:])
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("Fail to wrap the eth address")
@@ -95,7 +95,7 @@ func (jc *JoltifyChainInstance) processMsg(blockHeight int64, address []types.Ac
 	return errors.New("we only allow fee and top up in one tx now")
 }
 
-func (jc *JoltifyChainInstance) processDemonAndFee(txID string, blockHeight int64, fromAddress types.AccAddress, demonName string, demonAmount, feeAmount types.Int) *outboundTx {
+func (jc *OppyChainInstance) processDemonAndFee(txID string, blockHeight int64, fromAddress types.AccAddress, demonName string, demonAmount, feeAmount types.Int) *outboundTx {
 	token := types.Coin{
 		Denom:  demonName,
 		Amount: demonAmount,
@@ -126,7 +126,7 @@ func (jc *JoltifyChainInstance) processDemonAndFee(txID string, blockHeight int6
 }
 
 // GetPool get the latest two pool address
-func (jc *JoltifyChainInstance) GetPool() []*bcommon.PoolInfo {
+func (jc *OppyChainInstance) GetPool() []*bcommon.PoolInfo {
 	jc.poolUpdateLocker.RLock()
 	defer jc.poolUpdateLocker.RUnlock()
 	var ret []*bcommon.PoolInfo
@@ -135,7 +135,7 @@ func (jc *JoltifyChainInstance) GetPool() []*bcommon.PoolInfo {
 }
 
 // UpdatePool update the tss pool address
-func (jc *JoltifyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.PoolInfo {
+func (jc *OppyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.PoolInfo {
 	poolPubKey := pool.CreatePool.PoolPubKey
 	ethAddr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
 	if err != nil {
@@ -150,10 +150,10 @@ func (jc *JoltifyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.P
 	}
 
 	p := bcommon.PoolInfo{
-		Pk:             poolPubKey,
-		JoltifyAddress: addr,
-		EthAddress:     ethAddr,
-		PoolInfo:       pool,
+		Pk:          poolPubKey,
+		OppyAddress: addr,
+		EthAddress:  ethAddr,
+		PoolInfo:    pool,
 	}
 
 	jc.poolUpdateLocker.Lock()
@@ -167,8 +167,8 @@ func (jc *JoltifyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.P
 	return previousPool
 }
 
-func (jc *JoltifyChainInstance) DoMoveFunds(fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) (bool, error) {
-	from := fromPool.JoltifyAddress
+func (jc *OppyChainInstance) DoMoveFunds(fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) (bool, error) {
+	from := fromPool.OppyAddress
 	acc, err := queryAccount(from.String(), jc.grpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("Fail to query the pool account")

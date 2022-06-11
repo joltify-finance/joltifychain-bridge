@@ -12,8 +12,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
 func createdTestOutBoundReqs(n int) []*common.InBoundReq {
@@ -73,15 +73,15 @@ func TestConfig(t *testing.T) {
 	accs, err := generateRandomPrivKey(2)
 	assert.Nil(t, err)
 	pool := common.PoolInfo{
-		Pk:             accs[0].pk,
-		JoltifyAddress: accs[0].joltAddr,
-		EthAddress:     accs[0].commAddr,
+		Pk:          accs[0].pk,
+		OppyAddress: accs[0].joltAddr,
+		EthAddress:  accs[0].commAddr,
 	}
 
 	pool1 := common.PoolInfo{
-		Pk:             accs[1].pk,
-		JoltifyAddress: accs[1].joltAddr,
-		EthAddress:     accs[1].commAddr,
+		Pk:          accs[1].pk,
+		OppyAddress: accs[1].joltAddr,
+		EthAddress:  accs[1].commAddr,
 	}
 
 	jc.AddMoveFundItem(&pool, 10)

@@ -1,4 +1,4 @@
-module = gitlab.com/joltify/joltifyBridge
+module = gitlab.com/oppy-finance/oppy-bridge
 
 .PHONY: clear tools install test test-watch lint-pre lint lint-verbose protob build docker-gitlab-login docker-gitlab-push docker-gitlab-build
 
@@ -9,7 +9,7 @@ clear:
 
 
 install: go.sum
-	go install ./cmd/joltifyBridge.go
+	go install ./cmd/oppyBridge.go
 
 go.sum: go.mod
 	@echo "--> Ensure dependencies have not been modified"
@@ -22,8 +22,8 @@ test-watch: clear
 	@gow -c test -tags testnet -mod=readonly ./...
 
 lint-pre:
-	@gofumpt -l  cmd config joltifybridge monitor storage validators bridge common misc pubchain tssclient
-	#@test -z "$(shell gofumpt -l  cmd config joltifybridge monitor storage validators bridge common misc pubchain tssclient)" # cause error
+	@gofumpt -l  cmd config oppybridge monitor storage validators bridge common misc pubchain tssclient
+	#@test -z "$(shell gofumpt -l  cmd config oppybridge monitor storage validators bridge common misc pubchain tssclient)" # cause error
 	@go mod verify
 
 lint: lint-pre
@@ -43,8 +43,8 @@ docker-gitlab-login:
 	docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
 
 docker-gitlab-push:
-	docker push registry.gitlab.com/joltify/tss/go-tss
+	docker push registry.gitlab.com/oppy/tss/go-tss
 
 docker-gitlab-build:
-	docker build -t registry.gitlab.com/joltify/tss/go-tss .
-	docker tag registry.gitlab.com/joltify/tss/go-tss $$(git rev-parse --short HEAD)
+	docker build -t registry.gitlab.com/oppy/tss/go-tss .
+	docker tag registry.gitlab.com/oppy/tss/go-tss $$(git rev-parse --short HEAD)

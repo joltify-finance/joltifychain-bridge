@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"context"
@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
-	"gitlab.com/joltify/joltifychain-bridge/tssclient"
+	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
 
-	"github.com/joltify-finance/tss/common"
+	"github.com/oppyfinance/tss/common"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 
@@ -18,8 +18,8 @@ import (
 const capacity = 10000
 
 // AddSubscribe add the subscirbe to the chain
-func (jc *JoltifyChainInstance) AddSubscribe(ctx context.Context, query string) (<-chan ctypes.ResultEvent, error) {
-	out, err := jc.wsClient.Subscribe(ctx, "joltifyBridge", query, capacity)
+func (jc *OppyChainInstance) AddSubscribe(ctx context.Context, query string) (<-chan ctypes.ResultEvent, error) {
+	out, err := jc.wsClient.Subscribe(ctx, "oppyBridge", query, capacity)
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("Failed to subscribe to query with error %v", err)
 		return nil, err
@@ -29,7 +29,7 @@ func (jc *JoltifyChainInstance) AddSubscribe(ctx context.Context, query string) 
 }
 
 // HandleUpdateValidators check whether we need to generate the new tss pool message
-func (jc *JoltifyChainInstance) HandleUpdateValidators(height int64) error {
+func (jc *OppyChainInstance) HandleUpdateValidators(height int64) error {
 	v, err := jc.getValidators(strconv.FormatInt(height, 10))
 	if err != nil {
 		return err

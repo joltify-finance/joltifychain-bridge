@@ -16,19 +16,19 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/tendermint/tendermint/types"
-	"gitlab.com/joltify/joltifychain-bridge/storage"
-	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
+	"gitlab.com/oppy-finance/oppy-bridge/storage"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
 	"github.com/ethereum/go-ethereum/common"
 
-	common2 "gitlab.com/joltify/joltifychain-bridge/common"
+	common2 "gitlab.com/oppy-finance/oppy-bridge/common"
 
-	"gitlab.com/joltify/joltifychain-bridge/monitor"
-	"gitlab.com/joltify/joltifychain-bridge/tssclient"
+	"gitlab.com/oppy-finance/oppy-bridge/monitor"
+	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
 
-	"gitlab.com/joltify/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain-bridge/joltifybridge"
-	"gitlab.com/joltify/joltifychain-bridge/pubchain"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
+	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
 
 	zlog "github.com/rs/zerolog/log"
 )
@@ -76,9 +76,9 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	joltifyBridge, err := joltifybridge.NewJoltifyBridge(config.JoltifyChain.GrpcAddress, config.JoltifyChain.WsAddress, tssServer, tl)
+	oppyBridge, err := oppybridge.NewOppyBridge(config.OppyChain.GrpcAddress, config.OppyChain.WsAddress, tssServer, tl)
 	if err != nil {
-		log.Fatalln("fail to create the invoice joltify_bridge", err)
+		log.Fatalln("fail to create the invoice oppy_bridge", err)
 		cancel()
 		return
 	}
@@ -93,26 +93,26 @@ func NewBridgeService(config config.Config) {
 	}
 
 	// fixme need to update the passcode
-	err = joltifyBridge.Keyring.ImportPrivKey("operator", string(dat), "12345678")
+	err = oppyBridge.Keyring.ImportPrivKey("operator", string(dat), "12345678")
 	if err != nil {
 		cancel()
 		return
 	}
 
 	defer func() {
-		err := joltifyBridge.TerminateBridge()
+		err := oppyBridge.TerminateBridge()
 		if err != nil {
 			return
 		}
 	}()
 
-	err = joltifyBridge.InitValidators(config.JoltifyChain.HTTPAddress)
+	err = oppyBridge.InitValidators(config.OppyChain.HTTPAddress)
 	if err != nil {
 		fmt.Printf("error in init the validators %v", err)
 		cancel()
 		return
 	}
-	tssHTTPServer := NewJoltifyHttpServer(ctx, config.TssConfig.HTTPAddr, joltifyBridge.GetTssNodeID())
+	tssHTTPServer := NewOppyHttpServer(ctx, config.TssConfig.HTTPAddr, oppyBridge.GetTssNodeID())
 
 	wg.Add(1)
 	ret := tssHTTPServer.Start(&wg)
@@ -137,7 +137,7 @@ func NewBridgeService(config config.Config) {
 	}
 	if items != nil {
 		for _, el := range items {
-			joltifyBridge.AddItem(el)
+			oppyBridge.AddItem(el)
 		}
 		fmt.Printf("we have loaded the unprocessed outbound tx")
 	}
@@ -178,12 +178,12 @@ func NewBridgeService(config config.Config) {
 		fmt.Printf("we have loaded the unprocessed inbound bnb pending tx")
 	}
 
-	addEventLoop(ctx, &wg, joltifyBridge, pi, metrics, fsm, int64(config.JoltifyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl)
+	addEventLoop(ctx, &wg, oppyBridge, pi, metrics, fsm, int64(config.OppyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl)
 	<-c
 	cancel()
 	wg.Wait()
 
-	itemsexported := joltifyBridge.ExportItems()
+	itemsexported := oppyBridge.ExportItems()
 	err = fsm.SaveOutBoundState(itemsexported)
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to save the outbound requests!!!")
@@ -214,8 +214,8 @@ func NewBridgeService(config config.Config) {
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybridge.JoltifyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, joltRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList) {
-	query := "complete_churn.churn = 'joltify_churn'"
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, joltRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList) {
+	query := "complete_churn.churn = 'oppy_churn'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
 
@@ -226,7 +226,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 	}
 
 	query = "tm.event = 'NewBlock'"
-	newJoltifyBlock, err := joltChain.AddSubscribe(ctxLocal, query)
+	newOppyBlock, err := joltChain.AddSubscribe(ctxLocal, query)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return
@@ -280,8 +280,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 					continue
 				}
 
-			// process the new joltify block, validator may need to submit the pool address
-			case block := <-newJoltifyBlock:
+			// process the new oppy block, validator may need to submit the pool address
+			case block := <-newOppyBlock:
 				currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
 				ok, _ := joltChain.CheckAndUpdatePool(currentBlockHeight)
 				if !ok {
@@ -377,14 +377,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 
 				// process the public chain new block event
 			case head := <-pubNewBlockChan:
-				joltifyBlockHeight, errInner := joltChain.GetLastBlockHeight()
+				oppyBlockHeight, errInner := joltChain.GetLastBlockHeight()
 				if errInner != nil {
-					zlog.Logger.Error().Err(err).Msg("fail to get the joltify chain block height for this round")
+					zlog.Logger.Error().Err(err).Msg("fail to get the oppy chain block height for this round")
 					continue
 				}
 				// process block with rollback gap
 				processableBlockHeight := big.NewInt(0).Sub(head.Number, big.NewInt(pubRollbackGap))
-				err := pi.ProcessNewBlock(processableBlockHeight, joltifyBlockHeight)
+				err := pi.ProcessNewBlock(processableBlockHeight, oppyBlockHeight)
 				pi.CurrentHeight = head.Number.Int64()
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
@@ -412,7 +412,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 				}
 
 				// todo we need also to add the check to avoid send tx near the churn blocks
-				if joltifyBlockHeight-previousTssBlockOutBound >= joltifybridge.GroupBlockGap && joltChain.Size() != 0 {
+				if oppyBlockHeight-previousTssBlockOutBound >= oppybridge.GroupBlockGap && joltChain.Size() != 0 {
 					// if we do not have enough tx to process, we wait for another round
 					if joltChain.Size() < pubchain.GroupSign && firstTimeOutbound {
 						firstTimeOutbound = false
@@ -445,12 +445,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						continue
 					}
 
-					err = pi.FeedTx(joltifyBlockHeight, pools[1].PoolInfo, outboundItems)
+					err = pi.FeedTx(oppyBlockHeight, pools[1].PoolInfo, outboundItems)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
 						continue
 					}
-					previousTssBlockOutBound = joltifyBlockHeight
+					previousTssBlockOutBound = oppyBlockHeight
 					firstTimeOutbound = true
 					metric.UpdateOutboundTxNum(float64(joltChain.Size()))
 
@@ -520,7 +520,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 							if err == nil {
 								tick := html.UnescapeString("&#" + "128228" + ";")
 								zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, fromAddr, toAddr, amount.String())
-								// now we submit our public chain tx to joltifychain
+								// now we submit our public chain tx to oppychain
 								localSubmitLocker.Lock()
 								bf := backoff.NewExponentialBackOff()
 								bf.MaxElapsedTime = time.Minute

@@ -12,8 +12,8 @@ import (
 
 	"sync"
 
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/pubchain"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
 )
 
 // LocalStateManager provide necessary methods to manage the local state, save it , and read it back

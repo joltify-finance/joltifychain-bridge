@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"context"
@@ -13,12 +13,12 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain-bridge/validators"
-	"gitlab.com/joltify/joltifychain/testutil/network"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/validators"
+	"gitlab.com/oppy-finance/oppychain/testutil/network"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 type SubmitOutBoundTestSuite struct {
@@ -101,7 +101,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	s.Require().NoError(err)
-	jc, err := NewJoltifyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, &tss, tl)
+	jc, err := NewOppyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, &tss, tl)
 	s.Require().NoError(err)
 	jc.Keyring = s.validatorky
 

@@ -30,7 +30,7 @@ func NewMetric() *Metric {
 
 		inboundTxNum: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Namespace: "Joltify",
+				Namespace: "Oppy",
 				Subsystem: "bridge",
 				Name:      "inbound_tx",
 				Help:      "the number of tx in inbound queue",
@@ -39,14 +39,14 @@ func NewMetric() *Metric {
 
 		outboundTxNum: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Namespace: "Joltify",
+				Namespace: "Oppy",
 				Subsystem: "bridge",
 				Name:      "outbound_tx",
 				Help:      "the number of tx in outbound queue",
 			},
 		),
 
-		logger: log.With().Str("module", "joltifyMonitor").Logger(),
+		logger: log.With().Str("module", "oppyMonitor").Logger(),
 	}
 	return &metrics
 }

@@ -1,11 +1,11 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"strconv"
 	"sync"
 
@@ -15,18 +15,18 @@ import (
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
 	prototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	tendertypes "github.com/tendermint/tendermint/types"
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/config"
+	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
 
 	coscrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	"github.com/joltify-finance/tss/common"
-	"github.com/joltify-finance/tss/keysign"
+	"github.com/oppyfinance/tss/common"
+	"github.com/oppyfinance/tss/keysign"
 	"github.com/tendermint/tendermint/crypto"
 	tmclienthttp "github.com/tendermint/tendermint/rpc/client/http"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain-bridge/tssclient"
-	"gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
+	"gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -39,13 +39,13 @@ import (
 	xauthsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
 
-// NewJoltifyBridge new the instance for the joltify pub_chain
-func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl *tokenlist.TokenList) (*JoltifyChainInstance, error) {
-	var joltifyBridge JoltifyChainInstance
+// NewOppyBridge new the instance for the oppy pub_chain
+func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl *tokenlist.TokenList) (*OppyChainInstance, error) {
+	var oppyBridge OppyChainInstance
 	var err error
-	joltifyBridge.logger = zlog.With().Str("module", "joltifyChain").Logger()
+	oppyBridge.logger = zlog.With().Str("module", "oppyChain").Logger()
 
-	joltifyBridge.grpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
+	oppyBridge.grpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
@@ -59,16 +59,16 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance
 		return nil, err
 	}
 
-	joltifyBridge.wsClient = client
+	oppyBridge.wsClient = client
 
-	joltifyBridge.Keyring = keyring.NewInMemory()
+	oppyBridge.Keyring = keyring.NewInMemory()
 
-	joltifyBridge.tssServer = tssServer
+	oppyBridge.tssServer = tssServer
 
-	joltifyBridge.msgSendCache = []tssPoolMsg{}
-	joltifyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
-	joltifyBridge.poolUpdateLocker = &sync.RWMutex{}
-	joltifyBridge.inboundGas = atomic.NewInt64(250000)
+	oppyBridge.msgSendCache = []tssPoolMsg{}
+	oppyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
+	oppyBridge.poolUpdateLocker = &sync.RWMutex{}
+	oppyBridge.inboundGas = atomic.NewInt64(250000)
 
 	// we put the dummy query here to avoid the panic
 	//query := "tm.event = 'Tx' AND transfer.sender = 'jolt1x'"
@@ -76,23 +76,23 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance
 	//if err != nil {
 	//	zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
 	//}
-	//joltifyBridge.TransferChan = make([]*<-chan ctypes.ResultEvent, 2)
-	//joltifyBridge.TransferChan = []*<-chan ctypes.ResultEvent{&out, &out}
+	//oppyBridge.TransferChan = make([]*<-chan ctypes.ResultEvent, 2)
+	//oppyBridge.TransferChan = []*<-chan ctypes.ResultEvent{&out, &out}
 
 	encode := MakeEncodingConfig()
-	joltifyBridge.encoding = &encode
-	joltifyBridge.OutboundReqChan = make(chan *bcommon.OutBoundReq, reqCacheSize)
-	joltifyBridge.RetryOutboundReq = &sync.Map{}
-	joltifyBridge.moveFundReq = &sync.Map{}
-	joltifyBridge.TokenList = tl
-	return &joltifyBridge, nil
+	oppyBridge.encoding = &encode
+	oppyBridge.OutboundReqChan = make(chan *bcommon.OutBoundReq, reqCacheSize)
+	oppyBridge.RetryOutboundReq = &sync.Map{}
+	oppyBridge.moveFundReq = &sync.Map{}
+	oppyBridge.TokenList = tl
+	return &oppyBridge, nil
 }
 
-func (jc *JoltifyChainInstance) GetTssNodeID() string {
+func (jc *OppyChainInstance) GetTssNodeID() string {
 	return jc.tssServer.GetTssNodeID()
 }
 
-func (jc *JoltifyChainInstance) TerminateBridge() error {
+func (jc *OppyChainInstance) TerminateBridge() error {
 	err := jc.wsClient.Stop()
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to terminate the ws")
@@ -102,7 +102,7 @@ func (jc *JoltifyChainInstance) TerminateBridge() error {
 	return nil
 }
 
-func (jc *JoltifyChainInstance) genSendTx(key keyring.Info, sdkMsg []sdk.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (client.TxBuilder, error) {
+func (jc *OppyChainInstance) genSendTx(key keyring.Info, sdkMsg []sdk.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (client.TxBuilder, error) {
 	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
 	// following function.
 	encCfg := *jc.encoding
@@ -172,7 +172,7 @@ func (jc *JoltifyChainInstance) genSendTx(key keyring.Info, sdkMsg []sdk.Msg, ac
 	return txBuilder, nil
 }
 
-func (jc *JoltifyChainInstance) signTx(txConfig client.TxConfig, txBuilder client.TxBuilder, signerData xauthsigning.SignerData, signMsg *tssclient.TssSignigMsg) (signing.SignatureV2, error) {
+func (jc *OppyChainInstance) signTx(txConfig client.TxConfig, txBuilder client.TxBuilder, signerData xauthsigning.SignerData, signMsg *tssclient.TssSignigMsg) (signing.SignatureV2, error) {
 	var sigV2 signing.SignatureV2
 
 	signMode := txConfig.SignModeHandler().DefaultMode()
@@ -235,7 +235,7 @@ func (jc *JoltifyChainInstance) signTx(txConfig client.TxConfig, txBuilder clien
 	return sigV2, nil
 }
 
-func (jc *JoltifyChainInstance) doTssSign(msg *tssclient.TssSignigMsg) (keysign.Response, error) {
+func (jc *OppyChainInstance) doTssSign(msg *tssclient.TssSignigMsg) (keysign.Response, error) {
 	resp, err := jc.tssServer.KeySign(msg.Pk, msg.Msgs, msg.BlockHeight, msg.Signers, tssclient.TssVersion)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to generate the tss signature")
@@ -244,8 +244,8 @@ func (jc *JoltifyChainInstance) doTssSign(msg *tssclient.TssSignigMsg) (keysign.
 	return resp, nil
 }
 
-// SimBroadcastTx broadcast the tx to the joltifyChain to get gas estimation
-func (jc *JoltifyChainInstance) SimBroadcastTx(ctx context.Context, txbytes []byte) (uint64, error) {
+// SimBroadcastTx broadcast the tx to the oppyChain to get gas estimation
+func (jc *OppyChainInstance) SimBroadcastTx(ctx context.Context, txbytes []byte) (uint64, error) {
 	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
 	// service.
 	txClient := cosTx.NewServiceClient(jc.grpcClient)
@@ -259,7 +259,7 @@ func (jc *JoltifyChainInstance) SimBroadcastTx(ctx context.Context, txbytes []by
 }
 
 // GasEstimation this function get the estimation of the fee
-func (jc *JoltifyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssSignMsg *tssclient.TssSignigMsg) (uint64, error) {
+func (jc *OppyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssSignMsg *tssclient.TssSignigMsg) (uint64, error) {
 	encoding := MakeEncodingConfig()
 	encCfg := encoding
 	// Create a new TxBuilder.
@@ -324,12 +324,12 @@ func (jc *JoltifyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, t
 }
 
 // UpdateGas update the gas needed from the last tx
-func (jc *JoltifyChainInstance) UpdateGas(gasUsed int64) {
+func (jc *OppyChainInstance) UpdateGas(gasUsed int64) {
 	jc.inboundGas.Store(gasUsed)
 }
 
 // GetGasEstimation get the gas estimation
-func (jc *JoltifyChainInstance) GetGasEstimation() int64 {
+func (jc *OppyChainInstance) GetGasEstimation() int64 {
 	previousGasUsed := jc.inboundGas.Load()
 	gasUsedDec := sdk.NewDecFromIntWithPrec(sdk.NewIntFromUint64(uint64(previousGasUsed)), 0)
 	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO)).RoundInt64()
@@ -338,8 +338,8 @@ func (jc *JoltifyChainInstance) GetGasEstimation() int64 {
 	return 50000000
 }
 
-// BroadcastTx broadcast the tx to the joltifyChain
-func (jc *JoltifyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte, isTssMsg bool) (bool, string, error) {
+// BroadcastTx broadcast the tx to the oppyChain
+func (jc *OppyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte, isTssMsg bool) (bool, string, error) {
 	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
 	// service.
 	txClient := cosTx.NewServiceClient(jc.grpcClient)
@@ -372,7 +372,7 @@ func (jc *JoltifyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte,
 	return true, txHash, nil
 }
 
-func (jc *JoltifyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
+func (jc *OppyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
 	msg := types.NewMsgCreateCreatePool(creator, pubKey, height)
 
 	acc, err := queryAccount(creator.String(), jc.grpcClient)
@@ -401,19 +401,19 @@ func (jc *JoltifyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, h
 }
 
 // GetLastBlockHeight gets the current block height
-func (jc *JoltifyChainInstance) GetLastBlockHeight() (int64, error) {
+func (jc *OppyChainInstance) GetLastBlockHeight() (int64, error) {
 	b, err := GetLastBlockHeight(jc.grpcClient)
 	return b, err
 }
 
 // GetBlockByHeight get the block based on the 'RollbackGapJolt'
-func (jc *JoltifyChainInstance) GetBlockByHeight(blockHeight int64) (*prototypes.Block, error) {
+func (jc *OppyChainInstance) GetBlockByHeight(blockHeight int64) (*prototypes.Block, error) {
 	block, err := GetBlockByHeight(jc.grpcClient, blockHeight)
 	return block, err
 }
 
-// CheckAndUpdatePool send the tx to the joltify pub_chain, if the pool outReceiverAddress is updated, it returns true
-func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, string) {
+// CheckAndUpdatePool send the tx to the oppy pub_chain, if the pool outReceiverAddress is updated, it returns true
+func (jc *OppyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, string) {
 	jc.poolUpdateLocker.Lock()
 	if len(jc.msgSendCache) < 1 {
 		jc.poolUpdateLocker.Unlock()
@@ -466,12 +466,12 @@ func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, str
 }
 
 // CheckOutBoundTx checks
-func (jc *JoltifyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertypes.Tx) {
+func (jc *OppyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertypes.Tx) {
 	pools := jc.GetPool()
 	if pools[0] == nil || pools[1] == nil {
 		return
 	}
-	poolAddress := []sdk.AccAddress{pools[0].JoltifyAddress, pools[1].JoltifyAddress}
+	poolAddress := []sdk.AccAddress{pools[0].OppyAddress, pools[1].OppyAddress}
 	config := jc.encoding
 
 	tx, err := config.TxConfig.TxDecoder()(rawTx)

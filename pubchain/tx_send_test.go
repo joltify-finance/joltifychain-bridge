@@ -8,15 +8,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	types2 "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
 func generateRandomPrivKey(n int) ([]account, error) {
@@ -121,7 +121,7 @@ func TestSendToken(t *testing.T) {
 	tss := TssMock{
 		sk: &sk,
 	}
-	websocketTest := "ws://rpc.joltify.io:8456/"
+	websocketTest := "ws://rpc.test.oppy.zone:8456/"
 	tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	assert.Nil(t, err)

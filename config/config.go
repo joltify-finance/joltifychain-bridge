@@ -8,7 +8,7 @@ import (
 	maddr "github.com/multiformats/go-multiaddr"
 )
 
-type JoltifyChainConfig struct {
+type OppyChainConfig struct {
 	GrpcAddress string
 	WsAddress   string
 	WsEndpoint  string
@@ -63,7 +63,7 @@ func (al *AddrList) Set(value string) error {
 }
 
 type Config struct {
-	JoltifyChain       JoltifyChainConfig
+	OppyChain          OppyChainConfig
 	PubChainConfig     PubChainConfig
 	TssConfig          TssConfig
 	KeyringAddress     string
@@ -75,15 +75,15 @@ type Config struct {
 
 func DefaultConfig() Config {
 	var config Config
-	flag.StringVar(&config.JoltifyChain.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for joltify pub_chain")
-	flag.StringVar(&config.JoltifyChain.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for joltify pub_chain")
-	flag.StringVar(&config.JoltifyChain.HTTPAddress, "http-port", "http://localhost:26657", "ws address for joltify pub_chain")
-	flag.StringVar(&config.JoltifyChain.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for joltify pub_chain")
-	flag.IntVar(&config.JoltifyChain.RollbackGap, "joltify-rollback-gap", 10, "delay the transaction process to prevent chain rollback")
-	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://rpc.joltify.io:8456/", "endpoint for public pub_chain listener")
+	flag.StringVar(&config.OppyChain.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for oppy pub_chain")
+	flag.StringVar(&config.OppyChain.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for oppy pub_chain")
+	flag.StringVar(&config.OppyChain.HTTPAddress, "http-port", "http://localhost:26657", "ws address for oppy pub_chain")
+	flag.StringVar(&config.OppyChain.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for oppy pub_chain")
+	flag.IntVar(&config.OppyChain.RollbackGap, "oppy-rollback-gap", 10, "delay the transaction process to prevent chain rollback")
+	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://rpc.test.oppy.zone:8456/", "endpoint for public pub_chain listener")
 	flag.IntVar(&config.PubChainConfig.RollbackGap, "pubchain-rollback-gap", 10, "delay the transaction process to prevent chain rollback")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
-	flag.StringVar(&config.HomeDir, "home", "/root/.joltifyChain/config", "home director for joltify_bridge")
+	flag.StringVar(&config.HomeDir, "home", "/root/.oppyChain/config", "home director for oppy_bridge")
 	flag.StringVar(&config.TokenListPath, "token-list", "tokenlist.json", "file path to load token white list")
 	flag.IntVar(&config.TokenListUpdateGap, "tokenlist-update-gap", 30, "gap to update the token list")
 	flag.StringVar(&config.TssConfig.HTTPAddr, "tss-http-port", "0.0.0.0:8321", "tss http port for info only")
@@ -94,10 +94,10 @@ func DefaultConfig() Config {
 	flag.DurationVar(&config.TssConfig.PartyTimeout, "joinpartytimeout", 30*time.Second, "join party timeout")
 
 	flag.DurationVar(&config.TssConfig.PreParamTimeout, "preparamtimeout", 5*time.Minute, "pre-parameter generation timeout")
-	flag.BoolVar(&config.EnableMonitor, "enablemonitor", true, "enable the joltifyChain monitor")
+	flag.BoolVar(&config.EnableMonitor, "enablemonitor", true, "enable the oppyChain monitor")
 
 	// we setup the p2p network configuration
-	flag.StringVar(&config.TssConfig.RendezvousString, "rendezvous", "joltifyChainTss",
+	flag.StringVar(&config.TssConfig.RendezvousString, "rendezvous", "oppyChainTss",
 		"Unique string to identify group of nodes. Share this with your friends to let them connect with you")
 	flag.IntVar(&config.TssConfig.Port, "p2p-port", 6668, "listening port local")
 	flag.StringVar(&config.TssConfig.ExternalIP, "external-ip", "", "external IP of this node")

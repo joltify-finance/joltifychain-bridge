@@ -2,7 +2,7 @@ package validators
 
 import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 	"sync"
 
 	"github.com/cosmos/cosmos-sdk/types"

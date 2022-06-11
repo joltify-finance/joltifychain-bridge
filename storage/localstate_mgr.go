@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"io/ioutil"
 	"os"
 	"path/filepath"

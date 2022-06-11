@@ -2,11 +2,11 @@ package main
 
 import (
 	golog "github.com/ipfs/go-log"
-	"github.com/joltify-finance/tss/common"
+	"github.com/oppyfinance/tss/common"
 	"github.com/rs/zerolog"
-	"gitlab.com/joltify/joltifychain-bridge/bridge"
-	"gitlab.com/joltify/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/bridge"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
 func main() {
@@ -17,6 +17,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	common.InitLog("info", true, "joltifyBridge_service")
+	common.InitLog("info", true, "oppyBridge_service")
 	bridge.NewBridgeService(config)
 }

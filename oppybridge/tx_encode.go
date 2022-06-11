@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -7,7 +7,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	"github.com/cosmos/cosmos-sdk/std"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
-	"gitlab.com/joltify/joltifychain/app"
+	"gitlab.com/oppy-finance/oppychain/app"
 )
 
 func genEncodingConfig() params.EncodingConfig {

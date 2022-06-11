@@ -1,20 +1,20 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common/math"
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
 )
 
-func (jc *JoltifyChainInstance) AddMoveFundItem(pool *common.PoolInfo, height int64) {
+func (jc *OppyChainInstance) AddMoveFundItem(pool *common.PoolInfo, height int64) {
 	jc.moveFundReq.Store(height, pool)
 }
 
 // popMoveFundItemAfterBlock pop a move fund item after give block duration
-func (jc *JoltifyChainInstance) popMoveFundItemAfterBlock(currentBlockHeight int64) (*common.PoolInfo, int64) {
+func (jc *OppyChainInstance) popMoveFundItemAfterBlock(currentBlockHeight int64) (*common.PoolInfo, int64) {
 	min := int64(math.MaxInt64)
 	jc.moveFundReq.Range(func(key, value interface{}) bool {
 		h := key.(int64)
@@ -31,7 +31,7 @@ func (jc *JoltifyChainInstance) popMoveFundItemAfterBlock(currentBlockHeight int
 	return nil, 0
 }
 
-func (jc *JoltifyChainInstance) ExportItems() []*common.OutBoundReq {
+func (jc *OppyChainInstance) ExportItems() []*common.OutBoundReq {
 	var items []*common.OutBoundReq
 	jc.RetryOutboundReq.Range(func(_, value interface{}) bool {
 		items = append(items, value.(*common.OutBoundReq))
@@ -40,11 +40,11 @@ func (jc *JoltifyChainInstance) ExportItems() []*common.OutBoundReq {
 	return items
 }
 
-func (jc *JoltifyChainInstance) AddItem(req *common.OutBoundReq) {
+func (jc *OppyChainInstance) AddItem(req *common.OutBoundReq) {
 	jc.RetryOutboundReq.Store(req.Index(), req)
 }
 
-func (jc *JoltifyChainInstance) PopItem(n int) []*common.OutBoundReq {
+func (jc *OppyChainInstance) PopItem(n int) []*common.OutBoundReq {
 	var allkeys []*big.Int
 	jc.RetryOutboundReq.Range(func(key, value interface{}) bool {
 		allkeys = append(allkeys, key.(*big.Int))
@@ -77,7 +77,7 @@ func (jc *JoltifyChainInstance) PopItem(n int) []*common.OutBoundReq {
 	return inboundReqs
 }
 
-func (jc *JoltifyChainInstance) Size() int {
+func (jc *OppyChainInstance) Size() int {
 	i := 0
 	jc.RetryOutboundReq.Range(func(key, value interface{}) bool {
 		i += 1

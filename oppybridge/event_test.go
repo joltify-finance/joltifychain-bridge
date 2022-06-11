@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"context"
@@ -14,9 +14,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain/testutil/network"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppychain/testutil/network"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 type EventTestSuite struct {
@@ -111,7 +111,7 @@ func (e EventTestSuite) TestSubscribe() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	e.Require().NoError(err)
-	jc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
+	jc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
 	e.Require().NoError(err)
 	defer func() {
 		err := jc.TerminateBridge()
@@ -137,7 +137,7 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	e.Require().NoError(err)
-	jc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
+	jc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
 	e.Require().NoError(err)
 	defer func() {
 		err := jc.TerminateBridge()

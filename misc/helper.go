@@ -10,16 +10,16 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/joltify-finance/tss/keysign"
+	"github.com/oppyfinance/tss/keysign"
 	"github.com/tendermint/btcd/btcec"
 )
 
-// SetupBech32Prefix sets up the prefix of the joltify chain
+// SetupBech32Prefix sets up the prefix of the oppy chain
 func SetupBech32Prefix() {
 	config := types.GetConfig()
-	config.SetBech32PrefixForAccount("jolt", "joltpub")
-	config.SetBech32PrefixForValidator("joltval", "joltvpub")
-	config.SetBech32PrefixForConsensusNode("joltvalcons", "joltcpub")
+	config.SetBech32PrefixForAccount("oppy", "oppypub")
+	config.SetBech32PrefixForValidator("oppyval", "oppyvpub")
+	config.SetBech32PrefixForConsensusNode("oppyvalcons", "oppycpub")
 }
 
 // PoolPubKeyToJoltAddress return the jolt encoded pubkey
@@ -32,7 +32,7 @@ func PoolPubKeyToJoltAddress(pk string) (types.AccAddress, error) {
 	return addr, err
 }
 
-// PoolPubKeyToEthAddress export the joltify pubkey to the ETH format address
+// PoolPubKeyToEthAddress export the oppy pubkey to the ETH format address
 func PoolPubKeyToEthAddress(pk string) (common.Address, error) {
 	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) //nolint
 	if err != nil {
@@ -46,7 +46,7 @@ func PoolPubKeyToEthAddress(pk string) (common.Address, error) {
 	return addr, nil
 }
 
-// AccountPubKeyToEthAddress export the joltify pubkey to the ETH format address
+// AccountPubKeyToEthAddress export the oppy pubkey to the ETH format address
 func AccountPubKeyToEthAddress(pk cryptotypes.PubKey) (common.Address, error) {
 	pubkey, err := crypto.DecompressPubkey(pk.Bytes())
 	if err != nil {
@@ -56,7 +56,7 @@ func AccountPubKeyToEthAddress(pk cryptotypes.PubKey) (common.Address, error) {
 	return addr, nil
 }
 
-// SerializeSig for both joltify chain and public chain
+// SerializeSig for both oppy chain and public chain
 func SerializeSig(sig *keysign.Signature, needRecovery bool) ([]byte, error) {
 	rBytes, err := base64.StdEncoding.DecodeString(sig.R)
 	if err != nil {
@@ -116,7 +116,7 @@ func MakeSignature(r, s, v *big.Int) []byte {
 	return sigBytes
 }
 
-// EthSignPubKeytoJoltAddr derives the joltify address from the pubkey derived from the signature
+// EthSignPubKeytoJoltAddr derives the oppy address from the pubkey derived from the signature
 func EthSignPubKeyToJoltAddr(pk []byte) (types.AccAddress, error) {
 	pk2, err := btcec.ParsePubKey(pk, btcec.S256())
 	if err != nil {

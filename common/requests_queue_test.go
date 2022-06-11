@@ -62,7 +62,7 @@ func TestInBoundTx(t *testing.T) {
 	outboundreqs := createdTestInBoundReqs(2)
 	index := outboundreqs[0].Index()
 	assert.NotNil(t, index)
-	outboundreqs[0].SetAccountInfoAndHeight(2, 100, outboundreqs[1].PoolJoltifyAddress, "123", 100)
+	outboundreqs[0].SetAccountInfoAndHeight(2, 100, outboundreqs[1].PoolOppyAddress, "123", 100)
 	seq, num, _, _ := outboundreqs[0].GetAccountInfo()
 	assert.Equal(t, seq, uint64(100))
 	assert.Equal(t, num, uint64(2))

@@ -3,9 +3,9 @@ package pubchain
 import (
 	"context"
 
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 func (pi *Instance) FeedTx(currentBlockHeight int64, lastPoolInfo *vaulttypes.PoolInfo, outboundReqs []*common.OutBoundReq) error {
@@ -24,7 +24,7 @@ func (pi *Instance) FeedTx(currentBlockHeight int64, lastPoolInfo *vaulttypes.Po
 	}
 
 	roundBlockHeight := currentBlockHeight / ROUNDBLOCK
-	// for BSC we need to use the next nonce while for joltify, we used the returned nonce
+	// for BSC we need to use the next nonce while for oppy, we used the returned nonce
 	for _, el := range outboundReqs {
 		el.SetItemHeightAndNonce(roundBlockHeight, currentBlockHeight, nonce)
 		nonce += 1

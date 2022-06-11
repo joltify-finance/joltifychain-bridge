@@ -98,12 +98,12 @@ func (acq *InBoundReq) GetInboundReqInfo() (types.AccAddress, common.Address, ty
 func (acq *InBoundReq) SetAccountInfoAndHeight(number, seq uint64, address types.AccAddress, pk string, roundBlockHeight int64) {
 	acq.AccNum = number
 	acq.AccSeq = seq
-	acq.PoolJoltifyAddress = address
+	acq.PoolOppyAddress = address
 	acq.PoolPk = pk
 	acq.RoundBlockHeight = roundBlockHeight
 }
 
 // GetAccountInfo returns the account number and seq
 func (acq *InBoundReq) GetAccountInfo() (uint64, uint64, types.AccAddress, string) {
-	return acq.AccSeq, acq.AccNum, acq.PoolJoltifyAddress, acq.PoolPk
+	return acq.AccSeq, acq.AccNum, acq.PoolOppyAddress, acq.PoolPk
 }

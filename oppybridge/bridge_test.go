@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/joltify/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
-	"gitlab.com/joltify/joltifychain/app"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
+	"gitlab.com/oppy-finance/oppychain/app"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -25,11 +25,11 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain-bridge/tssclient"
-	"gitlab.com/joltify/joltifychain/testutil/network"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
+	"gitlab.com/oppy-finance/oppychain/testutil/network"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -117,7 +117,7 @@ func (b BridgeTestSuite) TestBridgeTx() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	b.Require().NoError(err)
-	jc, err := NewJoltifyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
+	jc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
 	jc.Keyring = b.validatorKey
 
@@ -193,7 +193,7 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	b.Require().NoError(err)
-	jc, err := NewJoltifyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
+	jc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
 	jc.Keyring = b.validatorKey
 
@@ -253,13 +253,13 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	b.Require().NoError(err)
-	jc, err := NewJoltifyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
+	jc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
 
 	pool := common.PoolInfo{
-		Pk:             accs[0].pk,
-		JoltifyAddress: accs[0].joltAddr,
-		EthAddress:     accs[0].commAddr,
+		Pk:          accs[0].pk,
+		OppyAddress: accs[0].joltAddr,
+		EthAddress:  accs[0].commAddr,
 	}
 
 	jc.lastTwoPools[0] = &pool

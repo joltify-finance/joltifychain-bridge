@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"context"
@@ -13,11 +13,11 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain/testutil/network"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppychain/testutil/network"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 type MoveFundTestSuite struct {
@@ -105,7 +105,7 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	m.Require().NoError(err)
-	jc, err := NewJoltifyBridge(m.network.Validators[0].RPCAddress, m.network.Validators[0].RPCAddress, &tss, tl)
+	jc, err := NewOppyBridge(m.network.Validators[0].RPCAddress, m.network.Validators[0].RPCAddress, &tss, tl)
 	m.Require().NoError(err)
 	defer func() {
 		err2 := jc.TerminateBridge()
@@ -131,9 +131,9 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 	}
 
 	poolinfo := common.PoolInfo{
-		JoltifyAddress: valAddr,
-		Pk:             pkstr,
-		PoolInfo:       &vaulttypes.PoolInfo{CreatePool: &pro},
+		OppyAddress: valAddr,
+		Pk:          pkstr,
+		PoolInfo:    &vaulttypes.PoolInfo{CreatePool: &pro},
 	}
 	acc, err := queryAccount(info.GetAddress().String(), jc.grpcClient)
 	m.Require().NoError(err)

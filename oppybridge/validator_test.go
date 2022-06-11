@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"strconv"
@@ -12,9 +12,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain/testutil/network"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppychain/testutil/network"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 type ValidatorTestSuite struct {
@@ -114,7 +114,7 @@ func (v *ValidatorTestSuite) SetupSuite() {
 }
 
 func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
-	jc := new(JoltifyChainInstance)
+	jc := new(OppyChainInstance)
 	jc.grpcClient = v.network.Validators[0].ClientCtx
 	err := jc.InitValidators(v.network.Validators[0].APIAddress)
 	v.Require().Nil(err)
@@ -140,14 +140,14 @@ func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
 }
 
 func (v ValidatorTestSuite) TestQueryPool() {
-	jc := new(JoltifyChainInstance)
+	jc := new(OppyChainInstance)
 	jc.grpcClient = v.network.Validators[0].ClientCtx
 	_, err := jc.QueryLastPoolAddress()
 	v.Require().NoError(err)
 }
 
 func (v ValidatorTestSuite) TestCheckWhetherSigner() {
-	jc := new(JoltifyChainInstance)
+	jc := new(OppyChainInstance)
 	jc.grpcClient = v.network.Validators[0].ClientCtx
 	jc.Keyring = v.validatorky
 	blockHeight, err := GetLastBlockHeight(jc.grpcClient)
@@ -176,8 +176,8 @@ func TestInitValidator(t *testing.T) {
 	suite.Run(t, new(ValidatorTestSuite))
 }
 
-func (v ValidatorTestSuite) TestJoltifyChainBridge_CheckWhetherAlreadyExist() {
-	jc := new(JoltifyChainInstance)
+func (v ValidatorTestSuite) TestOppyChainBridge_CheckWhetherAlreadyExist() {
+	jc := new(OppyChainInstance)
 	jc.grpcClient = v.network.Validators[0].ClientCtx
 	ret := jc.CheckWhetherAlreadyExist("testindex")
 	v.Require().True(ret)

@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"crypto/ecdsa"
@@ -10,10 +10,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/joltify-finance/tss/blame"
-	"github.com/joltify-finance/tss/common"
-	"github.com/joltify-finance/tss/keygen"
-	"github.com/joltify-finance/tss/keysign"
+	"github.com/oppyfinance/tss/blame"
+	"github.com/oppyfinance/tss/common"
+	"github.com/oppyfinance/tss/keygen"
+	"github.com/oppyfinance/tss/keysign"
 )
 
 type TssMock struct {

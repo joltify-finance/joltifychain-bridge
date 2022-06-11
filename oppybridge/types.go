@@ -1,7 +1,7 @@
-package joltifybridge
+package oppybridge
 
 import (
-	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"sync"
 	"time"
 
@@ -12,10 +12,10 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/ethereum/go-ethereum/common"
 	grpc1 "github.com/gogo/protobuf/grpc"
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/tssclient"
-	"gitlab.com/joltify/joltifychain-bridge/validators"
-	"gitlab.com/joltify/joltifychain/x/vault/types"
+	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
+	"gitlab.com/oppy-finance/oppy-bridge/validators"
+	"gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/rs/zerolog"
@@ -38,8 +38,8 @@ type tssPoolMsg struct {
 	blockHeight int64
 }
 
-// JoltifyChainInstance defines the types for joltify pub_chain side
-type JoltifyChainInstance struct {
+// OppyChainInstance defines the types for oppy pub_chain side
+type OppyChainInstance struct {
 	grpcClient       grpc1.ClientConn
 	wsClient         *tmclienthttp.HTTP
 	encoding         *params.EncodingConfig

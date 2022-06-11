@@ -15,16 +15,16 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/crypto"
 	zlog "github.com/rs/zerolog/log"
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"gitlab.com/joltify/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain-bridge/generated"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/generated"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
 // ProcessInBoundERC20 process the inbound contract token top-up
@@ -42,7 +42,7 @@ func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, tra
 
 	transferFrom, err := misc.EthSignPubKeyToJoltAddr(sigPublicKey)
 	if err != nil {
-		pi.logger.Error().Err(err).Msg("fail to recover the joltify Address")
+		pi.logger.Error().Err(err).Msg("fail to recover the oppy Address")
 		return err
 	}
 
@@ -55,7 +55,7 @@ func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, tra
 }
 
 // ProcessNewBlock process the blocks received from the public pub_chain
-func (pi *Instance) ProcessNewBlock(number *big.Int, joltifyBlockHeight int64) error {
+func (pi *Instance) ProcessNewBlock(number *big.Int, oppyBlockHeight int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
 	block, err := pi.EthClient.BlockByNumber(ctx, number)
@@ -63,7 +63,7 @@ func (pi *Instance) ProcessNewBlock(number *big.Int, joltifyBlockHeight int64) e
 		pi.logger.Error().Err(err).Msg("fail to retrieve the block")
 		return err
 	}
-	pi.processEachBlock(block, joltifyBlockHeight)
+	pi.processEachBlock(block, oppyBlockHeight)
 	return nil
 }
 
@@ -86,7 +86,7 @@ func (pi *Instance) updateInboundTx(txID string, amount *big.Int, blockNum uint6
 	err := thisAccount.Verify()
 	if err != nil {
 		pi.pendingInbounds.Store(txID, thisAccount)
-		pi.logger.Warn().Msgf("the account cannot be processed on joltify pub_chain this round with err %v\n", err)
+		pi.logger.Warn().Msgf("the account cannot be processed on oppy pub_chain this round with err %v\n", err)
 		return nil
 	}
 	// since this tx is processed,we do not need to store it any longer
@@ -141,7 +141,7 @@ func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types
 	err := tx.Verify()
 	if err != nil {
 		pi.pendingInbounds.Store(txID, &tx)
-		pi.logger.Warn().Msgf("the account cannot be processed on joltify pub_chain this round with err %v\n", err)
+		pi.logger.Warn().Msgf("the account cannot be processed on oppy pub_chain this round with err %v\n", err)
 		return nil
 	}
 	txIDBytes, err := hex.DecodeString(txID)
@@ -181,7 +181,7 @@ func (pi *Instance) checkErc20(data []byte) (common.Address, *big.Int, error) {
 }
 
 // fixme we need to check timeout to remove the pending transactions
-func (pi *Instance) processEachBlock(block *ethTypes.Block, joltifyBlockHeight int64) {
+func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int64) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
 			continue
@@ -219,8 +219,8 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, joltifyBlockHeight i
 			payTxID := tx.Data()
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
-				roundBlockHeight := joltifyBlockHeight / ROUNDBLOCK
-				item := bcommon.NewAccountInboundReq(account.Address, *tx.To(), account.Token, payTxID, joltifyBlockHeight, roundBlockHeight)
+				roundBlockHeight := oppyBlockHeight / ROUNDBLOCK
+				item := bcommon.NewAccountInboundReq(account.Address, *tx.To(), account.Token, payTxID, oppyBlockHeight, roundBlockHeight)
 				// we add to the retry pool to  sort the tx
 				pi.AddItem(&item)
 			}
@@ -250,10 +250,10 @@ func (pi *Instance) UpdatePool(pool *vaulttypes.PoolInfo) error {
 	defer pi.poolLocker.Unlock()
 
 	p := bcommon.PoolInfo{
-		Pk:             poolPubKey,
-		JoltifyAddress: addr,
-		EthAddress:     ethAddr,
-		PoolInfo:       pool,
+		Pk:          poolPubKey,
+		OppyAddress: addr,
+		EthAddress:  ethAddr,
+		PoolInfo:    pool,
 	}
 
 	if pi.lastTwoPools[1] != nil {
@@ -314,7 +314,7 @@ func (pi *Instance) DeleteExpired(currentHeight uint64) {
 	}
 }
 
-// Verify is the function  to verify the correctness of the account on joltify_bridge
+// Verify is the function  to verify the correctness of the account on oppy_bridge
 func (a *InboundTx) Verify() error {
 	if a.Fee.Denom != config.InBoundDenomFee {
 		return fmt.Errorf("invalid inbound fee denom with fee demo : %v and want %v", a.Fee.Denom, a.Token.Denom)

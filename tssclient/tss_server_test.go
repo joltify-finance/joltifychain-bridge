@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/joltify-finance/tss/keygen"
-	"github.com/joltify-finance/tss/keysign"
 	maddr "github.com/multiformats/go-multiaddr"
+	"github.com/oppyfinance/tss/keygen"
+	"github.com/oppyfinance/tss/keysign"
 	"github.com/rs/zerolog"
-	"gitlab.com/joltify/joltifychain-bridge/config"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
 
 	. "gopkg.in/check.v1"
 )

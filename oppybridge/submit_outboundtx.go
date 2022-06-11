@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"context"
@@ -6,13 +6,13 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"strconv"
 
-	"gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
 
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
-// SubmitOutboundTx submit the outbound record to joltify chain
-func (jc *JoltifyChainInstance) SubmitOutboundTx(operator keyring.Info, requestID string, blockHeight int64, pubchainTx string) error {
+// SubmitOutboundTx submit the outbound record to oppy chain
+func (jc *OppyChainInstance) SubmitOutboundTx(operator keyring.Info, requestID string, blockHeight int64, pubchainTx string) error {
 	var err error
 	if operator == nil {
 		operator, err = jc.Keyring.Key("operator")
@@ -43,7 +43,7 @@ func (jc *JoltifyChainInstance) SubmitOutboundTx(operator keyring.Info, requestI
 }
 
 // GetPubChainSubmittedTx get the submitted mint tx
-func (jc *JoltifyChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (string, error) {
+func (jc *OppyChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (string, error) {
 	reqStr := req.Hash().Hex()
 	jc.logger.Info().Msgf("we check the hash %v\n", reqStr)
 	vaultQuery := vaulttypes.NewQueryClient(jc.grpcClient)

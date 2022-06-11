@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"math/big"
 	"strings"
 	"sync"
@@ -12,14 +12,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/rs/zerolog"
-	"gitlab.com/joltify/joltifychain-bridge/generated"
-	"gitlab.com/joltify/joltifychain-bridge/tssclient"
+	"gitlab.com/oppy-finance/oppy-bridge/generated"
+	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/rs/zerolog/log"
 
-	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 )
 
 const (
@@ -48,7 +48,7 @@ type InboundTxBnb struct {
 	Fee         sdk.Coin `json:"fee"`
 }
 
-// Instance hold the joltify_bridge entity
+// Instance hold the oppy_bridge entity
 type Instance struct {
 	EthClient          *ethclient.Client
 	configAddr         string
@@ -67,7 +67,7 @@ type Instance struct {
 	TokenList          *tokenlist.TokenList
 }
 
-// NewChainInstance initialize the joltify_bridge entity
+// NewChainInstance initialize the oppy_bridge entity
 func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl *tokenlist.TokenList) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
 

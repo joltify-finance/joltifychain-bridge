@@ -1,4 +1,4 @@
-package joltifybridge
+package oppybridge
 
 import (
 	"fmt"
@@ -10,8 +10,8 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/ethereum/go-ethereum/crypto"
-	"gitlab.com/joltify/joltifychain-bridge/common"
-	"gitlab.com/joltify/joltifychain-bridge/pubchain"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -20,9 +20,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain/testutil/network"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppychain/testutil/network"
+	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 type FeedtransactionTestSuite struct {
@@ -124,7 +124,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	f.Require().NoError(err)
-	jc, err := NewJoltifyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl)
+	jc, err := NewOppyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl)
 	f.Require().NoError(err)
 	jc.Keyring = f.validatorky
 	jc.grpcClient = f.network.Validators[0].ClientCtx
