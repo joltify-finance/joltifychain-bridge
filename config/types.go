@@ -5,7 +5,7 @@ import "time"
 const (
 	InBoundDenomFee = "BNB"
 
-	OutBoundDenomFee = "JOLT"
+	OutBoundDenomFee = "pjolt"
 
 	InBoundFeeMin    = "0.00000000000000001"
 	OUTBoundFeeOut   = "0.00000000000000001"
