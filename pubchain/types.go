@@ -51,6 +51,7 @@ type InboundTxBnb struct {
 // Instance hold the joltify_bridge entity
 type Instance struct {
 	EthClient          *ethclient.Client
+	EthClientLocker    *sync.RWMutex
 	configAddr         string
 	chainID            *big.Int
 	tokenAbi           *abi.ABI
@@ -93,6 +94,7 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl *tokenlist.
 	return &Instance{
 		logger:             logger,
 		EthClient:          ethClient,
+		EthClientLocker:    &sync.RWMutex{},
 		configAddr:         ws,
 		chainID:            chainID,
 		tokenAbi:           &tAbi,
