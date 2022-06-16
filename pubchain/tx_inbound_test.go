@@ -447,6 +447,7 @@ func TestProcessEachBlock(t *testing.T) {
 	pi := Instance{
 		EthClient:          c,
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
+		EthClientLocker:    &sync.RWMutex{},
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
@@ -561,6 +562,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	pi := Instance{
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
+		EthClientLocker:    &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
 		pendingInboundsBnB: &sync.Map{},
 		tokenAbi:           &tAbi,

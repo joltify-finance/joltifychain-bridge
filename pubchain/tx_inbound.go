@@ -58,7 +58,9 @@ func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, tra
 func (pi *Instance) ProcessNewBlock(number *big.Int, joltifyBlockHeight int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
+	pi.EthClientLocker.RLock()
 	block, err := pi.EthClient.BlockByNumber(ctx, number)
+	pi.EthClientLocker.RUnlock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to retrieve the block")
 		return err
@@ -507,7 +509,9 @@ func (pi *Instance) doMoveFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolIn
 func (pi *Instance) checkEachTx(h common.Hash) (uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel()
+	pi.EthClientLocker.RLock()
 	receipt, err := pi.EthClient.TransactionReceipt(ctx, h)
+	pi.EthClientLocker.RUnlock()
 	if err != nil {
 		return 0, err
 	}

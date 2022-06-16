@@ -36,7 +36,9 @@ func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) 
 		ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 		defer cancel()
 
+		pi.EthClientLocker.RLock()
 		nonce, err := pi.EthClient.PendingNonceAt(ctx, poolAddress)
+		pi.EthClientLocker.RUnlock()
 		if err != nil {
 			pi.logger.Error().Err(err).Msgf("fail to get the nonce of the given pool address")
 			return err
@@ -95,7 +97,9 @@ func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, recei
 			return readyTx.Hash(), err
 		}
 	}
+	pi.EthClientLocker.RLock()
 	err = pi.EthClient.SendTransaction(ctxSend, readyTx)
+	pi.EthClientLocker.RUnlock()
 	if err != nil {
 		//we reset the ethcliet
 		fmt.Printf("error of the ethclient is %v\n", err)
@@ -110,7 +114,9 @@ func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, recei
 					pi.logger.Error().Err(err).Msg("fail to dial the websocket")
 					return err
 				}
+				pi.EthClientLocker.Lock()
 				pi.EthClient = ethClient
+				pi.EthClientLocker.Unlock()
 				return nil
 			}
 
