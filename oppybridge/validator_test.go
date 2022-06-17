@@ -1,9 +1,6 @@
 package oppybridge
 
 import (
-	"strconv"
-	"testing"
-
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -15,6 +12,9 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 	"gitlab.com/oppy-finance/oppychain/testutil/network"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
+	"strconv"
+	"testing"
+	"time"
 )
 
 type ValidatorTestSuite struct {
@@ -56,17 +56,19 @@ func genNValidator(n int, validatorky keyring.Keyring) ([]stakingtypes.Validator
 func (v *ValidatorTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
+	cfg.BondDenom = "stake"
 	v.cfg = cfg
 	v.validatorky = keyring.NewInMemory()
 	// now we put the mock pool list in the test
-	state := vaulttypes.GenesisState{}
+	stateVaule := vaulttypes.GenesisState{}
 	stateStaking := stakingtypes.GenesisState{}
 
-	v.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[vaulttypes.ModuleName], &state))
+	v.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[vaulttypes.ModuleName], &stateVaule))
 	v.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[stakingtypes.ModuleName], &stateStaking))
 
 	validators, err := genNValidator(3, v.validatorky)
 	v.Require().NoError(err)
+	height := []int{13, 15, 17, 19}
 	for i := 1; i < 5; i++ {
 		randPoolSk := ed25519.GenPrivKey()
 		poolPubKey, err := legacybech32.MarshalPubKey(legacybech32.AccPK, randPoolSk.PubKey()) // nolint
@@ -84,90 +86,93 @@ func (v *ValidatorTestSuite) SetupSuite() {
 			PoolPubKey: poolPubKey,
 			Nodes:      nodes,
 		}
-		state.CreatePoolList = append(state.CreatePoolList, &vaulttypes.CreatePool{BlockHeight: strconv.Itoa(i), Validators: validators, Proposal: []*vaulttypes.PoolProposal{&pro}})
+		stateVaule.CreatePoolList = append(stateVaule.CreatePoolList, &vaulttypes.CreatePool{BlockHeight: strconv.Itoa(height[i-1]), Validators: validators, Proposal: []*vaulttypes.PoolProposal{&pro}})
 	}
 	testToken := vaulttypes.IssueToken{
 		Index: "testindex",
 	}
-	state.IssueTokenList = append(state.IssueTokenList, &testToken)
+	stateVaule.IssueTokenList = append(stateVaule.IssueTokenList, &testToken)
 
-	buf, err := cfg.Codec.MarshalJSON(&state)
+	buf, err := cfg.Codec.MarshalJSON(&stateVaule)
 	v.Require().NoError(err)
 	cfg.GenesisState[vaulttypes.ModuleName] = buf
 
 	var stateVault stakingtypes.GenesisState
 	v.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[stakingtypes.ModuleName], &stateVault))
 	stateVault.Params.MaxValidators = 3
-	state.Params.BlockChurnInterval = 1
+	stateVaule.Params.BlockChurnInterval = 2
 	buf, err = cfg.Codec.MarshalJSON(&stateVault)
 	v.Require().NoError(err)
 	cfg.GenesisState[stakingtypes.ModuleName] = buf
 
+	buf, err = cfg.Codec.MarshalJSON(&stateVaule)
+	v.Require().NoError(err)
+	cfg.GenesisState[vaulttypes.ModuleName] = buf
+
 	v.network = network.New(v.T(), cfg)
 
 	v.Require().NotNil(v.network)
-
-	_, err = v.network.WaitForHeight(1)
+	_, err = v.network.WaitForHeightWithTimeout(14, 5*time.Minute)
 	v.Require().Nil(err)
 
 	v.queryClient = tmservice.NewServiceClient(v.network.Validators[0].ClientCtx)
 }
 
 func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
-	jc := new(OppyChainInstance)
-	jc.grpcClient = v.network.Validators[0].ClientCtx
-	err := jc.InitValidators(v.network.Validators[0].APIAddress)
+	oc := new(OppyChainInstance)
+	oc.grpcClient = v.network.Validators[0].ClientCtx
+	err := oc.InitValidators(v.network.Validators[0].APIAddress)
 	v.Require().Nil(err)
 
-	validators, _ := jc.GetLastValidator()
+	validators, _ := oc.GetLastValidator()
 	v.Require().Equal(len(validators), len(v.network.Validators))
 
 	//sk := secp256k1.GenPrivKey()
 	//remoteValidator := tmtypes.NewValidator(sk.PubKey(), 100)
-	//err = jc.UpdateLatestValidator([]*tmtypes.Validator{remoteValidator}, 10)
+	//err = oc.UpdateLatestValidator([]*tmtypes.Validator{remoteValidator}, 10)
 	//v.Require().Nil(err)
-	//validators, height := jc.GetLastValidator()
+	//validators, height := oc.GetLastValidator()
 	//v.Require().Equal(len(v.network.Validators)+1, len(validators))
 	//v.Require().Equal(int64(10), height)
 	//// now we remote the last added
 	//
 	//remoteValidator = tmtypes.NewValidator(sk.PubKey(), 0)
-	//err = jc.UpdateLatestValidator([]*vaulttypes.Validators{remoteValidator}, 10)
+	//err = oc.UpdateLatestValidator([]*vaulttypes.Validators{remoteValidator}, 10)
 	//v.Require().Nil(err)
-	//validators, height = jc.GetLastValidator()
+	//validators, height = oc.GetLastValidator()
 	//v.Require().Equal(len(v.network.Validators), len(validators))
 	//v.Require().Equal(int64(10), height)
 }
 
 func (v ValidatorTestSuite) TestQueryPool() {
-	jc := new(OppyChainInstance)
-	jc.grpcClient = v.network.Validators[0].ClientCtx
-	_, err := jc.QueryLastPoolAddress()
+	oc := new(OppyChainInstance)
+	oc.grpcClient = v.network.Validators[0].ClientCtx
+	_, err := oc.QueryLastPoolAddress()
 	v.Require().NoError(err)
 }
 
 func (v ValidatorTestSuite) TestCheckWhetherSigner() {
-	jc := new(OppyChainInstance)
-	jc.grpcClient = v.network.Validators[0].ClientCtx
-	jc.Keyring = v.validatorky
-	blockHeight, err := GetLastBlockHeight(jc.grpcClient)
+	oc := new(OppyChainInstance)
+	oc.grpcClient = v.network.Validators[0].ClientCtx
+	oc.Keyring = v.validatorky
+	blockHeight, err := GetLastBlockHeight(oc.grpcClient)
 	v.Require().NoError(err)
 	v.Require().GreaterOrEqual(blockHeight, int64(1))
 
-	poolInfo, err := jc.QueryLastPoolAddress()
+	poolInfo, err := oc.QueryLastPoolAddress()
 	v.Require().NoError(err)
 	v.Require().False(len(poolInfo) == 0)
 	lastPoolInfo := poolInfo[0]
-	ret, err := jc.CheckWhetherSigner(lastPoolInfo)
+	ret, err := oc.CheckWhetherSigner(lastPoolInfo)
 	v.Require().NoError(err)
 	v.Require().True(ret)
 
-	err = jc.Keyring.Delete("operator")
+	err = oc.Keyring.Delete("operator")
 	v.Require().NoError(err)
 
-	_, _, err = jc.Keyring.NewMnemonic("operator", keyring.English, sdk.FullFundraiserPath, keyring.DefaultBIP39Passphrase, hd.Secp256k1)
+	_, _, err = oc.Keyring.NewMnemonic("operator", keyring.English, sdk.FullFundraiserPath, keyring.DefaultBIP39Passphrase, hd.Secp256k1)
 	v.Require().NoError(err)
-	ret, err = jc.CheckWhetherSigner(lastPoolInfo)
+	ret, err = oc.CheckWhetherSigner(lastPoolInfo)
 	v.Require().NoError(err)
 	v.Require().False(ret)
 }
@@ -177,11 +182,11 @@ func TestInitValidator(t *testing.T) {
 }
 
 func (v ValidatorTestSuite) TestOppyChainBridge_CheckWhetherAlreadyExist() {
-	jc := new(OppyChainInstance)
-	jc.grpcClient = v.network.Validators[0].ClientCtx
-	ret := jc.CheckWhetherAlreadyExist("testindex")
+	oc := new(OppyChainInstance)
+	oc.grpcClient = v.network.Validators[0].ClientCtx
+	ret := oc.CheckWhetherAlreadyExist("testindex")
 	v.Require().True(ret)
 
-	ret = jc.CheckWhetherAlreadyExist("testindexnoexist")
+	ret = oc.CheckWhetherAlreadyExist("testindexnoexist")
 	v.Require().False(ret)
 }

@@ -44,6 +44,7 @@ type BridgeTestSuite struct {
 func (b *BridgeTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
+	cfg.BondDenom = "stake"
 	cfg.MinGasPrices = "0stake"
 	config.ChainID = cfg.ChainID
 	b.validatorKey = keyring.NewInMemory()

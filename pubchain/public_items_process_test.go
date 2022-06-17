@@ -26,7 +26,7 @@ func createdTestOutBoundReqs(n int) []*common.InBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		joltAddress := "jolt1sdw2qtv6nj5zwfje57rff0dlvr0hwezkqudn5w"
+		joltAddress := "oppy1rfmwldwrm3652shx3a7say0v4vvtglasncg0uu"
 		jaddr, err := sdk.AccAddressFromBech32(joltAddress)
 		if err != nil {
 			panic(err)

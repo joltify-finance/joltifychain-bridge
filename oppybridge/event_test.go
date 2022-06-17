@@ -30,6 +30,7 @@ type EventTestSuite struct {
 func (v *EventTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
+	cfg.BondDenom = "stake"
 	v.cfg = cfg
 	v.validatorky = keyring.NewInMemory()
 	// now we put the mock pool list in the test

@@ -36,6 +36,7 @@ type FeedtransactionTestSuite struct {
 func (f *FeedtransactionTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
+	cfg.BondDenom = "stake"
 	f.cfg = cfg
 	f.validatorky = keyring.NewInMemory()
 	// now we put the mock pool list in the test

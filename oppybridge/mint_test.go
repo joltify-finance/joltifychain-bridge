@@ -36,6 +36,7 @@ type MintTestSuite struct {
 func (v *MintTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
+	cfg.BondDenom = "stake"
 	config.ChainID = cfg.ChainID
 	cfg.MinGasPrices = "0stake"
 	v.validatorky = keyring.NewInMemory()

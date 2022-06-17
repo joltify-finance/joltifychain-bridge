@@ -31,6 +31,7 @@ type MoveFundTestSuite struct {
 func (m *MoveFundTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
+	cfg.BondDenom = "stake"
 	cfg.MinGasPrices = "0stake"
 	config.ChainID = cfg.ChainID
 	m.cfg = cfg

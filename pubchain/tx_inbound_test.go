@@ -961,7 +961,7 @@ func TestAccountVerify(t *testing.T) {
 		fee     sdk.Coin
 	}
 
-	addr, err := sdk.AccAddressFromBech32("jolt1ljh48799pqcnezpsjr69ukpfq4mgapvpr7kzhm")
+	addr, err := sdk.AccAddressFromBech32("oppy1rfmwldwrm3652shx3a7say0v4vvtglasncg0uu")
 	assert.NoError(t, err)
 	minFee, err := sdk.NewDecFromStr(config.InBoundFeeMin)
 	assert.Nil(t, err)

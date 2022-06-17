@@ -15,10 +15,7 @@ import (
 )
 
 const (
-	AddrJUSD     = "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
-	AddrJoltBNB  = "0x15fb343d82cD1C22542261dF408dA8396A829F6B"
-	DenomJUSD    = "JUSD"
-	DenomJoltBNB = "JoltBNB"
+	AddrPUSD = "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
 )
 
 func TestFeedTx(t *testing.T) {
@@ -52,16 +49,16 @@ func TestFeedTx(t *testing.T) {
 	poolInfo := vaulttypes.PoolInfo{
 		BlockHeight: "225",
 		CreatePool: &vaulttypes.PoolProposal{
-			PoolPubKey: "joltpub1addwnpepq2adqkank6j0vwxfcjxzwxkkxqnw4248wu9jmyr957y8l690j5j8ckrsvx2",
+			PoolPubKey: "oppypub1addwnpepqgknlvjpa7237gnrm2kakjd37xagm7435hmk6zqf5248dnext9cfse7dze7",
 		},
 	}
-	toAddr, err := misc.PoolPubKeyToEthAddress("joltpub1addwnpepq2adqkank6j0vwxfcjxzwxkkxqnw4248wu9jmyr957y8l690j5j8ckrsvx2")
+	toAddr, err := misc.PoolPubKeyToEthAddress("oppypub1addwnpepqgknlvjpa7237gnrm2kakjd37xagm7435hmk6zqf5248dnext9cfse7dze7")
 	assert.NilError(t, err)
 
-	a1 := common.NewOutboundReq("test1", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrJUSD, 125, 120)
-	a2 := common.NewOutboundReq("test2", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrJUSD, 125, 120)
-	a3 := common.NewOutboundReq("test3", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrJUSD, 125, 120)
-	a4 := common.NewOutboundReq("test4", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrJUSD, 125, 120)
+	a1 := common.NewOutboundReq("test1", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, 120)
+	a2 := common.NewOutboundReq("test2", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, 120)
+	a3 := common.NewOutboundReq("test3", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, 120)
+	a4 := common.NewOutboundReq("test4", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, 120)
 	testOutBoundReqs := []*common.OutBoundReq{&a1, &a2, &a3, &a4}
 
 	err = pi.FeedTx(testBlockHeight, &poolInfo, testOutBoundReqs)

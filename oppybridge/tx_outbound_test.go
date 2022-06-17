@@ -42,6 +42,7 @@ const (
 func (v *OutBoundTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
+	cfg.BondDenom = "stake"
 	cfg.MinGasPrices = "0stake"
 	cfg.ChainID = config.ChainID
 	v.cfg = cfg
