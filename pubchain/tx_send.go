@@ -95,7 +95,7 @@ func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, recei
 			return readyTx.Hash(), err
 		}
 	}
-	err = pi.EthClient.SendTransaction(ctxSend, readyTx)
+	err = pi.sendTransactionWithLock(ctxSend, readyTx)
 	if err != nil {
 		//we reset the ethcliet
 		fmt.Printf("error of the ethclient is %v\n", err)
@@ -110,7 +110,7 @@ func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, recei
 					pi.logger.Error().Err(err).Msg("fail to dial the websocket")
 					return err
 				}
-				pi.EthClient = ethClient
+				pi.renewEthClientWithLock(ethClient)
 				return nil
 			}
 

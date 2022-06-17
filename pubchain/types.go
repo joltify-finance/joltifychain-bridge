@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"math/big"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/rs/zerolog/log"
 
+	"github.com/ethereum/go-ethereum/core/types"
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 )
 
@@ -51,6 +53,7 @@ type InboundTxBnb struct {
 // Instance hold the oppy_bridge entity
 type Instance struct {
 	EthClient          *ethclient.Client
+	ethClientLocker    *sync.RWMutex
 	configAddr         string
 	chainID            *big.Int
 	tokenAbi           *abi.ABI
@@ -93,6 +96,7 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl *tokenlist.
 	return &Instance{
 		logger:             logger,
 		EthClient:          ethClient,
+		ethClientLocker:    &sync.RWMutex{},
 		configAddr:         ws,
 		chainID:            chainID,
 		tokenAbi:           &tAbi,
@@ -106,4 +110,31 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl *tokenlist.
 		moveFundReq:        &sync.Map{},
 		TokenList:          tl,
 	}, nil
+}
+
+func (pi *Instance) getBlockByNumberWithLock(ctx context.Context, number *big.Int) (*types.Block, error) {
+	pi.ethClientLocker.RLock()
+	block, err := pi.EthClient.BlockByNumber(ctx, number)
+	pi.ethClientLocker.RUnlock()
+	return block, err
+}
+
+func (pi *Instance) getTransactionReceiptWithLock(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
+	pi.ethClientLocker.RLock()
+	receipt, err := pi.EthClient.TransactionReceipt(ctx, txHash)
+	pi.ethClientLocker.RUnlock()
+	return receipt, err
+}
+
+func (pi *Instance) sendTransactionWithLock(ctx context.Context, tx *types.Transaction) error {
+	pi.ethClientLocker.RLock()
+	err := pi.EthClient.SendTransaction(ctx, tx)
+	pi.ethClientLocker.RUnlock()
+	return err
+}
+
+func (pi *Instance) renewEthClientWithLock(ethclient *ethclient.Client) {
+	pi.ethClientLocker.Lock()
+	pi.EthClient = ethclient
+	pi.ethClientLocker.Unlock()
 }
