@@ -446,6 +446,7 @@ func TestProcessEachBlock(t *testing.T) {
 	c := ethclient.NewClient(client)
 	pi := Instance{
 		EthClient:          c,
+		ethClientLocker:    &sync.RWMutex{},
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
@@ -559,6 +560,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	tl, err := createMockTokenlist(accs[1].commAddr.String(), "test")
 	assert.Nil(t, err)
 	pi := Instance{
+		ethClientLocker:    &sync.RWMutex{},
 		lastTwoPools:       make([]*common2.PoolInfo, 2),
 		poolLocker:         &sync.RWMutex{},
 		pendingInbounds:    &sync.Map{},
