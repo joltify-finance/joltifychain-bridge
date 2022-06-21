@@ -110,7 +110,7 @@ func TestMakeSignature(t *testing.T) {
 	sigPublicKey, err := crypto.Ecrecover(signer.Hash(tx).Bytes(), sigBytes)
 	assert.Nil(t, err)
 
-	transferFrom, err := EthSignPubKeyToJoltAddr(sigPublicKey)
+	transferFrom, err := EthSignPubKeyToOppyAddr(sigPublicKey)
 	assert.Nil(t, err)
 	assert.Equal(t, "oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7", transferFrom.String())
 }

@@ -118,16 +118,16 @@ func (b BridgeTestSuite) TestBridgeTx() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	b.Require().NoError(err)
-	jc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
+	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
-	jc.Keyring = b.validatorKey
+	oc.Keyring = b.validatorKey
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	jc.grpcClient = b.network.Validators[0].ClientCtx
+	oc.grpcClient = b.network.Validators[0].ClientCtx
 	defer func() {
-		err := jc.TerminateBridge()
+		err := oc.TerminateBridge()
 		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
+			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
 		}
 	}()
 
@@ -136,25 +136,25 @@ func (b BridgeTestSuite) TestBridgeTx() {
 		PoolPubKey:  accs[1].pk,
 		BlockHeight: "5",
 	}
-	acc, err := queryAccount(b.network.Validators[0].Address.String(), jc.grpcClient)
+	acc, err := queryAccount(b.network.Validators[0].Address.String(), oc.grpcClient)
 	b.Require().NoError(err)
 
 	num, seq := acc.GetAccountNumber(), acc.GetSequence()
 	_, err = b.network.WaitForHeightWithTimeout(5, time.Minute*5)
 	b.Require().NoError(err)
-	gas, err := jc.GasEstimation([]sdk.Msg{&tmsg}, seq, nil)
+	gas, err := oc.GasEstimation([]sdk.Msg{&tmsg}, seq, nil)
 	b.Require().NoError(err)
 	b.Require().Greater(gas, uint64(0))
 
-	key, err := jc.Keyring.Key("operator")
+	key, err := oc.Keyring.Key("operator")
 	b.Require().NoError(err)
-	_, err = jc.genSendTx(key, []sdk.Msg{&tmsg}, seq, num, gas, nil)
+	_, err = oc.genSendTx(key, []sdk.Msg{&tmsg}, seq, num, gas, nil)
 	b.Require().NoError(err)
 
 	h := sha3.New256()
 	h.Write([]byte("123"))
 	msg := base64.StdEncoding.EncodeToString(h.Sum(nil))
-	info, err := jc.Keyring.Key("operator")
+	info, err := oc.Keyring.Key("operator")
 	b.Require().NoError(err)
 	legacybech32.UnmarshalPubKey(legacybech32.AccPK, info.GetPubKey().String()) // nolint
 	mpk := secp256k1.PubKey{
@@ -163,19 +163,19 @@ func (b BridgeTestSuite) TestBridgeTx() {
 	pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, &mpk) // nolint
 	b.Require().NoError(err)
 	tssMsg := tssclient.TssSignigMsg{Pk: pk, Msgs: []string{msg}, Signers: []string{"1", "2"}, BlockHeight: int64(2), Version: "0.15.6"}
-	txBuilder, err := jc.genSendTx(key, []sdk.Msg{&tmsg}, seq, num, gas, &tssMsg)
+	txBuilder, err := oc.genSendTx(key, []sdk.Msg{&tmsg}, seq, num, gas, &tssMsg)
 	b.Require().NoError(err)
 
-	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	b.Require().NoError(err)
-	_, _, err = jc.BroadcastTx(context.Background(), txBytes, false)
+	_, _, err = oc.BroadcastTx(context.Background(), txBytes, false)
 	b.Require().NoError(err)
 	_, err = b.network.WaitForHeightWithTimeout(10, time.Second*30)
 	b.Require().NoError(err)
-	bh, err := jc.GetLastBlockHeight()
+	bh, err := oc.GetLastBlockHeight()
 	b.Require().NoError(err)
 	b.Require().Greater(bh, int64(0))
-	err = jc.prepareTssPool(b.network.Validators[0].Address, accs[1].pk, "10")
+	err = oc.prepareTssPool(b.network.Validators[0].Address, accs[1].pk, "10")
 	b.Require().NoError(err)
 }
 
@@ -194,26 +194,26 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	b.Require().NoError(err)
-	jc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
+	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
-	jc.Keyring = b.validatorKey
+	oc.Keyring = b.validatorKey
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	jc.grpcClient = b.network.Validators[0].ClientCtx
+	oc.grpcClient = b.network.Validators[0].ClientCtx
 	defer func() {
-		err := jc.TerminateBridge()
+		err := oc.TerminateBridge()
 		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
+			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
 		}
 	}()
 
 	creatorPk := legacybech32.MustMarshalPubKey(legacybech32.AccPK, keyInfo.GetPubKey()) // nolint
 	_, err = b.network.WaitForHeightWithTimeout(10, time.Second*30)
 	b.Require().NoError(err)
-	err = jc.prepareTssPool(b.network.Validators[0].Address, creatorPk, "10")
+	err = oc.prepareTssPool(b.network.Validators[0].Address, creatorPk, "10")
 	b.Require().NoError(err)
-	b.Require().Equal(len(jc.msgSendCache), 1)
-	ret, _ := jc.CheckAndUpdatePool(10)
+	b.Require().Equal(len(oc.msgSendCache), 1)
+	ret, _ := oc.CheckAndUpdatePool(10)
 	b.Require().False(ret)
 }
 
@@ -254,55 +254,55 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	b.Require().NoError(err)
-	jc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
+	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
 
 	pool := common.PoolInfo{
 		Pk:          accs[0].pk,
-		OppyAddress: accs[0].joltAddr,
+		OppyAddress: accs[0].oppyAddr,
 		EthAddress:  accs[0].commAddr,
 	}
 
-	jc.lastTwoPools[0] = &pool
-	jc.lastTwoPools[1] = &pool
+	oc.lastTwoPools[0] = &pool
+	oc.lastTwoPools[1] = &pool
 
-	jc.grpcClient = b.network.Validators[0].ClientCtx
+	oc.grpcClient = b.network.Validators[0].ClientCtx
 	defer func() {
-		err := jc.TerminateBridge()
+		err := oc.TerminateBridge()
 		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
+			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
 		}
 	}()
 
 	info, _ := b.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()
 	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
-	valAddr, err := misc.PoolPubKeyToJoltAddress(pkstr)
+	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
 	b.Require().NoError(err)
 
-	send := banktypes.NewMsgSend(valAddr, accs[0].joltAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
+	send := banktypes.NewMsgSend(valAddr, accs[0].oppyAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
-	acc, err := queryAccount(valAddr.String(), jc.grpcClient)
+	acc, err := queryAccount(valAddr.String(), oc.grpcClient)
 	b.Require().NoError(err)
 
-	// txBuilder, err := jc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
-	txBuilder, err := Gensigntx(jc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), b.network.Validators[0].ClientCtx.Keyring)
+	// txBuilder, err := oc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
+	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), b.network.Validators[0].ClientCtx.Keyring)
 	b.Require().NoError(err)
-	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	b.Require().NoError(err)
-	ret, txHash, err := jc.BroadcastTx(context.Background(), txBytes, false)
+	ret, txHash, err := oc.BroadcastTx(context.Background(), txBytes, false)
 	b.Require().NoError(err)
 	b.Require().True(ret)
 	err = b.network.WaitForNextBlock()
 	b.Require().NoError(err)
-	txClient := cosTx.NewServiceClient(jc.grpcClient)
+	txClient := cosTx.NewServiceClient(oc.grpcClient)
 	txquery := cosTx.GetTxRequest{Hash: txHash}
 	resp, err := txClient.GetTx(context.Background(), &txquery, nil)
 	b.Require().NoError(err)
-	block, err := jc.GetBlockByHeight(resp.TxResponse.Height)
+	block, err := oc.GetBlockByHeight(resp.TxResponse.Height)
 	b.Require().NoError(err)
 	tx := block.Data.Txs[0]
-	jc.CheckOutBoundTx(1, tx)
+	oc.CheckOutBoundTx(1, tx)
 }
 
 func TestBridge(t *testing.T) {

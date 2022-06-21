@@ -105,7 +105,7 @@ func GetLastBlockHeight(grpcClient grpc1.ClientConn) (int64, error) {
 	return resp.Block.Header.Height, nil
 }
 
-// GetBlockByHeight get the block from jolt chain based on provided height
+// GetBlockByHeight get the block from oppy chain based on provided height
 func GetBlockByHeight(grpcClient grpc1.ClientConn, height int64) (*types.Block, error) {
 	ts := tmservice.NewServiceClient(grpcClient)
 
@@ -122,14 +122,14 @@ func GetBlockByHeight(grpcClient grpc1.ClientConn, height int64) (*types.Block, 
 }
 
 // CheckTxStatus check whether the tx has been done successfully
-func (jc *OppyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSeq uint64) error {
+func (oc *OppyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSeq uint64) error {
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
 
 	alreadyPassed := false
 	op := func() error {
-		acc, err := queryAccount(poolAddress.String(), jc.grpcClient)
+		acc, err := queryAccount(poolAddress.String(), oc.grpcClient)
 		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to query the account")
+			oc.logger.Error().Err(err).Msgf("fail to query the account")
 			return errors.New("invalid account query")
 		}
 		if acc.GetSequence() == targetSeq {
@@ -149,33 +149,33 @@ func (jc *OppyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSeq u
 	return err
 }
 
-func (jc *OppyChainInstance) composeAndSend(operator keyring.Info, sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
-	gasWanted := jc.GetGasEstimation()
-	txBuilder, err := jc.genSendTx(operator, []sdk.Msg{sendMsg}, accSeq, accNum, uint64(gasWanted), signMsg)
+func (oc *OppyChainInstance) composeAndSend(operator keyring.Info, sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
+	gasWanted := oc.GetGasEstimation()
+	txBuilder, err := oc.genSendTx(operator, []sdk.Msg{sendMsg}, accSeq, accNum, uint64(gasWanted), signMsg)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to generate the tx")
+		oc.logger.Error().Err(err).Msg("fail to generate the tx")
 		return false, "", err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 
-	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to encode the tx")
+		oc.logger.Error().Err(err).Msg("fail to encode the tx")
 		return false, "", err
 	}
 
 	err = nil
 	if signMsg != nil {
-		err = jc.waitAndSend(poolAddress, accSeq)
+		err = oc.waitAndSend(poolAddress, accSeq)
 	}
 	if err == nil {
 		isTssMsg := true
 		if signMsg == nil {
 			isTssMsg = false
 		}
-		ok, resp, err := jc.BroadcastTx(ctx, txBytes, isTssMsg)
+		ok, resp, err := oc.BroadcastTx(ctx, txBytes, isTssMsg)
 		return ok, resp, err
 	}
 	return false, "", err

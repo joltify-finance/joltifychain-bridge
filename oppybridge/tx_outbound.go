@@ -17,37 +17,37 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
-func (jc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte) error {
+func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 
 	toAddress, err := types.AccAddressFromBech32(msg.ToAddress)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to parse the to outReceiverAddress")
+		oc.logger.Error().Err(err).Msg("fail to parse the to outReceiverAddress")
 		return err
 	}
 
 	// here we need to calculate the node's eth address from public key rather than the oppy chain address
-	acc, err := queryAccount(msg.FromAddress, jc.grpcClient)
+	acc, err := queryAccount(msg.FromAddress, oc.grpcClient)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("Fail to query the account")
+		oc.logger.Error().Err(err).Msg("Fail to query the account")
 		return err
 	}
 
 	fromEthAddr, err := misc.AccountPubKeyToEthAddress(acc.GetPubKey())
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("Fail to get the eth address")
+		oc.logger.Error().Err(err).Msg("Fail to get the eth address")
 		return err
 	}
 	// now we wrap the fromEthAddress with oppy hex address
 	wrapFromEthAddr, err := types.AccAddressFromHex(fromEthAddr.Hex()[2:])
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("Fail to wrap the eth address")
+		oc.logger.Error().Err(err).Msg("Fail to wrap the eth address")
 		return err
 	}
 
 	// we check whether it is the message to the pool
 	if !(toAddress.Equals(address[0]) || toAddress.Equals(address[1])) {
-		jc.logger.Warn().Msg("not a top up message to the pool")
+		oc.logger.Warn().Msg("not a top up message to the pool")
 		return errors.New("not a top up message to the pool")
 	}
 
@@ -59,7 +59,7 @@ func (jc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAd
 		indexDemoFee := 0
 		tokenDenom := ""
 		tokenAddr := ""
-		addr, tokenExist := jc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
+		addr, tokenExist := oc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
 		if tokenExist && msg.Amount[1].GetDenom() == config.OutBoundDenomFee {
 			tokenDenom = msg.Amount[0].GetDenom()
 			tokenAddr = addr
@@ -68,7 +68,7 @@ func (jc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAd
 			found = true
 		}
 
-		addr, tokenExist = jc.TokenList.GetTokenAddress(msg.Amount[1].GetDenom())
+		addr, tokenExist = oc.TokenList.GetTokenAddress(msg.Amount[1].GetDenom())
 		if tokenExist && msg.Amount[0].GetDenom() == config.OutBoundDenomFee {
 			tokenDenom = msg.Amount[1].GetDenom()
 			tokenAddr = addr
@@ -80,13 +80,13 @@ func (jc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAd
 			return errors.New("invalid fee pair")
 		}
 
-		item := jc.processDemonAndFee(txID, blockHeight, wrapFromEthAddr, tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
+		item := oc.processDemonAndFee(txID, blockHeight, wrapFromEthAddr, tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
 		// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 		if item != nil {
 			roundBlockHeight := blockHeight / ROUNDBLOCK
 			itemReq := bcommon.NewOutboundReq(txID, item.outReceiverAddress, curEthAddr, item.token, tokenAddr, blockHeight, roundBlockHeight)
-			jc.AddItem(&itemReq)
-			jc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, jc.CurrentHeight)
+			oc.AddItem(&itemReq)
+			oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, oc.CurrentHeight)
 			return nil
 		}
 		return errors.New("not enough fee")
@@ -95,7 +95,7 @@ func (jc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAd
 	return errors.New("we only allow fee and top up in one tx now")
 }
 
-func (jc *OppyChainInstance) processDemonAndFee(txID string, blockHeight int64, fromAddress types.AccAddress, demonName string, demonAmount, feeAmount types.Int) *outboundTx {
+func (oc *OppyChainInstance) processDemonAndFee(txID string, blockHeight int64, fromAddress types.AccAddress, demonName string, demonAmount, feeAmount types.Int) *outboundTx {
 	token := types.Coin{
 		Denom:  demonName,
 		Amount: demonAmount,
@@ -104,9 +104,9 @@ func (jc *OppyChainInstance) processDemonAndFee(txID string, blockHeight int64, 
 		Denom:  config.OutBoundDenomFee,
 		Amount: feeAmount,
 	}
-	tokenAddr, exit := jc.TokenList.GetTokenAddress(demonName)
+	tokenAddr, exit := oc.TokenList.GetTokenAddress(demonName)
 	if !exit {
-		jc.logger.Error().Msgf("The token is not existed in the white list")
+		oc.logger.Error().Msgf("The token is not existed in the white list")
 		return nil
 	}
 	tx := outboundTx{
@@ -118,34 +118,34 @@ func (jc *OppyChainInstance) processDemonAndFee(txID string, blockHeight int64, 
 	}
 	err := tx.Verify()
 	if err != nil {
-		jc.logger.Error().Err(err).Msgf("the transaction is invalid")
+		oc.logger.Error().Err(err).Msgf("the transaction is invalid")
 		return nil
 	}
-	jc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.token.String())
+	oc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.token.String())
 	return &tx
 }
 
 // GetPool get the latest two pool address
-func (jc *OppyChainInstance) GetPool() []*bcommon.PoolInfo {
-	jc.poolUpdateLocker.RLock()
-	defer jc.poolUpdateLocker.RUnlock()
+func (oc *OppyChainInstance) GetPool() []*bcommon.PoolInfo {
+	oc.poolUpdateLocker.RLock()
+	defer oc.poolUpdateLocker.RUnlock()
 	var ret []*bcommon.PoolInfo
-	ret = append(ret, jc.lastTwoPools...)
+	ret = append(ret, oc.lastTwoPools...)
 	return ret
 }
 
 // UpdatePool update the tss pool address
-func (jc *OppyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.PoolInfo {
+func (oc *OppyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.PoolInfo {
 	poolPubKey := pool.CreatePool.PoolPubKey
 	ethAddr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
 	if err != nil {
-		fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
+		fmt.Printf("fail to convert the oppy address to eth address %v", poolPubKey)
 		return nil
 	}
 
-	addr, err := misc.PoolPubKeyToJoltAddress(poolPubKey)
+	addr, err := misc.PoolPubKeyToOppyAddress(poolPubKey)
 	if err != nil {
-		fmt.Printf("fail to convert the jolt address to jolt address %v", poolPubKey)
+		fmt.Printf("fail to convert the eth address to oppy address %v", poolPubKey)
 		return nil
 	}
 
@@ -156,31 +156,31 @@ func (jc *OppyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.Pool
 		PoolInfo:    pool,
 	}
 
-	jc.poolUpdateLocker.Lock()
-	previousPool := jc.lastTwoPools[0]
+	oc.poolUpdateLocker.Lock()
+	previousPool := oc.lastTwoPools[0]
 
-	if jc.lastTwoPools[1] != nil {
-		jc.lastTwoPools[0] = jc.lastTwoPools[1]
+	if oc.lastTwoPools[1] != nil {
+		oc.lastTwoPools[0] = oc.lastTwoPools[1]
 	}
-	jc.lastTwoPools[1] = &p
-	jc.poolUpdateLocker.Unlock()
+	oc.lastTwoPools[1] = &p
+	oc.poolUpdateLocker.Unlock()
 	return previousPool
 }
 
-func (jc *OppyChainInstance) DoMoveFunds(fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) (bool, error) {
+func (oc *OppyChainInstance) DoMoveFunds(fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) (bool, error) {
 	from := fromPool.OppyAddress
-	acc, err := queryAccount(from.String(), jc.grpcClient)
+	acc, err := queryAccount(from.String(), oc.grpcClient)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("Fail to query the pool account")
+		oc.logger.Error().Err(err).Msg("Fail to query the pool account")
 		return false, err
 	}
-	coins, err := queryBalance(from.String(), jc.grpcClient)
+	coins, err := queryBalance(from.String(), oc.grpcClient)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("Fail to query the balance")
+		oc.logger.Error().Err(err).Msg("Fail to query the balance")
 		return false, err
 	}
 	if len(coins) == 0 {
-		jc.logger.Warn().Msg("we do not have any balance skip send")
+		oc.logger.Warn().Msg("we do not have any balance skip send")
 		return true, nil
 	}
 
@@ -193,15 +193,15 @@ func (jc *OppyChainInstance) DoMoveFunds(fromPool *bcommon.PoolInfo, to types.Ac
 		Version:     tssclient.TssVersion,
 	}
 
-	key, err := jc.Keyring.Key("operator")
+	key, err := oc.Keyring.Key("operator")
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to get the operator key")
+		oc.logger.Error().Err(err).Msg("fail to get the operator key")
 		return false, err
 	}
 
-	ok, resp, err := jc.composeAndSend(key, msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, acc.GetAddress())
+	ok, resp, err := oc.composeAndSend(key, msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, acc.GetAddress())
 	if err != nil || !ok {
-		jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
+		oc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
 		return false, errors.New("fail to process the inbound tx")
 	}
 	return false, nil

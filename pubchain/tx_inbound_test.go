@@ -44,7 +44,7 @@ import (
 type account struct {
 	sk       *secp256k1.PrivKey
 	pk       string
-	joltAddr sdk.AccAddress
+	oppyAddr sdk.AccAddress
 	commAddr common.Address
 }
 
@@ -86,7 +86,7 @@ func TestUpdatePoolAndGetPool(t *testing.T) {
 		BlockHeight: "100",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: accs[0].pk,
-			PoolAddr:   accs[0].joltAddr,
+			PoolAddr:   accs[0].oppyAddr,
 		},
 	}
 
@@ -94,7 +94,7 @@ func TestUpdatePoolAndGetPool(t *testing.T) {
 		BlockHeight: "101",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: accs[1].pk,
-			PoolAddr:   accs[1].joltAddr,
+			PoolAddr:   accs[1].oppyAddr,
 		},
 	}
 	err = ci.UpdatePool(nil)
@@ -114,7 +114,7 @@ func TestUpdatePoolAndGetPool(t *testing.T) {
 		BlockHeight: "102",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: accs[2].pk,
-			PoolAddr:   accs[2].joltAddr,
+			PoolAddr:   accs[2].oppyAddr,
 		},
 	}
 	//
@@ -138,7 +138,7 @@ func TestCheckToBridge(t *testing.T) {
 		BlockHeight: "100",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: accs[0].pk,
-			PoolAddr:   accs[0].joltAddr,
+			PoolAddr:   accs[0].oppyAddr,
 		},
 	}
 
@@ -146,7 +146,7 @@ func TestCheckToBridge(t *testing.T) {
 		BlockHeight: "101",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: accs[1].pk,
-			PoolAddr:   accs[1].joltAddr,
+			PoolAddr:   accs[1].oppyAddr,
 		},
 	}
 
@@ -154,7 +154,7 @@ func TestCheckToBridge(t *testing.T) {
 		BlockHeight: "102",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: accs[2].pk,
-			PoolAddr:   accs[2].joltAddr,
+			PoolAddr:   accs[2].oppyAddr,
 		},
 	}
 	err = ci.UpdatePool(&poolInfo)
@@ -248,7 +248,7 @@ func TestUpdateBridgeTx(t *testing.T) {
 	}
 	btx := InboundTx{
 		"testTxID",
-		accs[1].joltAddr,
+		accs[1].oppyAddr,
 		uint64(10),
 		coin,
 		feeCoin,
@@ -256,7 +256,7 @@ func TestUpdateBridgeTx(t *testing.T) {
 	pi.pendingInbounds.Store("test1", &btx)
 	// now we should have successfully top up the token
 	ret := pi.updateInboundTx("test1", big.NewInt(10), uint64(11))
-	require.Equal(t, ret.Address.String(), accs[1].joltAddr.String())
+	require.Equal(t, ret.Address.String(), accs[1].oppyAddr.String())
 	// now we top up the tx that not exist, and we should store this tx in pending bnb pool
 	ret = pi.updateInboundTx("test2", big.NewInt(20), uint64(29))
 	require.Nil(t, ret)
@@ -275,7 +275,7 @@ func TestUpdateBridgeTx(t *testing.T) {
 	}
 	btx = InboundTx{
 		"testTxID",
-		accs[1].joltAddr,
+		accs[1].oppyAddr,
 		uint64(10),
 		coin,
 		feeCoin,
@@ -290,7 +290,7 @@ func TestUpdateBridgeTx(t *testing.T) {
 	require.Nil(t, ret)
 
 	ret = pi.updateInboundTx("test2", big.NewInt(1), uint64(34))
-	require.Equal(t, ret.Address.String(), accs[1].joltAddr.String())
+	require.Equal(t, ret.Address.String(), accs[1].oppyAddr.String())
 }
 
 type testHasher struct {
@@ -469,7 +469,7 @@ func TestProcessEachBlock(t *testing.T) {
 
 	btx := InboundTx{
 		"testTxID",
-		accs[0].joltAddr,
+		accs[0].oppyAddr,
 		uint64(10),
 		coin,
 		feeCoin,
@@ -480,7 +480,7 @@ func TestProcessEachBlock(t *testing.T) {
 		BlockHeight: "100",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: accs[0].pk,
-			PoolAddr:   accs[0].joltAddr,
+			PoolAddr:   accs[0].oppyAddr,
 		},
 	}
 
@@ -491,7 +491,7 @@ func TestProcessEachBlock(t *testing.T) {
 	// indicate nothing happens
 	require.True(t, exist)
 	storedInbound := ret.(*InboundTx)
-	require.Equal(t, storedInbound.Address.String(), accs[0].joltAddr.String())
+	require.Equal(t, storedInbound.Address.String(), accs[0].oppyAddr.String())
 
 	header := &ethTypes.Header{
 		Difficulty: math.BigPow(11, 11),
@@ -508,7 +508,7 @@ func TestProcessEachBlock(t *testing.T) {
 	ret, exist = pi.pendingInbounds.Load(hex.EncodeToString([]byte("test1")))
 	require.True(t, exist)
 	storedInbound = ret.(*InboundTx)
-	require.Equal(t, storedInbound.Address.String(), accs[0].joltAddr.String())
+	require.Equal(t, storedInbound.Address.String(), accs[0].oppyAddr.String())
 
 	// check not to bridge
 	tBlock2 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxNotToBridge}, nil, nil, newHasher())
@@ -574,7 +574,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 		BlockHeight: "100",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: accs[0].pk,
-			PoolAddr:   accs[0].joltAddr,
+			PoolAddr:   accs[0].oppyAddr,
 		},
 	}
 
@@ -691,7 +691,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	})
 	assert.Equal(t, counter, 0)
 
-	mockPoolInfo := vaulttypes.PoolInfo{BlockHeight: "10", CreatePool: &vaulttypes.PoolProposal{PoolPubKey: accs[1].pk, PoolAddr: accs[1].joltAddr}}
+	mockPoolInfo := vaulttypes.PoolInfo{BlockHeight: "10", CreatePool: &vaulttypes.PoolProposal{PoolPubKey: accs[1].pk, PoolAddr: accs[1].oppyAddr}}
 	err = pi.UpdatePool(&mockPoolInfo)
 	assert.Nil(t, err)
 	err = pi.UpdatePool(&mockPoolInfo)
@@ -719,7 +719,7 @@ func TestDeleteExpire(t *testing.T) {
 	thirdBlock := uint64(30)
 	btx1 := InboundTx{
 		"testTxID1",
-		acc[0].joltAddr,
+		acc[0].oppyAddr,
 		firstBlock,
 		coin,
 		coin,
@@ -727,7 +727,7 @@ func TestDeleteExpire(t *testing.T) {
 
 	btx2 := InboundTx{
 		"testTxID2",
-		acc[0].joltAddr,
+		acc[0].oppyAddr,
 		secondBlock,
 		coin,
 		coin,
@@ -735,7 +735,7 @@ func TestDeleteExpire(t *testing.T) {
 
 	btx3 := InboundTx{
 		"testTxID3",
-		acc[0].joltAddr,
+		acc[0].oppyAddr,
 		thirdBlock,
 		coin,
 		coin,
@@ -908,7 +908,7 @@ func TestProcessBlockFeeAhead(t *testing.T) {
 	}
 
 	pi.pendingInboundsBnB.Store(hex.EncodeToString([]byte("test1")), &bnbTx)
-	err = pi.processInboundTx(hex.EncodeToString([]byte("test1")), uint64(10), accs[1].joltAddr, accs[2].commAddr, big.NewInt(11), accs[0].commAddr)
+	err = pi.processInboundTx(hex.EncodeToString([]byte("test1")), uint64(10), accs[1].oppyAddr, accs[2].commAddr, big.NewInt(11), accs[0].commAddr)
 	assert.NoError(t, err)
 
 	counter := 0
@@ -934,7 +934,7 @@ func TestProcessBlockFeeAhead(t *testing.T) {
 	}
 
 	pi.pendingInboundsBnB.Store(hex.EncodeToString([]byte("test2")), &bnbTx2)
-	err = pi.processInboundTx(hex.EncodeToString([]byte("test2")), uint64(10), accs[1].joltAddr, accs[2].commAddr, big.NewInt(11), accs[0].commAddr)
+	err = pi.processInboundTx(hex.EncodeToString([]byte("test2")), uint64(10), accs[1].oppyAddr, accs[2].commAddr, big.NewInt(11), accs[0].commAddr)
 	assert.NoError(t, err)
 
 	counter = 0

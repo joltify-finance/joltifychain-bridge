@@ -26,12 +26,12 @@ func createdTestOutBoundReqs(n int) []*common.InBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		joltAddress := "oppy1rfmwldwrm3652shx3a7say0v4vvtglasncg0uu"
-		jaddr, err := sdk.AccAddressFromBech32(joltAddress)
+		oppyAddress := "oppy1rfmwldwrm3652shx3a7say0v4vvtglasncg0uu"
+		oaddr, err := sdk.AccAddressFromBech32(oppyAddress)
 		if err != nil {
 			panic(err)
 		}
-		item := common.NewAccountInboundReq(jaddr, addr, testCoin, []byte(txid), int64(i), int64(i))
+		item := common.NewAccountInboundReq(oaddr, addr, testCoin, []byte(txid), int64(i), int64(i))
 		retReq[i] = &item
 	}
 	return retReq
@@ -40,18 +40,18 @@ func createdTestOutBoundReqs(n int) []*common.InBoundReq {
 func TestConfig(t *testing.T) {
 	misc.SetupBech32Prefix()
 	reqs := createdTestOutBoundReqs(100)
-	jc := Instance{
+	oc := Instance{
 		RetryInboundReq: &sync.Map{},
 		InboundReqChan:  make(chan *common.InBoundReq, 10),
 		moveFundReq:     &sync.Map{},
 	}
 
 	for _, el := range reqs {
-		jc.AddItem(el)
+		oc.AddItem(el)
 	}
-	assert.Equal(t, jc.Size(), 100)
+	assert.Equal(t, oc.Size(), 100)
 
-	poped := jc.PopItem(1000)
+	poped := oc.PopItem(1000)
 	assert.Equal(t, 100, len(poped))
 	var allindex []*big.Int
 	for _, el := range poped {
@@ -62,34 +62,34 @@ func TestConfig(t *testing.T) {
 		assert.Equal(t, allindex[i].Cmp(allindex[i-1]), 1)
 	}
 
-	assert.Equal(t, jc.Size(), 0)
+	assert.Equal(t, oc.Size(), 0)
 
 	for _, el := range reqs {
-		jc.AddItem(el)
+		oc.AddItem(el)
 	}
-	item := jc.ExportItems()
+	item := oc.ExportItems()
 	assert.Equal(t, len(item), 100)
 
 	accs, err := generateRandomPrivKey(2)
 	assert.Nil(t, err)
 	pool := common.PoolInfo{
 		Pk:          accs[0].pk,
-		OppyAddress: accs[0].joltAddr,
+		OppyAddress: accs[0].oppyAddr,
 		EthAddress:  accs[0].commAddr,
 	}
 
 	pool1 := common.PoolInfo{
 		Pk:          accs[1].pk,
-		OppyAddress: accs[1].joltAddr,
+		OppyAddress: accs[1].oppyAddr,
 		EthAddress:  accs[1].commAddr,
 	}
 
-	jc.AddMoveFundItem(&pool, 10)
-	jc.AddMoveFundItem(&pool1, 11)
-	popedItem, _ := jc.PopMoveFundItemAfterBlock(15)
+	oc.AddMoveFundItem(&pool, 10)
+	oc.AddMoveFundItem(&pool1, 11)
+	popedItem, _ := oc.PopMoveFundItemAfterBlock(15)
 	assert.Nil(t, popedItem)
 
-	popedItem, _ = jc.PopMoveFundItemAfterBlock(20)
+	popedItem, _ = oc.PopMoveFundItemAfterBlock(20)
 	assert.Equal(t, popedItem.Pk, accs[0].pk)
 }
 

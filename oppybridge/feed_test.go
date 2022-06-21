@@ -125,11 +125,11 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	f.Require().NoError(err)
-	jc, err := NewOppyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl)
+	oc, err := NewOppyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl)
 	f.Require().NoError(err)
-	jc.Keyring = f.validatorky
-	jc.grpcClient = f.network.Validators[0].ClientCtx
-	info, err := jc.Keyring.Key("operator")
+	oc.Keyring = f.validatorky
+	oc.grpcClient = f.network.Validators[0].ClientCtx
+	info, err := oc.Keyring.Key("operator")
 	f.Require().NoError(err)
 	poolInfo := vaulttypes.PoolInfo{
 		BlockHeight: "100",
@@ -139,7 +139,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		},
 	}
 
-	acc, err := queryAccount(f.network.Validators[0].Address.String(), jc.grpcClient)
+	acc, err := queryAccount(f.network.Validators[0].Address.String(), oc.grpcClient)
 	f.Require().NoError(err)
 	_ = acc
 	pi := pubchain.Instance{
@@ -147,7 +147,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		InboundReqChan:  make(chan *common.InBoundReq, 10),
 	}
 
-	err = jc.FeedTx(&poolInfo, &pi, 100)
+	err = oc.FeedTx(&poolInfo, &pi, 100)
 	f.Require().NoError(err)
 	f.Require().Equal(len(pi.InboundReqChan), 0)
 	reqs := createdTestInBoundReqs(1)
@@ -155,7 +155,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		pi.AddItem(el)
 	}
 
-	err = jc.FeedTx(&poolInfo, &pi, 100)
+	err = oc.FeedTx(&poolInfo, &pi, 100)
 	f.Require().NoError(err)
 	value := <-pi.InboundReqChan
 	f.Require().Equal(value.TxID, reqs[0].TxID)

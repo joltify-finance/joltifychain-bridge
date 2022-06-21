@@ -88,24 +88,24 @@ func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, t
 	return &oppyBridge, nil
 }
 
-func (jc *OppyChainInstance) GetTssNodeID() string {
-	return jc.tssServer.GetTssNodeID()
+func (oc *OppyChainInstance) GetTssNodeID() string {
+	return oc.tssServer.GetTssNodeID()
 }
 
-func (jc *OppyChainInstance) TerminateBridge() error {
-	err := jc.wsClient.Stop()
+func (oc *OppyChainInstance) TerminateBridge() error {
+	err := oc.wsClient.Stop()
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to terminate the ws")
+		oc.logger.Error().Err(err).Msg("fail to terminate the ws")
 		return err
 	}
-	jc.tssServer.Stop()
+	oc.tssServer.Stop()
 	return nil
 }
 
-func (jc *OppyChainInstance) genSendTx(key keyring.Info, sdkMsg []sdk.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (client.TxBuilder, error) {
+func (oc *OppyChainInstance) genSendTx(key keyring.Info, sdkMsg []sdk.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (client.TxBuilder, error) {
 	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
 	// following function.
-	encCfg := *jc.encoding
+	encCfg := *oc.encoding
 	// Create a new TxBuilder.
 	txBuilder := encCfg.TxConfig.NewTxBuilder()
 
@@ -134,7 +134,7 @@ func (jc *OppyChainInstance) genSendTx(key keyring.Info, sdkMsg []sdk.Msg, accSe
 		pk := tssSignMsg.Pk
 		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) // nolint
 		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
+			oc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
 			return nil, err
 		}
 		sigV2 = signing.SignatureV2{
@@ -158,21 +158,21 @@ func (jc *OppyChainInstance) genSendTx(key keyring.Info, sdkMsg []sdk.Msg, accSe
 		AccountNumber: accNum,
 		Sequence:      accSeq,
 	}
-	signatureV2, err := jc.signTx(encCfg.TxConfig, txBuilder, signerData, tssSignMsg)
+	signatureV2, err := oc.signTx(encCfg.TxConfig, txBuilder, signerData, tssSignMsg)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to generate the signature")
+		oc.logger.Error().Err(err).Msg("fail to generate the signature")
 		return nil, err
 	}
 	err = txBuilder.SetSignatures(signatureV2)
 	if err != nil {
-		jc.logger.Error().Err(err).Msgf("fail to set the signature")
+		oc.logger.Error().Err(err).Msgf("fail to set the signature")
 		return nil, err
 	}
 
 	return txBuilder, nil
 }
 
-func (jc *OppyChainInstance) signTx(txConfig client.TxConfig, txBuilder client.TxBuilder, signerData xauthsigning.SignerData, signMsg *tssclient.TssSignigMsg) (signing.SignatureV2, error) {
+func (oc *OppyChainInstance) signTx(txConfig client.TxConfig, txBuilder client.TxBuilder, signerData xauthsigning.SignerData, signMsg *tssclient.TssSignigMsg) (signing.SignatureV2, error) {
 	var sigV2 signing.SignatureV2
 
 	signMode := txConfig.SignModeHandler().DefaultMode()
@@ -186,7 +186,7 @@ func (jc *OppyChainInstance) signTx(txConfig client.TxConfig, txBuilder client.T
 	var pk coscrypto.PubKey
 	if signMsg == nil {
 		// Sign those bytes by the node itself
-		signature, pk, err = jc.Keyring.Sign("operator", signBytes)
+		signature, pk, err = oc.Keyring.Sign("operator", signBytes)
 		if err != nil {
 			return sigV2, err
 		}
@@ -194,28 +194,28 @@ func (jc *OppyChainInstance) signTx(txConfig client.TxConfig, txBuilder client.T
 		hashedMsg := crypto.Sha256(signBytes)
 		encodedMsg := base64.StdEncoding.EncodeToString(hashedMsg)
 		signMsg.Msgs = []string{encodedMsg}
-		resp, err := jc.doTssSign(signMsg)
+		resp, err := oc.doTssSign(signMsg)
 		if err != nil {
 			return signing.SignatureV2{}, err
 		}
 		if resp.Status != common.Success {
-			jc.logger.Error().Err(err).Msg("fail to generate the signature")
+			oc.logger.Error().Err(err).Msg("fail to generate the signature")
 			// todo we need to handle the blame
 			return signing.SignatureV2{}, err
 		}
 		if len(resp.Signatures) != 1 {
-			jc.logger.Error().Msgf("we should only have 1 signature")
+			oc.logger.Error().Msgf("we should only have 1 signature")
 			return signing.SignatureV2{}, errors.New("more than 1 signature received")
 		}
 		signature, err = misc.SerializeSig(&resp.Signatures[0], false)
 		if err != nil {
-			jc.logger.Error().Msgf("fail to encode the signature")
+			oc.logger.Error().Msgf("fail to encode the signature")
 			return signing.SignatureV2{}, err
 		}
 
 		pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, signMsg.Pk) // nolint
 		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to get the pubkey")
+			oc.logger.Error().Err(err).Msgf("fail to get the pubkey")
 			return signing.SignatureV2{}, err
 		}
 		pk = pubkey
@@ -235,20 +235,20 @@ func (jc *OppyChainInstance) signTx(txConfig client.TxConfig, txBuilder client.T
 	return sigV2, nil
 }
 
-func (jc *OppyChainInstance) doTssSign(msg *tssclient.TssSignigMsg) (keysign.Response, error) {
-	resp, err := jc.tssServer.KeySign(msg.Pk, msg.Msgs, msg.BlockHeight, msg.Signers, tssclient.TssVersion)
+func (oc *OppyChainInstance) doTssSign(msg *tssclient.TssSignigMsg) (keysign.Response, error) {
+	resp, err := oc.tssServer.KeySign(msg.Pk, msg.Msgs, msg.BlockHeight, msg.Signers, tssclient.TssVersion)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to generate the tss signature")
+		oc.logger.Error().Err(err).Msg("fail to generate the tss signature")
 		return keysign.Response{}, err
 	}
 	return resp, nil
 }
 
 // SimBroadcastTx broadcast the tx to the oppyChain to get gas estimation
-func (jc *OppyChainInstance) SimBroadcastTx(ctx context.Context, txbytes []byte) (uint64, error) {
+func (oc *OppyChainInstance) SimBroadcastTx(ctx context.Context, txbytes []byte) (uint64, error) {
 	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
 	// service.
-	txClient := cosTx.NewServiceClient(jc.grpcClient)
+	txClient := cosTx.NewServiceClient(oc.grpcClient)
 	// We then call the BroadcastTx method on this client.
 	grpcRes, err := txClient.Simulate(ctx, &cosTx.SimulateRequest{TxBytes: txbytes})
 	if err != nil {
@@ -259,7 +259,7 @@ func (jc *OppyChainInstance) SimBroadcastTx(ctx context.Context, txbytes []byte)
 }
 
 // GasEstimation this function get the estimation of the fee
-func (jc *OppyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssSignMsg *tssclient.TssSignigMsg) (uint64, error) {
+func (oc *OppyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssSignMsg *tssclient.TssSignigMsg) (uint64, error) {
 	encoding := MakeEncodingConfig()
 	encCfg := encoding
 	// Create a new TxBuilder.
@@ -267,14 +267,14 @@ func (jc *OppyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssS
 
 	err := txBuilder.SetMsgs(sdkMsg...)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to query the gas price")
+		oc.logger.Error().Err(err).Msg("fail to query the gas price")
 		return 0, err
 	}
 	// txBuilder.SetGasLimit(0)
 
-	key, err := jc.Keyring.Key("operator")
+	key, err := oc.Keyring.Key("operator")
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to get the operator key")
+		oc.logger.Error().Err(err).Msg("fail to get the operator key")
 		return 0, err
 	}
 	var pubKey coscrypto.PubKey
@@ -284,7 +284,7 @@ func (jc *OppyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssS
 		pk := tssSignMsg.Pk
 		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) // nolint
 		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
+			oc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
 			return 0, err
 		}
 		pubKey = cPk
@@ -305,16 +305,16 @@ func (jc *OppyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssS
 		return 0, err
 	}
 
-	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to encode the tx")
+		oc.logger.Error().Err(err).Msg("fail to encode the tx")
 		return 0, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
-	gasUsed, err := jc.SimBroadcastTx(ctx, txBytes)
+	gasUsed, err := oc.SimBroadcastTx(ctx, txBytes)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to estimate gas consumption from simulation")
+		oc.logger.Error().Err(err).Msg("fail to estimate gas consumption from simulation")
 		return 0, err
 	}
 
@@ -324,13 +324,13 @@ func (jc *OppyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssS
 }
 
 // UpdateGas update the gas needed from the last tx
-func (jc *OppyChainInstance) UpdateGas(gasUsed int64) {
-	jc.inboundGas.Store(gasUsed)
+func (oc *OppyChainInstance) UpdateGas(gasUsed int64) {
+	oc.inboundGas.Store(gasUsed)
 }
 
 // GetGasEstimation get the gas estimation
-func (jc *OppyChainInstance) GetGasEstimation() int64 {
-	previousGasUsed := jc.inboundGas.Load()
+func (oc *OppyChainInstance) GetGasEstimation() int64 {
+	previousGasUsed := oc.inboundGas.Load()
 	gasUsedDec := sdk.NewDecFromIntWithPrec(sdk.NewIntFromUint64(uint64(previousGasUsed)), 0)
 	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO)).RoundInt64()
 	_ = gasWanted
@@ -339,10 +339,10 @@ func (jc *OppyChainInstance) GetGasEstimation() int64 {
 }
 
 // BroadcastTx broadcast the tx to the oppyChain
-func (jc *OppyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte, isTssMsg bool) (bool, string, error) {
+func (oc *OppyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte, isTssMsg bool) (bool, string, error) {
 	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
 	// service.
-	txClient := cosTx.NewServiceClient(jc.grpcClient)
+	txClient := cosTx.NewServiceClient(oc.grpcClient)
 	// We then call the BroadcastTx method on this client.
 	grpcRes, err := txClient.BroadcastTx(
 		ctx,
@@ -361,29 +361,29 @@ func (jc *OppyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte, is
 	}
 
 	if grpcRes.GetTxResponse().Code != 0 {
-		jc.logger.Error().Err(err).Msgf("fail to broadcast with response %v", grpcRes.TxResponse)
+		oc.logger.Error().Err(err).Msgf("fail to broadcast with response %v", grpcRes.TxResponse)
 		return false, "", nil
 	}
 	txHash := grpcRes.GetTxResponse().TxHash
 	if isTssMsg {
-		jc.UpdateGas(grpcRes.GetTxResponse().GasUsed)
+		oc.UpdateGas(grpcRes.GetTxResponse().GasUsed)
 	}
 
 	return true, txHash, nil
 }
 
-func (jc *OppyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
+func (oc *OppyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
 	msg := types.NewMsgCreateCreatePool(creator, pubKey, height)
 
-	acc, err := queryAccount(creator.String(), jc.grpcClient)
+	acc, err := queryAccount(creator.String(), oc.grpcClient)
 	if err != nil {
-		jc.logger.Error().Err(err).Msg("Fail to query the account")
+		oc.logger.Error().Err(err).Msg("Fail to query the account")
 		return err
 	}
 
 	dHeight, err := strconv.ParseInt(height, 10, 64)
 	if err != nil {
-		jc.logger.Error().Err(err).Msgf("fail to parse the height")
+		oc.logger.Error().Err(err).Msgf("fail to parse the height")
 		return err
 	}
 
@@ -393,90 +393,90 @@ func (jc *OppyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, heig
 		pubKey,
 		dHeight,
 	}
-	jc.poolUpdateLocker.Lock()
+	oc.poolUpdateLocker.Lock()
 	// we store the latest two tss pool outReceiverAddress
-	jc.msgSendCache = append(jc.msgSendCache, item)
-	jc.poolUpdateLocker.Unlock()
+	oc.msgSendCache = append(oc.msgSendCache, item)
+	oc.poolUpdateLocker.Unlock()
 	return nil
 }
 
 // GetLastBlockHeight gets the current block height
-func (jc *OppyChainInstance) GetLastBlockHeight() (int64, error) {
-	b, err := GetLastBlockHeight(jc.grpcClient)
+func (oc *OppyChainInstance) GetLastBlockHeight() (int64, error) {
+	b, err := GetLastBlockHeight(oc.grpcClient)
 	return b, err
 }
 
-// GetBlockByHeight get the block based on the 'RollbackGapJolt'
-func (jc *OppyChainInstance) GetBlockByHeight(blockHeight int64) (*prototypes.Block, error) {
-	block, err := GetBlockByHeight(jc.grpcClient, blockHeight)
+// GetBlockByHeight get the block based on the 'oppyRollbackGap'
+func (oc *OppyChainInstance) GetBlockByHeight(blockHeight int64) (*prototypes.Block, error) {
+	block, err := GetBlockByHeight(oc.grpcClient, blockHeight)
 	return block, err
 }
 
 // CheckAndUpdatePool send the tx to the oppy pub_chain, if the pool outReceiverAddress is updated, it returns true
-func (jc *OppyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, string) {
-	jc.poolUpdateLocker.Lock()
-	if len(jc.msgSendCache) < 1 {
-		jc.poolUpdateLocker.Unlock()
+func (oc *OppyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, string) {
+	oc.poolUpdateLocker.Lock()
+	if len(oc.msgSendCache) < 1 {
+		oc.poolUpdateLocker.Unlock()
 		// no need to submit
 		return true, ""
 	}
-	el := jc.msgSendCache[0]
-	jc.poolUpdateLocker.Unlock()
+	el := oc.msgSendCache[0]
+	oc.poolUpdateLocker.Unlock()
 	if el.blockHeight == blockHeight {
-		jc.logger.Info().Msgf("we are submit the block at height>>>>>>>>%v\n", el.blockHeight)
+		oc.logger.Info().Msgf("we are submit the block at height>>>>>>>>%v\n", el.blockHeight)
 		ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 		defer cancel()
 
-		gasWanted, err := jc.GasEstimation([]sdk.Msg{el.msg}, el.acc.GetSequence(), nil)
+		gasWanted, err := oc.GasEstimation([]sdk.Msg{el.msg}, el.acc.GetSequence(), nil)
 		if err != nil {
-			jc.logger.Error().Err(err).Msg("Fail to get the gas estimation")
+			oc.logger.Error().Err(err).Msg("Fail to get the gas estimation")
 			return false, ""
 		}
-		key, err := jc.Keyring.Key("operator")
+		key, err := oc.Keyring.Key("operator")
 		if err != nil {
-			jc.logger.Error().Err(err).Msg("fail to get the operator key")
+			oc.logger.Error().Err(err).Msg("fail to get the operator key")
 			return false, ""
 		}
-		txBuilder, err := jc.genSendTx(key, []sdk.Msg{el.msg}, el.acc.GetSequence(), el.acc.GetAccountNumber(), gasWanted, nil)
+		txBuilder, err := oc.genSendTx(key, []sdk.Msg{el.msg}, el.acc.GetSequence(), el.acc.GetAccountNumber(), gasWanted, nil)
 		if err != nil {
-			jc.logger.Error().Err(err).Msg("fail to generate the tx")
+			oc.logger.Error().Err(err).Msg("fail to generate the tx")
 			return false, ""
 		}
-		txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+		txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 		if err != nil {
-			jc.logger.Error().Err(err).Msg("fail to encode the tx")
+			oc.logger.Error().Err(err).Msg("fail to encode the tx")
 			return false, ""
 		}
-		ok, resp, err := jc.BroadcastTx(ctx, txBytes, false)
+		ok, resp, err := oc.BroadcastTx(ctx, txBytes, false)
 		if err != nil || !ok {
-			jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
+			oc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
 
-			jc.poolUpdateLocker.Lock()
-			jc.msgSendCache = jc.msgSendCache[1:]
-			jc.poolUpdateLocker.Unlock()
+			oc.poolUpdateLocker.Lock()
+			oc.msgSendCache = oc.msgSendCache[1:]
+			oc.poolUpdateLocker.Unlock()
 			return false, ""
 		}
-		jc.poolUpdateLocker.Lock()
-		jc.msgSendCache = jc.msgSendCache[1:]
-		jc.poolUpdateLocker.Unlock()
-		jc.logger.Info().Msgf("successfully broadcast the pool info")
+		oc.poolUpdateLocker.Lock()
+		oc.msgSendCache = oc.msgSendCache[1:]
+		oc.poolUpdateLocker.Unlock()
+		oc.logger.Info().Msgf("successfully broadcast the pool info")
 		return true, el.poolPubKey
 	}
 	return true, ""
 }
 
 // CheckOutBoundTx checks
-func (jc *OppyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertypes.Tx) {
-	pools := jc.GetPool()
+func (oc *OppyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertypes.Tx) {
+	pools := oc.GetPool()
 	if pools[0] == nil || pools[1] == nil {
 		return
 	}
 	poolAddress := []sdk.AccAddress{pools[0].OppyAddress, pools[1].OppyAddress}
-	config := jc.encoding
+	config := oc.encoding
 
 	tx, err := config.TxConfig.TxDecoder()(rawTx)
 	if err != nil {
-		jc.logger.Info().Msgf("fail to decode the data and skip this tx")
+		oc.logger.Info().Msgf("fail to decode the data and skip this tx")
 		return
 	}
 
@@ -489,11 +489,11 @@ func (jc *OppyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertype
 	for _, msg := range txWithMemo.GetMsgs() {
 		switch eachMsg := msg.(type) {
 		case *banktypes.MsgSend:
-			txClient := cosTx.NewServiceClient(jc.grpcClient)
+			txClient := cosTx.NewServiceClient(oc.grpcClient)
 			txquery := cosTx.GetTxRequest{Hash: hex.EncodeToString(rawTx.Hash())}
 			t, err := txClient.GetTx(ctx, &txquery)
 			if err != nil {
-				jc.logger.Error().Err(err).Msgf("fail to query the tx")
+				oc.logger.Error().Err(err).Msgf("fail to query the tx")
 				continue
 			}
 
@@ -503,10 +503,10 @@ func (jc *OppyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertype
 				continue
 			}
 
-			err = jc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, rawTx.Hash())
+			err = oc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, rawTx.Hash())
 			if err != nil {
 				if err.Error() != "not a top up message to the pool" {
-					jc.logger.Error().Err(err).Msgf("fail to process the message, it is not a top up message")
+					oc.logger.Error().Err(err).Msgf("fail to process the message, it is not a top up message")
 				}
 			}
 

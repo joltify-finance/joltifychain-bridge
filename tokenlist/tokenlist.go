@@ -11,7 +11,7 @@ import (
 )
 
 type TokenList struct {
-	joltTokenList *sync.Map
+	oppyTokenList *sync.Map
 	pubTokenList  *sync.Map
 	updateGap     int64
 	filePath      string
@@ -41,7 +41,7 @@ func NewTokenList(filePath string, updateGap int64) (*TokenList, error) {
 
 	// init TokenList
 	tl := &TokenList{
-		joltTokenList: &sync.Map{},
+		oppyTokenList: &sync.Map{},
 		pubTokenList:  &sync.Map{},
 		updateGap:     updateGap,
 		filePath:      filePath,
@@ -51,7 +51,7 @@ func NewTokenList(filePath string, updateGap int64) (*TokenList, error) {
 	// load token list
 	for tokenAddr, tokenDenom := range result {
 		tl.pubTokenList.Store(tokenAddr, tokenDenom.(string))
-		tl.joltTokenList.Store(tokenDenom.(string), tokenAddr)
+		tl.oppyTokenList.Store(tokenDenom.(string), tokenAddr)
 	}
 	tl.logger.Info().Msgf("token list is created from %v", tl.filePath)
 	return tl, nil
@@ -82,15 +82,15 @@ func (tl *TokenList) UpdateTokenList(currentBlockHeight int64) error {
 	}
 
 	// create a new token list
-	newJoltTokenlist := &sync.Map{}
+	newOppyTokenlist := &sync.Map{}
 	newPubTokenlist := &sync.Map{}
 	for tokenAddr, tokenDenom := range result {
 		newPubTokenlist.Store(tokenAddr, tokenDenom.(string))
-		newJoltTokenlist.Store(tokenDenom.(string), tokenAddr)
+		newOppyTokenlist.Store(tokenDenom.(string), tokenAddr)
 	}
 
 	// update the token list
-	tl.joltTokenList = newJoltTokenlist
+	tl.oppyTokenList = newOppyTokenlist
 	tl.pubTokenList = newPubTokenlist
 	tl.logger.Info().Msgf("Token List is updated")
 	return nil
@@ -103,7 +103,7 @@ func (tl *TokenList) GetTokenDenom(tokenAddr string) (string, bool) {
 }
 
 func (tl *TokenList) GetTokenAddress(tokenDenom string) (string, bool) {
-	tokenAddr, exist := tl.joltTokenList.Load(tokenDenom)
+	tokenAddr, exist := tl.oppyTokenList.Load(tokenDenom)
 	tokenAddrStr, _ := tokenAddr.(string)
 	return tokenAddrStr, exist
 }

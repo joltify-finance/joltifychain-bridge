@@ -214,19 +214,19 @@ func NewBridgeService(config config.Config) {
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, joltRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, oppyRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList) {
 	query := "complete_churn.churn = 'oppy_churn'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
 
-	validatorUpdateChan, err := joltChain.AddSubscribe(ctxLocal, query)
+	validatorUpdateChan, err := oppyChain.AddSubscribe(ctxLocal, query)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return
 	}
 
 	query = "tm.event = 'NewBlock'"
-	newOppyBlock, err := joltChain.AddSubscribe(ctxLocal, query)
+	newOppyBlock, err := oppyChain.AddSubscribe(ctxLocal, query)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return
@@ -241,7 +241,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 		cancelsubscription()
 		return
 	}
-	blockHeight, err := joltChain.GetLastBlockHeight()
+	blockHeight, err := oppyChain.GetLastBlockHeight()
 	if err != nil {
 		fmt.Printf("we fail to get the latest block height")
 		cancelsubscription()
@@ -264,7 +264,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 				return
 				// process the update of the validators
 			case vals := <-validatorUpdateChan:
-				height, err := joltChain.GetLastBlockHeight()
+				height, err := oppyChain.GetLastBlockHeight()
 				if err != nil {
 					continue
 				}
@@ -274,7 +274,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 					continue
 				}
 
-				err = joltChain.HandleUpdateValidators(height)
+				err = oppyChain.HandleUpdateValidators(height)
 				if err != nil {
 					fmt.Printf("error in handle update validator")
 					continue
@@ -283,36 +283,36 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 			// process the new oppy block, validator may need to submit the pool address
 			case block := <-newOppyBlock:
 				currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
-				ok, _ := joltChain.CheckAndUpdatePool(currentBlockHeight)
+				ok, _ := oppyChain.CheckAndUpdatePool(currentBlockHeight)
 				if !ok {
 					// it is okay to fail to submit a pool address as other nodes can submit, as long as 2/3 nodes submit, it is fine.
 					zlog.Logger.Warn().Msgf("we fail to submit the new pool address")
 				}
 
-				joltChain.CurrentHeight = currentBlockHeight
+				oppyChain.CurrentHeight = currentBlockHeight
 
 				// we update the token list, if the current block height refresh the update mark
-				err := tl.UpdateTokenList(joltChain.CurrentHeight)
+				err := tl.UpdateTokenList(oppyChain.CurrentHeight)
 				if err != nil {
 					zlog.Logger.Warn().Msgf("error in updating token list %v", err)
 				}
 
 				// we update the tx new, if there exits a processable block
-				if currentBlockHeight > joltRollbackGap {
-					processableBlockHeight := currentBlockHeight - joltRollbackGap
-					processableBlock, err := joltChain.GetBlockByHeight(processableBlockHeight)
+				if currentBlockHeight > oppyRollbackGap {
+					processableBlockHeight := currentBlockHeight - oppyRollbackGap
+					processableBlock, err := oppyChain.GetBlockByHeight(processableBlockHeight)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("error in get block to process %v", err)
 						continue
 					}
 					for _, el := range processableBlock.Data.Txs {
-						joltChain.CheckOutBoundTx(processableBlockHeight, el)
+						oppyChain.CheckOutBoundTx(processableBlockHeight, el)
 					}
 				}
 
 				// now we check whether we need to update the pool
 				// we query the pool from the chain directly.
-				poolInfo, err := joltChain.QueryLastPoolAddress()
+				poolInfo, err := oppyChain.QueryLastPoolAddress()
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msgf("error in get pool with error %v", err)
 					continue
@@ -330,7 +330,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 						if err != nil {
 							zlog.Log().Err(err).Msgf("fail to update the pool")
 						}
-						joltChain.UpdatePool(el)
+						oppyChain.UpdatePool(el)
 					}
 					continue
 				}
@@ -340,16 +340,16 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 					if err != nil {
 						zlog.Log().Err(err).Msgf("fail to update the pool")
 					}
-					previousPool := joltChain.UpdatePool(poolInfo[0])
+					previousPool := oppyChain.UpdatePool(poolInfo[0])
 					if previousPool.Pk != poolInfo[0].CreatePool.PoolPubKey {
 						// we force the first try of the tx to be run without blocking by the block wait
-						joltChain.AddMoveFundItem(previousPool, currentBlockHeight-config.MINCHECKBLOCKGAP+5)
+						oppyChain.AddMoveFundItem(previousPool, currentBlockHeight-config.MINCHECKBLOCKGAP+5)
 						pi.AddMoveFundItem(previousPool, pi.CurrentHeight-config.MINCHECKBLOCKGAP+5)
 					}
 				}
 
 				latestPool := poolInfo[0].CreatePool.PoolAddr
-				moveFound := joltChain.MoveFound(currentBlockHeight, latestPool)
+				moveFound := oppyChain.MoveFound(currentBlockHeight, latestPool)
 				if moveFound {
 					// if we move fund in this round, we do not send tx to sign
 					continue
@@ -364,9 +364,9 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 						continue
 					}
 
-					pools := joltChain.GetPool()
+					pools := oppyChain.GetPool()
 					zlog.Logger.Warn().Msgf("we feed the tx now %v", pools[1].PoolInfo.CreatePool.String())
-					err := joltChain.FeedTx(pools[1].PoolInfo, pi, currentBlockHeight)
+					err := oppyChain.FeedTx(pools[1].PoolInfo, pi, currentBlockHeight)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
 					}
@@ -377,7 +377,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 
 				// process the public chain new block event
 			case head := <-pubNewBlockChan:
-				oppyBlockHeight, errInner := joltChain.GetLastBlockHeight()
+				oppyBlockHeight, errInner := oppyChain.GetLastBlockHeight()
 				if errInner != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to get the oppy chain block height for this round")
 					continue
@@ -396,7 +396,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 				previousPool, _ := pi.PopMoveFundItemAfterBlock(head.Number.Int64())
 				isSigner := false
 				if previousPool != nil {
-					isSigner, err = joltChain.CheckWhetherSigner(previousPool.PoolInfo)
+					isSigner, err = oppyChain.CheckWhetherSigner(previousPool.PoolInfo)
 					if err != nil {
 						zlog.Logger.Warn().Msg("fail in check whether we are signer in moving fund")
 					}
@@ -412,15 +412,15 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 				}
 
 				// todo we need also to add the check to avoid send tx near the churn blocks
-				if oppyBlockHeight-previousTssBlockOutBound >= oppybridge.GroupBlockGap && joltChain.Size() != 0 {
+				if oppyBlockHeight-previousTssBlockOutBound >= oppybridge.GroupBlockGap && oppyChain.Size() != 0 {
 					// if we do not have enough tx to process, we wait for another round
-					if joltChain.Size() < pubchain.GroupSign && firstTimeOutbound {
+					if oppyChain.Size() < pubchain.GroupSign && firstTimeOutbound {
 						firstTimeOutbound = false
-						metric.UpdateOutboundTxNum(float64(joltChain.Size()))
+						metric.UpdateOutboundTxNum(float64(oppyChain.Size()))
 						continue
 					}
 
-					pools := joltChain.GetPool()
+					pools := oppyChain.GetPool()
 					if len(pools) < 2 || pools[1] == nil {
 						// this is need once we resume the bridge to avoid the panic that the pool address has not been filled
 						zlog.Logger.Warn().Msgf("we do not have 2 pools to start the tx")
@@ -428,14 +428,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 					}
 					zlog.Logger.Warn().Msgf("we feed the tx now %v", pools[1].PoolInfo.CreatePool.String())
 
-					outboundItems := joltChain.PopItem(pubchain.GroupSign)
+					outboundItems := oppyChain.PopItem(pubchain.GroupSign)
 
 					if outboundItems == nil {
 						zlog.Logger.Info().Msgf("empty queue")
 						continue
 					}
 
-					found, err := joltChain.CheckWhetherSigner(pools[1].PoolInfo)
+					found, err := oppyChain.CheckWhetherSigner(pools[1].PoolInfo)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
 						continue
@@ -452,10 +452,10 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 					}
 					previousTssBlockOutBound = oppyBlockHeight
 					firstTimeOutbound = true
-					metric.UpdateOutboundTxNum(float64(joltChain.Size()))
+					metric.UpdateOutboundTxNum(float64(oppyChain.Size()))
 
 					for _, el := range outboundItems {
-						joltChain.OutboundReqChan <- el
+						oppyChain.OutboundReqChan <- el
 					}
 				}
 
@@ -464,14 +464,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 				wg.Add(1)
 				go func(item *common2.InBoundReq) {
 					defer wg.Done()
-					txHash, indexRet, err := joltChain.ProcessInBound(item)
+					txHash, indexRet, err := oppyChain.ProcessInBound(item)
 					if txHash == "" && indexRet == "" && err == nil {
 						return
 					}
 					wg.Add(1)
 					go func(index string) {
 						defer wg.Done()
-						err := joltChain.CheckTxStatus(index)
+						err := oppyChain.CheckTxStatus(index)
 						if err != nil {
 							zlog.Logger.Error().Err(err).Msgf("the tx index(%v) has not been successfully submitted retry", index)
 							pi.AddItem(item)
@@ -486,12 +486,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 					}(indexRet)
 				}(itemRecv)
 
-			case itemRecv := <-joltChain.OutboundReqChan:
+			case itemRecv := <-oppyChain.OutboundReqChan:
 
 				wg.Add(1)
 				go func(litem *common2.OutBoundReq) {
 					defer wg.Done()
-					submittedTx, err := joltChain.GetPubChainSubmittedTx(*litem)
+					submittedTx, err := oppyChain.GetPubChainSubmittedTx(*litem)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to query the submitted tx record, we continue process this tx")
 					}
@@ -533,7 +533,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 									if err != nil {
 										panic("blockheigh convert should never fail")
 									}
-									errInner := joltChain.SubmitOutboundTx(nil, itemCheck.Hash().Hex(), poolCreateHeight, txHash)
+									errInner := oppyChain.SubmitOutboundTx(nil, itemCheck.Hash().Hex(), poolCreateHeight, txHash)
 									return errInner
 								}
 								err := backoff.Retry(op, bf)
@@ -545,7 +545,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *oppybridge
 							}
 						}
 						zlog.Logger.Warn().Msgf("the tx is fail in submission, we need to resend")
-						joltChain.AddItem(itemCheck)
+						oppyChain.AddItem(itemCheck)
 					}(litem, txHashCheck)
 				}(itemRecv)
 			}

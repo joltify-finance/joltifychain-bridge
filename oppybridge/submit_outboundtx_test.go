@@ -102,43 +102,43 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	s.Require().NoError(err)
-	jc, err := NewOppyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, &tss, tl)
+	oc, err := NewOppyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, &tss, tl)
 	s.Require().NoError(err)
-	jc.Keyring = s.validatorky
+	oc.Keyring = s.validatorky
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	jc.grpcClient = s.network.Validators[0].ClientCtx
+	oc.grpcClient = s.network.Validators[0].ClientCtx
 	defer func() {
-		err := jc.TerminateBridge()
+		err := oc.TerminateBridge()
 		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
+			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
 		}
 	}()
 
 	_, err = s.network.WaitForHeightWithTimeout(11, time.Minute)
 	s.Require().NoError(err)
 
-	jc.validatorSet = validators.NewValidator()
-	err = jc.HandleUpdateValidators(20)
+	oc.validatorSet = validators.NewValidator()
+	err = oc.HandleUpdateValidators(20)
 	s.Require().NoError(err)
 	info, _ := s.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()
 	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
-	valAddr, err := misc.PoolPubKeyToJoltAddress(pkstr)
+	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
 	s.Require().NoError(err)
 
-	acc, err := queryAccount(valAddr.String(), jc.grpcClient)
+	acc, err := queryAccount(valAddr.String(), oc.grpcClient)
 	s.Require().NoError(err)
 
-	operatorInfo, _ := jc.Keyring.Key("operator")
+	operatorInfo, _ := oc.Keyring.Key("operator")
 
 	send := banktypes.NewMsgSend(valAddr, operatorInfo.GetAddress(), sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100))})
 
-	txBuilder, err := Gensigntx(jc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), s.network.Validators[0].ClientCtx.Keyring)
+	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), s.network.Validators[0].ClientCtx.Keyring)
 	s.Require().NoError(err)
-	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	s.Require().NoError(err)
-	ret, _, err := jc.BroadcastTx(context.Background(), txBytes, false)
+	ret, _, err := oc.BroadcastTx(context.Background(), txBytes, false)
 	s.Require().NoError(err)
 	s.Require().True(ret)
 
@@ -148,9 +148,9 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 		OriginalHeight:     5,
 	}
 	s.Require().NoError(err)
-	err = jc.SubmitOutboundTx(info, req.Hash().Hex(), 10, "testpubtx")
+	err = oc.SubmitOutboundTx(info, req.Hash().Hex(), 10, "testpubtx")
 	s.Require().NoError(err)
-	_, err = jc.GetPubChainSubmittedTx(req)
+	_, err = oc.GetPubChainSubmittedTx(req)
 	s.Require().NoError(err)
 }
 

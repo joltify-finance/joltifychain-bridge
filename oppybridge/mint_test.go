@@ -99,17 +99,17 @@ func (v *MintTestSuite) SetupSuite() {
 func (m MintTestSuite) TestPrepareIssueTokenRequest() {
 	accs, err := generateRandomPrivKey(3)
 	m.Require().NoError(err)
-	tx := common.NewAccountInboundReq(accs[0].joltAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(2), int64(100))
+	tx := common.NewAccountInboundReq(accs[0].oppyAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(2), int64(100))
 	_, err = prepareIssueTokenRequest(&tx, accs[2].commAddr.String(), "1")
 	m.Require().EqualError(err, "decoding bech32 failed: string not all lowercase or all uppercase")
 
-	_, err = prepareIssueTokenRequest(&tx, accs[2].joltAddr.String(), "1")
+	_, err = prepareIssueTokenRequest(&tx, accs[2].oppyAddr.String(), "1")
 
 	m.Require().NoError(err)
 }
 
-func Gensigntx(jc *OppyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum, accSeq uint64, signkeyring keyring.Keyring) (client.TxBuilder, error) {
-	encCfg := *jc.encoding
+func Gensigntx(oc *OppyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum, accSeq uint64, signkeyring keyring.Keyring) (client.TxBuilder, error) {
+	encCfg := *oc.encoding
 	// Create a new TxBuilder.
 	txBuilder := encCfg.TxConfig.NewTxBuilder()
 
@@ -166,7 +166,7 @@ func Gensigntx(jc *OppyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum
 	}
 	err = txBuilder.SetSignatures(sigV2)
 	if err != nil {
-		jc.logger.Error().Err(err).Msgf("fail to set the signature")
+		oc.logger.Error().Err(err).Msgf("fail to set the signature")
 		return nil, err
 	}
 
@@ -186,16 +186,16 @@ func (m MintTestSuite) TestProcessInbound() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	m.Require().NoError(err)
-	jc, err := NewOppyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, &tss, tl)
+	oc, err := NewOppyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, &tss, tl)
 	m.Require().NoError(err)
-	jc.Keyring = m.validatorky
+	oc.Keyring = m.validatorky
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	jc.grpcClient = m.network.Validators[0].ClientCtx
+	oc.grpcClient = m.network.Validators[0].ClientCtx
 	defer func() {
-		err := jc.TerminateBridge()
+		err := oc.TerminateBridge()
 		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
+			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
 		}
 	}()
 
@@ -205,36 +205,36 @@ func (m MintTestSuite) TestProcessInbound() {
 	info, _ := m.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()
 	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
-	valAddr, err := misc.PoolPubKeyToJoltAddress(pkstr)
+	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
 	m.Require().NoError(err)
 
-	acc, err := queryAccount(valAddr.String(), jc.grpcClient)
+	acc, err := queryAccount(valAddr.String(), oc.grpcClient)
 	m.Require().NoError(err)
 	tx := common.NewAccountInboundReq(valAddr, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100), int64(100))
 
-	tx.SetAccountInfoAndHeight(0, 0, accs[0].joltAddr, accs[0].pk, 0)
+	tx.SetAccountInfoAndHeight(0, 0, accs[0].oppyAddr, accs[0].pk, 0)
 
-	send := banktypes.NewMsgSend(valAddr, accs[0].joltAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
+	send := banktypes.NewMsgSend(valAddr, accs[0].oppyAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
-	// txBuilder, err := jc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
-	txBuilder, err := Gensigntx(jc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), m.network.Validators[0].ClientCtx.Keyring)
+	// txBuilder, err := oc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
+	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), m.network.Validators[0].ClientCtx.Keyring)
 	m.Require().NoError(err)
-	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	m.Require().NoError(err)
-	ret, _, err := jc.BroadcastTx(context.Background(), txBytes, false)
+	ret, _, err := oc.BroadcastTx(context.Background(), txBytes, false)
 	m.Require().NoError(err)
 	m.Require().True(ret)
 
 	pool := common.PoolInfo{
 		Pk:          accs[0].pk,
-		OppyAddress: accs[0].joltAddr,
+		OppyAddress: accs[0].oppyAddr,
 		EthAddress:  accs[0].commAddr,
 	}
 
-	jc.lastTwoPools[0] = &pool
-	jc.lastTwoPools[1] = &pool
+	oc.lastTwoPools[0] = &pool
+	oc.lastTwoPools[1] = &pool
 
-	_, _, err = jc.ProcessInBound(&tx)
+	_, _, err = oc.ProcessInBound(&tx)
 	m.Require().Error(err)
 }
 

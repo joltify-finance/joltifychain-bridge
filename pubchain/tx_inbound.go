@@ -40,7 +40,7 @@ func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, tra
 		return err
 	}
 
-	transferFrom, err := misc.EthSignPubKeyToJoltAddr(sigPublicKey)
+	transferFrom, err := misc.EthSignPubKeyToOppyAddr(sigPublicKey)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to recover the oppy Address")
 		return err
@@ -234,15 +234,15 @@ func (pi *Instance) UpdatePool(pool *vaulttypes.PoolInfo) error {
 		return errors.New("nil pool")
 	}
 	poolPubKey := pool.CreatePool.PoolPubKey
-	addr, err := misc.PoolPubKeyToJoltAddress(poolPubKey)
+	addr, err := misc.PoolPubKeyToOppyAddress(poolPubKey)
 	if err != nil {
-		pi.logger.Error().Err(err).Msgf("fail to convert the jolt addres to eth address %v", poolPubKey)
+		pi.logger.Error().Err(err).Msgf("fail to convert the oppy address to eth address %v", poolPubKey)
 		return err
 	}
 
 	ethAddr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
 	if err != nil {
-		fmt.Printf("fail to convert the jolt address to eth address %v", poolPubKey)
+		fmt.Printf("fail to convert the oppy address to eth address %v", poolPubKey)
 		return err
 	}
 
