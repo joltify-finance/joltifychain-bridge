@@ -126,6 +126,13 @@ func (pi *Instance) getTransactionReceiptWithLock(ctx context.Context, txHash co
 	return receipt, err
 }
 
+func (pi *Instance) getPendingNonceWithLock(ctx context.Context, poolAddress common.Address) (uint64, error) {
+	pi.ethClientLocker.RLock()
+	nonce, err := pi.EthClient.PendingNonceAt(ctx, poolAddress)
+	pi.ethClientLocker.RUnlock()
+	return nonce, err
+}
+
 func (pi *Instance) sendTransactionWithLock(ctx context.Context, tx *types.Transaction) error {
 	pi.ethClientLocker.RLock()
 	err := pi.EthClient.SendTransaction(ctx, tx)
