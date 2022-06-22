@@ -29,14 +29,14 @@ func generateRandomPrivKey(n int) ([]account, error) {
 		if err != nil {
 			return nil, err
 		}
-		addrJolt, err := types.AccAddressFromHex(sk.PubKey().Address().String())
+		addrOppy, err := types.AccAddressFromHex(sk.PubKey().Address().String())
 		if err != nil {
 			return nil, err
 		}
 		tAccount := account{
 			sk,
 			pk,
-			addrJolt,
+			addrOppy,
 			ethAddr,
 		}
 		randomAccounts[i] = tAccount
@@ -61,14 +61,14 @@ func TestPubChainInstance_composeTx(t *testing.T) {
 		BlockHeight: "100",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: accs[0].pk,
-			PoolAddr:   accs[0].joltAddr,
+			PoolAddr:   accs[0].oppyAddr,
 		},
 	}
 	poolInfo1 := vaulttypes.PoolInfo{
 		BlockHeight: "101",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: accs[1].pk,
-			PoolAddr:   accs[1].joltAddr,
+			PoolAddr:   accs[1].oppyAddr,
 		},
 	}
 
@@ -111,7 +111,7 @@ func TestSendToken(t *testing.T) {
 		panic(err)
 	}
 
-	fromAddress, err := misc.PoolPubKeyToJoltAddress(pk)
+	fromAddress, err := misc.PoolPubKeyToOppyAddress(pk)
 	if err != nil {
 		panic(err)
 	}

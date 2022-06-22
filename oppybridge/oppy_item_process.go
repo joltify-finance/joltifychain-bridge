@@ -9,14 +9,14 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 )
 
-func (jc *OppyChainInstance) AddMoveFundItem(pool *common.PoolInfo, height int64) {
-	jc.moveFundReq.Store(height, pool)
+func (oc *OppyChainInstance) AddMoveFundItem(pool *common.PoolInfo, height int64) {
+	oc.moveFundReq.Store(height, pool)
 }
 
 // popMoveFundItemAfterBlock pop a move fund item after give block duration
-func (jc *OppyChainInstance) popMoveFundItemAfterBlock(currentBlockHeight int64) (*common.PoolInfo, int64) {
+func (oc *OppyChainInstance) popMoveFundItemAfterBlock(currentBlockHeight int64) (*common.PoolInfo, int64) {
 	min := int64(math.MaxInt64)
-	jc.moveFundReq.Range(func(key, value interface{}) bool {
+	oc.moveFundReq.Range(func(key, value interface{}) bool {
 		h := key.(int64)
 		if h <= min {
 			min = h
@@ -25,28 +25,28 @@ func (jc *OppyChainInstance) popMoveFundItemAfterBlock(currentBlockHeight int64)
 	})
 
 	if min < math.MaxInt64 && (currentBlockHeight-min > config.MINCHECKBLOCKGAP) {
-		item, _ := jc.moveFundReq.LoadAndDelete(min)
+		item, _ := oc.moveFundReq.LoadAndDelete(min)
 		return item.(*common.PoolInfo), min
 	}
 	return nil, 0
 }
 
-func (jc *OppyChainInstance) ExportItems() []*common.OutBoundReq {
+func (oc *OppyChainInstance) ExportItems() []*common.OutBoundReq {
 	var items []*common.OutBoundReq
-	jc.RetryOutboundReq.Range(func(_, value interface{}) bool {
+	oc.RetryOutboundReq.Range(func(_, value interface{}) bool {
 		items = append(items, value.(*common.OutBoundReq))
 		return true
 	})
 	return items
 }
 
-func (jc *OppyChainInstance) AddItem(req *common.OutBoundReq) {
-	jc.RetryOutboundReq.Store(req.Index(), req)
+func (oc *OppyChainInstance) AddItem(req *common.OutBoundReq) {
+	oc.RetryOutboundReq.Store(req.Index(), req)
 }
 
-func (jc *OppyChainInstance) PopItem(n int) []*common.OutBoundReq {
+func (oc *OppyChainInstance) PopItem(n int) []*common.OutBoundReq {
 	var allkeys []*big.Int
-	jc.RetryOutboundReq.Range(func(key, value interface{}) bool {
+	oc.RetryOutboundReq.Range(func(key, value interface{}) bool {
 		allkeys = append(allkeys, key.(*big.Int))
 		return true
 	})
@@ -67,7 +67,7 @@ func (jc *OppyChainInstance) PopItem(n int) []*common.OutBoundReq {
 	inboundReqs := make([]*common.OutBoundReq, returnNum)
 
 	for i := 0; i < returnNum; i++ {
-		el, loaded := jc.RetryOutboundReq.LoadAndDelete(allkeys[i])
+		el, loaded := oc.RetryOutboundReq.LoadAndDelete(allkeys[i])
 		if !loaded {
 			panic("should never fail")
 		}
@@ -77,9 +77,9 @@ func (jc *OppyChainInstance) PopItem(n int) []*common.OutBoundReq {
 	return inboundReqs
 }
 
-func (jc *OppyChainInstance) Size() int {
+func (oc *OppyChainInstance) Size() int {
 	i := 0
-	jc.RetryOutboundReq.Range(func(key, value interface{}) bool {
+	oc.RetryOutboundReq.Range(func(key, value interface{}) bool {
 		i += 1
 		return true
 	})

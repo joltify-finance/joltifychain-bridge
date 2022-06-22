@@ -30,6 +30,7 @@ type EventTestSuite struct {
 func (v *EventTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
+	cfg.BondDenom = "stake"
 	v.cfg = cfg
 	v.validatorky = keyring.NewInMemory()
 	// now we put the mock pool list in the test
@@ -111,16 +112,16 @@ func (e EventTestSuite) TestSubscribe() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	e.Require().NoError(err)
-	jc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
+	oc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
 	e.Require().NoError(err)
 	defer func() {
-		err := jc.TerminateBridge()
+		err := oc.TerminateBridge()
 		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
+			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
 		}
 	}()
 	query := "tm.event = 'NewBlock'"
-	eventChain, err := jc.AddSubscribe(context.Background(), query)
+	eventChain, err := oc.AddSubscribe(context.Background(), query)
 	e.Require().NoError(err)
 	data := <-eventChain
 	e.T().Logf("new block event test %v", data.Events)
@@ -137,30 +138,30 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	e.Require().NoError(err)
-	jc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
+	oc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
 	e.Require().NoError(err)
 	defer func() {
-		err := jc.TerminateBridge()
+		err := oc.TerminateBridge()
 		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
+			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
 		}
 	}()
-	jc.grpcClient = e.network.Validators[0].ClientCtx
-	err = jc.InitValidators(e.network.Validators[0].APIAddress)
+	oc.grpcClient = e.network.Validators[0].ClientCtx
+	err = oc.InitValidators(e.network.Validators[0].APIAddress)
 	e.Require().NoError(err)
 	data := base64.StdEncoding.EncodeToString(e.network.Validators[0].PubKey.Bytes())
-	jc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value = data
+	oc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value = data
 
-	err = jc.HandleUpdateValidators(100)
+	err = oc.HandleUpdateValidators(100)
 	e.Require().NoError(err)
-	e.Require().Equal(len(jc.msgSendCache), 0)
+	e.Require().Equal(len(oc.msgSendCache), 0)
 	tss.keygenSuccess = true
 
-	jc.Keyring = e.validatorky
-	info, err := jc.Keyring.Key("operator")
+	oc.Keyring = e.validatorky
+	info, err := oc.Keyring.Key("operator")
 	e.Require().NoError(err)
 	errorMSg := fmt.Sprintf("rpc error: code = NotFound desc = rpc error: code = NotFound desc = account %v not found: key not found", info.GetAddress().String())
-	err = jc.HandleUpdateValidators(100)
+	err = oc.HandleUpdateValidators(100)
 	e.Require().EqualError(err, errorMSg)
 }
 

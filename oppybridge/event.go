@@ -18,10 +18,10 @@ import (
 const capacity = 10000
 
 // AddSubscribe add the subscirbe to the chain
-func (jc *OppyChainInstance) AddSubscribe(ctx context.Context, query string) (<-chan ctypes.ResultEvent, error) {
-	out, err := jc.wsClient.Subscribe(ctx, "oppyBridge", query, capacity)
+func (oc *OppyChainInstance) AddSubscribe(ctx context.Context, query string) (<-chan ctypes.ResultEvent, error) {
+	out, err := oc.wsClient.Subscribe(ctx, "oppyBridge", query, capacity)
 	if err != nil {
-		jc.logger.Error().Err(err).Msgf("Failed to subscribe to query with error %v", err)
+		oc.logger.Error().Err(err).Msgf("Failed to subscribe to query with error %v", err)
 		return nil, err
 	}
 
@@ -29,20 +29,20 @@ func (jc *OppyChainInstance) AddSubscribe(ctx context.Context, query string) (<-
 }
 
 // HandleUpdateValidators check whether we need to generate the new tss pool message
-func (jc *OppyChainInstance) HandleUpdateValidators(height int64) error {
-	v, err := jc.getValidators(strconv.FormatInt(height, 10))
+func (oc *OppyChainInstance) HandleUpdateValidators(height int64) error {
+	v, err := oc.getValidators(strconv.FormatInt(height, 10))
 	if err != nil {
 		return err
 	}
 
-	err = jc.UpdateLatestValidator(v, height)
+	err = oc.UpdateLatestValidator(v, height)
 	if err != nil {
-		jc.logger.Error().Msgf("fail to query the latest validator %v", err)
+		oc.logger.Error().Msgf("fail to query the latest validator %v", err)
 		return err
 	}
-	lastValidators, blockHeight := jc.GetLastValidator()
+	lastValidators, blockHeight := oc.GetLastValidator()
 
-	jc.logger.Info().Msgf(">>>>>>>>>>>>>>>>at block height %v system do keygen>>>>>>>>>>>>>>>\n", blockHeight)
+	oc.logger.Info().Msgf(">>>>>>>>>>>>>>>>at block height %v system do keygen>>>>>>>>>>>>>>>\n", blockHeight)
 
 	var pubkeys []string
 	doKeyGen := false
@@ -57,7 +57,7 @@ func (jc *OppyChainInstance) HandleUpdateValidators(height int64) error {
 			return err
 		}
 
-		pkValidator, err := base64.StdEncoding.DecodeString(jc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value)
+		pkValidator, err := base64.StdEncoding.DecodeString(oc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value)
 		if err != nil {
 			return err
 		}
@@ -72,29 +72,29 @@ func (jc *OppyChainInstance) HandleUpdateValidators(height int64) error {
 		pubkeys = append(pubkeys, pk)
 	}
 	if doKeyGen {
-		resp, err := jc.tssServer.KeyGen(pubkeys, blockHeight, tssclient.TssVersion)
+		resp, err := oc.tssServer.KeyGen(pubkeys, blockHeight, tssclient.TssVersion)
 		if err != nil {
-			jc.logger.Error().Err(err).Msg("fail to do the keygen")
+			oc.logger.Error().Err(err).Msg("fail to do the keygen")
 			return err
 		}
 		if resp.Status != common.Success {
 			// todo we need to put our blame on pub_chain as well
-			jc.logger.Error().Msgf("we fail to ge the valid key")
+			oc.logger.Error().Msgf("we fail to ge the valid key")
 			return nil
 		}
 		// now we put the tss key on pub_chain
-		creator, err := jc.Keyring.Key("operator")
+		creator, err := oc.Keyring.Key("operator")
 		if err != nil {
-			jc.logger.Error().Msgf("fail to get the operator key :%v", err)
+			oc.logger.Error().Msgf("fail to get the operator key :%v", err)
 			return err
 		}
 
-		err = jc.prepareTssPool(creator.GetAddress(), resp.PubKey, strconv.FormatInt(blockHeight+1, 10))
+		err = oc.prepareTssPool(creator.GetAddress(), resp.PubKey, strconv.FormatInt(blockHeight+1, 10))
 		if err != nil {
-			jc.logger.Error().Msgf("fail to broadcast the tss generated key on pub_chain")
+			oc.logger.Error().Msgf("fail to broadcast the tss generated key on pub_chain")
 			return err
 		}
-		jc.logger.Info().Msgf("successfully prepared the tss key info on pub_chain")
+		oc.logger.Info().Msgf("successfully prepared the tss key info on pub_chain")
 		return nil
 	}
 	return nil

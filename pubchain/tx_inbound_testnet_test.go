@@ -85,25 +85,25 @@ func (tn TestNetTestSuite) TestCheckTxStatus() {
 
 func (tn TestNetTestSuite) TestDoMoveFund() {
 	wg := sync.WaitGroup{}
-	ja, err := misc.PoolPubKeyToJoltAddress(tn.pk1)
+	oppyAddr, err := misc.PoolPubKeyToOppyAddress(tn.pk1)
 	tn.Require().NoError(err)
 	ea, err := misc.PoolPubKeyToEthAddress(tn.pk1)
 	tn.Require().NoError(err)
 
 	pool := bcommon.PoolInfo{
 		Pk:          tn.pk1,
-		OppyAddress: ja,
+		OppyAddress: oppyAddr,
 		EthAddress:  ea,
 	}
 
-	ja2, err := misc.PoolPubKeyToJoltAddress(tn.pk2)
+	oppyAddr2, err := misc.PoolPubKeyToOppyAddress(tn.pk2)
 	tn.Require().NoError(err)
 	ea2, err := misc.PoolPubKeyToEthAddress(tn.pk2)
 	tn.Require().NoError(err)
 
 	pool2 := bcommon.PoolInfo{
 		Pk:          tn.pk2,
-		OppyAddress: ja2,
+		OppyAddress: oppyAddr2,
 		EthAddress:  ea2,
 	}
 

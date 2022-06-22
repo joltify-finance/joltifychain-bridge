@@ -12,17 +12,17 @@ import (
 )
 
 // SubmitOutboundTx submit the outbound record to oppy chain
-func (jc *OppyChainInstance) SubmitOutboundTx(operator keyring.Info, requestID string, blockHeight int64, pubchainTx string) error {
+func (oc *OppyChainInstance) SubmitOutboundTx(operator keyring.Info, requestID string, blockHeight int64, pubchainTx string) error {
 	var err error
 	if operator == nil {
-		operator, err = jc.Keyring.Key("operator")
+		operator, err = oc.Keyring.Key("operator")
 		if err != nil {
 			return err
 		}
 	}
-	acc, err := queryAccount(operator.GetAddress().String(), jc.grpcClient)
+	acc, err := queryAccount(operator.GetAddress().String(), oc.grpcClient)
 	if err != nil {
-		jc.logger.Error().Err(err).Msgf("fail to query the account")
+		oc.logger.Error().Err(err).Msgf("fail to query the account")
 		return err
 	}
 	accSeq, accNum := acc.GetSequence(), acc.GetAccountNumber()
@@ -34,19 +34,19 @@ func (jc *OppyChainInstance) SubmitOutboundTx(operator keyring.Info, requestID s
 		BlockHeight: strconv.FormatInt(blockHeight, 10),
 	}
 
-	ok, _, err := jc.composeAndSend(operator, &outboundMsg, accSeq, accNum, nil, operator.GetAddress())
+	ok, _, err := oc.composeAndSend(operator, &outboundMsg, accSeq, accNum, nil, operator.GetAddress())
 	if !ok || err != nil {
-		jc.logger.Error().Err(err).Msgf("fail to submit the outbound tx record")
+		oc.logger.Error().Err(err).Msgf("fail to submit the outbound tx record")
 		return errors.New("fail to broadcast the outbound tx record")
 	}
 	return nil
 }
 
 // GetPubChainSubmittedTx get the submitted mint tx
-func (jc *OppyChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (string, error) {
+func (oc *OppyChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (string, error) {
 	reqStr := req.Hash().Hex()
-	jc.logger.Info().Msgf("we check the hash %v\n", reqStr)
-	vaultQuery := vaulttypes.NewQueryClient(jc.grpcClient)
+	oc.logger.Info().Msgf("we check the hash %v\n", reqStr)
+	vaultQuery := vaulttypes.NewQueryClient(oc.grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 	outboundTxRequest := vaulttypes.QueryGetOutboundTxRequest{RequestID: reqStr}
@@ -55,7 +55,7 @@ func (jc *OppyChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (str
 		return "", err
 	}
 
-	validators, _ := jc.GetLastValidator()
+	validators, _ := oc.GetLastValidator()
 	min := float32(len(validators)*2) / float32(3)
 
 	target := ""

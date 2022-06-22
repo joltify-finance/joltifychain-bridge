@@ -22,8 +22,8 @@ func SetupBech32Prefix() {
 	config.SetBech32PrefixForConsensusNode("oppyvalcons", "oppycpub")
 }
 
-// PoolPubKeyToJoltAddress return the jolt encoded pubkey
-func PoolPubKeyToJoltAddress(pk string) (types.AccAddress, error) {
+// PoolPubKeyToOppyAddress return the oppy encoded pubkey
+func PoolPubKeyToOppyAddress(pk string) (types.AccAddress, error) {
 	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) //nolint
 	if err != nil {
 		return types.AccAddress{}, err
@@ -116,16 +116,16 @@ func MakeSignature(r, s, v *big.Int) []byte {
 	return sigBytes
 }
 
-// EthSignPubKeytoJoltAddr derives the oppy address from the pubkey derived from the signature
-func EthSignPubKeyToJoltAddr(pk []byte) (types.AccAddress, error) {
+// EthSignPubKeytoOppyAddr derives the oppy address from the pubkey derived from the signature
+func EthSignPubKeyToOppyAddr(pk []byte) (types.AccAddress, error) {
 	pk2, err := btcec.ParsePubKey(pk, btcec.S256())
 	if err != nil {
 		return types.AccAddress{}, err
 	}
 
 	pk3 := secp256k1.PubKey{Key: pk2.SerializeCompressed()}
-	joltAddr, err := types.AccAddressFromHex(pk3.Address().String())
-	return joltAddr, err
+	oppyAddr, err := types.AccAddressFromHex(pk3.Address().String())
+	return oppyAddr, err
 }
 
 func isProtectedV(v *big.Int) bool {

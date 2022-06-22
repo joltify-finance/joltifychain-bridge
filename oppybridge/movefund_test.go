@@ -31,6 +31,7 @@ type MoveFundTestSuite struct {
 func (m *MoveFundTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
+	cfg.BondDenom = "stake"
 	cfg.MinGasPrices = "0stake"
 	config.ChainID = cfg.ChainID
 	m.cfg = cfg
@@ -105,25 +106,25 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 	}
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	m.Require().NoError(err)
-	jc, err := NewOppyBridge(m.network.Validators[0].RPCAddress, m.network.Validators[0].RPCAddress, &tss, tl)
+	oc, err := NewOppyBridge(m.network.Validators[0].RPCAddress, m.network.Validators[0].RPCAddress, &tss, tl)
 	m.Require().NoError(err)
 	defer func() {
-		err2 := jc.TerminateBridge()
+		err2 := oc.TerminateBridge()
 		if err2 != nil {
-			jc.logger.Error().Err(err2).Msgf("fail to terminate the bridge")
+			oc.logger.Error().Err(err2).Msgf("fail to terminate the bridge")
 		}
 	}()
 	err = m.network.WaitForNextBlock()
 	m.Require().NoError(err)
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	jc.grpcClient = m.network.Validators[0].ClientCtx
-	jc.Keyring = m.validatorky
+	oc.grpcClient = m.network.Validators[0].ClientCtx
+	oc.Keyring = m.validatorky
 
 	info, _ := m.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()
 	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
-	valAddr, err := misc.PoolPubKeyToJoltAddress(pkstr)
+	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
 	m.Require().NoError(err)
 
 	pro := vaulttypes.PoolProposal{
@@ -135,25 +136,25 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 		Pk:          pkstr,
 		PoolInfo:    &vaulttypes.PoolInfo{CreatePool: &pro},
 	}
-	acc, err := queryAccount(info.GetAddress().String(), jc.grpcClient)
+	acc, err := queryAccount(info.GetAddress().String(), oc.grpcClient)
 	m.Require().NoError(err)
 
 	coin := sdk.NewCoin("stake", sdk.NewInt(100))
-	msg := types.NewMsgSend(valAddr, accs[0].joltAddr, sdk.NewCoins(coin))
-	txBuilder, err := Gensigntx(jc, []sdk.Msg{msg}, info, acc.GetAccountNumber(), acc.GetSequence(), m.network.Validators[0].ClientCtx.Keyring)
+	msg := types.NewMsgSend(valAddr, accs[0].oppyAddr, sdk.NewCoins(coin))
+	txBuilder, err := Gensigntx(oc, []sdk.Msg{msg}, info, acc.GetAccountNumber(), acc.GetSequence(), m.network.Validators[0].ClientCtx.Keyring)
 	m.Require().NoError(err)
-	txBytes, err := jc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	m.Require().NoError(err)
-	ret, _, err := jc.BroadcastTx(context.Background(), txBytes, false)
+	ret, _, err := oc.BroadcastTx(context.Background(), txBytes, false)
 	m.Require().NoError(err)
 	m.Require().True(ret)
 
-	jc.AddMoveFundItem(&poolinfo, 20)
-	ret = jc.MoveFound(20, accs[0].joltAddr)
+	oc.AddMoveFundItem(&poolinfo, 20)
+	ret = oc.MoveFound(20, accs[0].oppyAddr)
 	m.Require().False(ret)
 
 	// we are not the sisnger
-	ret = jc.MoveFound(300, accs[0].joltAddr)
+	ret = oc.MoveFound(300, accs[0].oppyAddr)
 	m.Require().False(ret)
 
 	info2, err := m.validatorky.Key("operator")
@@ -164,8 +165,8 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 
 	poolinfo.PoolInfo = &vaulttypes.PoolInfo{CreatePool: &pro2}
 
-	jc.AddMoveFundItem(&poolinfo, 21)
+	oc.AddMoveFundItem(&poolinfo, 21)
 	// we are not the sisnger
-	ret = jc.MoveFound(300, accs[0].joltAddr)
+	ret = oc.MoveFound(300, accs[0].oppyAddr)
 	m.Require().True(ret)
 }

@@ -39,19 +39,19 @@ func TestPoolPubkeyToEthAddress(t *testing.T) {
 		Key: pkCompressed,
 	}
 
-	// we generate the eth address from jolt
+	// we generate the eth address from oppy
 	poolPk := legacybech32.MustMarshalPubKey(legacybech32.AccPK, &cpk) //nolint
 	ethAddr, err := PoolPubKeyToEthAddress(poolPk)
 	assert.NoError(t, err)
 
-	addrJolt, err := types.AccAddressFromHex(cpk.Address().String())
+	addrOppy, err := types.AccAddressFromHex(cpk.Address().String())
 
 	require.Nil(t, err)
 	require.EqualValues(t, ethAddr.Hex(), expectedAddr.Hex())
-	require.EqualValues(t, addrJolt.String(), "jolt1txtsnx4gr4effr8542778fsxc20j5vzqxet7t0")
+	require.EqualValues(t, addrOppy.String(), "oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7")
 }
 
-func TestGetJoltAddressFromETHSignature(t *testing.T) {
+func TestGetOppyAddressFromETHSignature(t *testing.T) {
 	ske := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
 	// skECDSA, err := crypto.HexToECDSA(hex.EncodeToString(sk.Bytes()))
 	skECDSA, err := crypto.HexToECDSA(ske)
@@ -67,7 +67,7 @@ func TestGetJoltAddressFromETHSignature(t *testing.T) {
 		Key: pkCompressed,
 	}
 
-	JoltAddr, err := types.AccAddressFromHex(cpk.Address().String())
+	OppyAddr, err := types.AccAddressFromHex(cpk.Address().String())
 	require.Nil(t, err)
 
 	data := []byte("hello")
@@ -89,9 +89,9 @@ func TestGetJoltAddressFromETHSignature(t *testing.T) {
 
 	pk3 := secp256k1.PubKey{Key: pk2.SerializeCompressed()}
 
-	expectedJoltAddr, err := types.AccAddressFromHex(pk3.Address().String())
+	expectedOppyAddr, err := types.AccAddressFromHex(pk3.Address().String())
 	require.Nil(t, err)
-	require.True(t, expectedJoltAddr.Equals(JoltAddr))
+	require.True(t, expectedOppyAddr.Equals(OppyAddr))
 }
 
 func TestMakeSignature(t *testing.T) {
@@ -110,7 +110,7 @@ func TestMakeSignature(t *testing.T) {
 	sigPublicKey, err := crypto.Ecrecover(signer.Hash(tx).Bytes(), sigBytes)
 	assert.Nil(t, err)
 
-	transferFrom, err := EthSignPubKeyToJoltAddr(sigPublicKey)
+	transferFrom, err := EthSignPubKeyToOppyAddr(sigPublicKey)
 	assert.Nil(t, err)
-	assert.Equal(t, "jolt1txtsnx4gr4effr8542778fsxc20j5vzqxet7t0", transferFrom.String())
+	assert.Equal(t, "oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7", transferFrom.String())
 }

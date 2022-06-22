@@ -41,7 +41,7 @@ func TestNewTokenList(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, tl.updateGap, int64(100))
 
-	// check tl.JoltTokenlist
+	// check token existence
 	var exit bool
 	var tokenAddr string
 	var tokenDenom string

@@ -33,15 +33,15 @@ type OutBoundTestSuite struct {
 }
 
 const (
-	AddrJUSD     = "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
-	AddrJoltBNB  = "0x15fb343d82cD1C22542261dF408dA8396A829F6B"
-	DenomJUSD    = "JUSD"
-	DenomJoltBNB = "JoltBNB"
+	AddrJUSD    = "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
+	AddrJoltBNB = "0x15fb343d82cD1C22542261dF408dA8396A829F6B"
+	DenomJUSD   = "JUSD"
 )
 
 func (v *OutBoundTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
+	cfg.BondDenom = "stake"
 	cfg.MinGasPrices = "0stake"
 	cfg.ChainID = config.ChainID
 	v.cfg = cfg
@@ -104,7 +104,7 @@ func (v *OutBoundTestSuite) SetupSuite() {
 type account struct {
 	sk       *secp256k1.PrivKey
 	pk       string
-	joltAddr sdk.AccAddress
+	oppyAddr sdk.AccAddress
 	commAddr common.Address
 }
 
@@ -118,14 +118,14 @@ func generateRandomPrivKey(n int) ([]account, error) {
 		if err != nil {
 			return nil, err
 		}
-		addrJolt, err := sdk.AccAddressFromHex(sk.PubKey().Address().String())
+		addrOppy, err := sdk.AccAddressFromHex(sk.PubKey().Address().String())
 		if err != nil {
 			return nil, err
 		}
 		tAccount := account{
 			sk,
 			pk,
-			addrJolt,
+			addrOppy,
 			ethAddr,
 		}
 		randomAccounts[i] = tAccount
@@ -146,22 +146,22 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 	//
 	tl, err := createMockTokenlist("testAddr", "testDenom")
 	o.Require().NoError(err)
-	jc, err := NewOppyBridge(o.network.Validators[0].APIAddress, o.network.Validators[0].RPCAddress, &tss, tl)
+	oc, err := NewOppyBridge(o.network.Validators[0].APIAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
 	defer func() {
-		err := jc.TerminateBridge()
+		err := oc.TerminateBridge()
 		if err != nil {
-			jc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
+			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
 		}
 	}()
 	//
-	key, _, err := jc.Keyring.NewMnemonic("pooltester1", keyring.English, sdk.FullFundraiserPath, keyring.DefaultBIP39Passphrase, hd.Secp256k1)
+	key, _, err := oc.Keyring.NewMnemonic("pooltester1", keyring.English, sdk.FullFundraiserPath, keyring.DefaultBIP39Passphrase, hd.Secp256k1)
 	o.Require().NoError(err)
 
-	key2, _, err := jc.Keyring.NewMnemonic("pooltester2", keyring.English, sdk.FullFundraiserPath, keyring.DefaultBIP39Passphrase, hd.Secp256k1)
+	key2, _, err := oc.Keyring.NewMnemonic("pooltester2", keyring.English, sdk.FullFundraiserPath, keyring.DefaultBIP39Passphrase, hd.Secp256k1)
 	o.Require().NoError(err)
 
-	key3, _, err := jc.Keyring.NewMnemonic("pooltester3", keyring.English, sdk.FullFundraiserPath, keyring.DefaultBIP39Passphrase, hd.Secp256k1)
+	key3, _, err := oc.Keyring.NewMnemonic("pooltester3", keyring.English, sdk.FullFundraiserPath, keyring.DefaultBIP39Passphrase, hd.Secp256k1)
 	o.Require().NoError(err)
 
 	cospk := legacybech32.MustMarshalPubKey(legacybech32.AccPK, key.GetPubKey()) // nolint
@@ -170,15 +170,15 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 		BlockHeight: "100",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: cospk,
-			PoolAddr:   accs[0].joltAddr,
+			PoolAddr:   accs[0].oppyAddr,
 		},
 	}
 
-	jc.UpdatePool(&poolInfo)
+	oc.UpdatePool(&poolInfo)
 	pubkeyStr := key.GetPubKey().Address().String()
 	pk, err := sdk.AccAddressFromHex(pubkeyStr)
 	o.Require().NoError(err)
-	pools := jc.GetPool()
+	pools := oc.GetPool()
 	o.Require().Nil(pools[0])
 	addr2 := pools[1].OppyAddress
 	o.Require().True(pk.Equals(addr2))
@@ -189,17 +189,17 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 		BlockHeight: "101",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: cospk,
-			PoolAddr:   accs[0].joltAddr,
+			PoolAddr:   accs[0].oppyAddr,
 		},
 	}
-	jc.UpdatePool(&poolInfo)
-	pools = jc.GetPool()
+	oc.UpdatePool(&poolInfo)
+	pools = oc.GetPool()
 	pubkeyStr = key2.GetPubKey().Address().String()
 	pk2, err := sdk.AccAddressFromHex(pubkeyStr)
 	o.Require().NoError(err)
 	o.Require().True(pk.Equals(pools[0].OppyAddress))
 
-	pool1 := jc.lastTwoPools[1].OppyAddress
+	pool1 := oc.lastTwoPools[1].OppyAddress
 	o.Require().True(pk2.Equals(pool1))
 
 	// now we add another pool and pop out the firt one
@@ -210,11 +210,11 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 		BlockHeight: "102",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: cospk,
-			PoolAddr:   accs[0].joltAddr,
+			PoolAddr:   accs[0].oppyAddr,
 		},
 	}
-	jc.UpdatePool(&poolInfo)
-	pools = jc.GetPool()
+	oc.UpdatePool(&poolInfo)
+	pools = oc.GetPool()
 
 	pubkeyStr = key3.GetPubKey().Address().String()
 	pk3, err := sdk.AccAddressFromHex(pubkeyStr)
@@ -267,36 +267,36 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	}
 	tl, err := createMockTokenlist("testAddr", DenomJUSD)
 	o.Require().NoError(err)
-	jc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
+	oc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
 	defer func() {
-		err2 := jc.TerminateBridge()
+		err2 := oc.TerminateBridge()
 		if err2 != nil {
-			jc.logger.Error().Err(err2).Msgf("fail to terminate the bridge")
+			oc.logger.Error().Err(err2).Msgf("fail to terminate the bridge")
 		}
 	}()
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	jc.grpcClient = o.network.Validators[0].ClientCtx
+	oc.grpcClient = o.network.Validators[0].ClientCtx
 	baseBlockHeight := int64(100)
 	msg := banktypes.MsgSend{}
 
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "empty address string is not allowed")
 
 	msg.FromAddress = o.network.Validators[0].Address.String()
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "empty address string is not allowed")
 
-	ret := jc.CheckWhetherAlreadyExist("testindex")
+	ret := oc.CheckWhetherAlreadyExist("testindex")
 	o.Require().True(ret)
 
-	msg.ToAddress = accs[3].joltAddr.String()
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	msg.ToAddress = accs[3].oppyAddr.String()
+	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "not a top up message to the pool")
 
-	msg.ToAddress = accs[1].joltAddr.String()
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	msg.ToAddress = accs[1].oppyAddr.String()
+	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "we only allow fee and top up in one tx now")
 
 	coin1 := sdk.NewCoin(DenomJUSD, sdk.NewInt(100))
@@ -305,23 +305,23 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	coin4 := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewInt(100))
 
 	msg.Amount = sdk.NewCoins(coin1, coin3)
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "invalid fee pair")
 	msg.Amount = sdk.NewCoins(coin2, coin3)
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "invalid fee pair")
 
 	msg.Amount = sdk.NewCoins(coin1, coin2)
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "not enough fee")
 
 	msg.Amount = sdk.NewCoins(coin1, coin4)
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, &msg, []byte("msg1"))
 	o.Require().NoError(err)
 
 	// we set the wrong account
 	msg.FromAddress = accs[1].commAddr.String()
-	err = jc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, accs[3].commAddr, &msg, []byte("msg1"))
+	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "rpc error: code = InvalidArgument desc = decoding bech32 failed: string not all lowercase or all uppercase: invalid request")
 }
 
