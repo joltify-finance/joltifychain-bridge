@@ -11,7 +11,7 @@ require (
 	github.com/ipfs/go-log v1.0.4
 	github.com/libp2p/go-libp2p-peerstore v0.2.6
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/oppyfinance/tss v1.6.0
+	github.com/oppyfinance/tss v1.7.0
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/zerolog v1.26.0
 	github.com/stretchr/testify v1.7.1
