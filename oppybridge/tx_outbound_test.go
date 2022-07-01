@@ -228,7 +228,7 @@ func (o OutBoundTestSuite) TestOutBoundReq() {
 	accs, err := generateRandomPrivKey(2)
 	o.Require().NoError(err)
 	boundReq := common2.NewOutboundReq("testID", accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("JUSD", sdk.NewInt(1)), AddrJUSD, 101, 2)
-	boundReq.SetItemHeightAndNonce(2, 100, 10)
+	boundReq.SetItemHeightAndNonce(2, 100, common.Address{}, 10)
 	a, b, _, _, h, _ := boundReq.GetOutBoundInfo()
 	o.Require().Equal(a.String(), accs[0].commAddr.String())
 	o.Require().Equal(b.String(), accs[1].commAddr.String())
