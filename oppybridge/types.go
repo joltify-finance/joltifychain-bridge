@@ -1,9 +1,10 @@
 package oppybridge
 
 import (
-	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"sync"
 	"time"
+
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
 	"go.uber.org/atomic"
 
@@ -49,7 +50,7 @@ type OppyChainInstance struct {
 	myValidatorInfo  info
 	tssServer        tssclient.TssInstance
 	poolUpdateLocker *sync.RWMutex
-	msgSendCache     []tssPoolMsg
+	keyGenCache      []tssPoolMsg
 	lastTwoPools     []*bcommon.PoolInfo
 	OutboundReqChan  chan *bcommon.OutBoundReq
 	RetryOutboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry

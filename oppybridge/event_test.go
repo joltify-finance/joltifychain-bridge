@@ -154,7 +154,7 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 
 	err = oc.HandleUpdateValidators(100)
 	e.Require().NoError(err)
-	e.Require().Equal(len(oc.msgSendCache), 0)
+	e.Require().Equal(len(oc.keyGenCache), 0)
 	tss.keygenSuccess = true
 
 	oc.Keyring = e.validatorky

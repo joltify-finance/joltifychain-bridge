@@ -5,9 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"strconv"
 	"sync"
+
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
 	"go.uber.org/atomic"
 
@@ -65,7 +66,7 @@ func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, t
 
 	oppyBridge.tssServer = tssServer
 
-	oppyBridge.msgSendCache = []tssPoolMsg{}
+	oppyBridge.keyGenCache = []tssPoolMsg{}
 	oppyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
 	oppyBridge.poolUpdateLocker = &sync.RWMutex{}
 	oppyBridge.inboundGas = atomic.NewInt64(250000)
@@ -395,7 +396,7 @@ func (oc *OppyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, heig
 	}
 	oc.poolUpdateLocker.Lock()
 	// we store the latest two tss pool outReceiverAddress
-	oc.msgSendCache = append(oc.msgSendCache, item)
+	oc.keyGenCache = append(oc.keyGenCache, item)
 	oc.poolUpdateLocker.Unlock()
 	return nil
 }
@@ -415,14 +416,14 @@ func (oc *OppyChainInstance) GetBlockByHeight(blockHeight int64) (*prototypes.Bl
 // CheckAndUpdatePool send the tx to the oppy pub_chain, if the pool outReceiverAddress is updated, it returns true
 func (oc *OppyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, string) {
 	oc.poolUpdateLocker.Lock()
-	if len(oc.msgSendCache) < 1 {
+	if len(oc.keyGenCache) < 1 {
 		oc.poolUpdateLocker.Unlock()
 		// no need to submit
 		return true, ""
 	}
-	el := oc.msgSendCache[0]
+	el := oc.keyGenCache[0]
 	oc.poolUpdateLocker.Unlock()
-	if el.blockHeight == blockHeight {
+	if el.blockHeight >= blockHeight {
 		oc.logger.Info().Msgf("we are submit the block at height>>>>>>>>%v\n", el.blockHeight)
 		ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 		defer cancel()
@@ -450,14 +451,11 @@ func (oc *OppyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, string
 		ok, resp, err := oc.BroadcastTx(ctx, txBytes, false)
 		if err != nil || !ok {
 			oc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
-
-			oc.poolUpdateLocker.Lock()
-			oc.msgSendCache = oc.msgSendCache[1:]
-			oc.poolUpdateLocker.Unlock()
 			return false, ""
 		}
+		// we remove the successful keygen request
 		oc.poolUpdateLocker.Lock()
-		oc.msgSendCache = oc.msgSendCache[1:]
+		oc.keyGenCache = oc.keyGenCache[1:]
 		oc.poolUpdateLocker.Unlock()
 		oc.logger.Info().Msgf("successfully broadcast the pool info")
 		return true, el.poolPubKey
