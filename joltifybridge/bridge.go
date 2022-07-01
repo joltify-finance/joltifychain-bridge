@@ -62,7 +62,7 @@ func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssSign) (*
 
 	joltifyBridge.tssServer = tssServer
 
-	joltifyBridge.msgSendCache = []tssPoolMsg{}
+	joltifyBridge.tssPoolCache = []tssPoolMsg{}
 	joltifyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
 	joltifyBridge.poolUpdateLocker = &sync.RWMutex{}
 
@@ -372,7 +372,7 @@ func (jc *JoltifyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, h
 	}
 	jc.poolUpdateLocker.Lock()
 	// we store the latest two tss pool outReceiverAddress
-	jc.msgSendCache = append(jc.msgSendCache, item)
+	jc.tssPoolCache = append(jc.tssPoolCache, item)
 	jc.poolUpdateLocker.Unlock()
 	return nil
 }
@@ -386,13 +386,13 @@ func (jc *JoltifyChainInstance) GetLastBlockHeight() (int64, error) {
 // CheckAndUpdatePool send the tx to the joltify pub_chain, if the pool outReceiverAddress is updated, it returns true
 func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, string) {
 	jc.poolUpdateLocker.Lock()
-	if len(jc.msgSendCache) < 1 {
+	if len(jc.tssPoolCache) < 1 {
 		jc.poolUpdateLocker.Unlock()
 		return false, ""
 	}
-	el := jc.msgSendCache[0]
+	el := jc.tssPoolCache[0]
 	jc.poolUpdateLocker.Unlock()
-	if el.blockHeight == blockHeight {
+	if el.blockHeight >= blockHeight {
 		jc.logger.Info().Msgf("we are submit the block at height>>>>>>>>%v\n", el.blockHeight)
 		ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 		defer cancel()
@@ -415,14 +415,11 @@ func (jc *JoltifyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, str
 		ok, resp, err := jc.BroadcastTx(ctx, txBytes)
 		if err != nil || !ok {
 			jc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
-
-			jc.poolUpdateLocker.Lock()
-			jc.msgSendCache = jc.msgSendCache[1:]
-			jc.poolUpdateLocker.Unlock()
+			// as we failed to submit the pool address, we leave the item in the cache.
 			return false, ""
 		}
 		jc.poolUpdateLocker.Lock()
-		jc.msgSendCache = jc.msgSendCache[1:]
+		jc.tssPoolCache = jc.tssPoolCache[1:]
 		jc.poolUpdateLocker.Unlock()
 		jc.logger.Info().Msgf("successfully broadcast the pool info")
 		return true, el.poolPubKey

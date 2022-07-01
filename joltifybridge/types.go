@@ -116,7 +116,7 @@ type JoltifyChainInstance struct {
 	myValidatorInfo  info
 	tssServer        tssclient.TssSign
 	poolUpdateLocker *sync.RWMutex
-	msgSendCache     []tssPoolMsg
+	tssPoolCache     []tssPoolMsg
 	lastTwoPools     []*bcommon.PoolInfo
 	OutboundReqChan  chan *OutBoundReq
 	RetryOutboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry

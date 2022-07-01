@@ -226,7 +226,7 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 	b.Require().NoError(err)
 	err = jc.prepareTssPool(b.network.Validators[0].Address, creatorPk, "10")
 	b.Require().NoError(err)
-	b.Require().Equal(len(jc.msgSendCache), 1)
+	b.Require().Equal(len(jc.tssPoolCache), 1)
 	ret, _ := jc.CheckAndUpdatePool(10)
 	b.Require().False(ret)
 }

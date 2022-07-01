@@ -140,7 +140,7 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 	remoteValidator := tmtypes.NewValidator(sk.PubKey(), 100)
 	err = jc.HandleUpdateValidators([]*tmtypes.Validator{remoteValidator}, 10)
 	e.Require().NoError(err)
-	e.Require().Equal(len(jc.msgSendCache), 0)
+	e.Require().Equal(len(jc.tssPoolCache), 0)
 	tss.keygenSuccess = true
 
 	jc.Keyring = e.validatorky
