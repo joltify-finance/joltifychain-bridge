@@ -36,7 +36,7 @@ func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) 
 		ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 		defer cancel()
 
-		nonce, err := pi.EthClient.PendingNonceAt(ctx, poolAddress)
+		nonce, err := pi.getPendingNonceWithLock(ctx, poolAddress)
 		if err != nil {
 			pi.logger.Error().Err(err).Msgf("fail to get the nonce of the given pool address")
 			return err
