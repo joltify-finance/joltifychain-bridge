@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	tmtypes "github.com/tendermint/tendermint/types"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	"gitlab.com/joltify/joltifychain-bridge/config"
@@ -19,8 +20,6 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 
 	zlog "github.com/rs/zerolog/log"
-
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 // NewBridgeService starts the new bridge service
@@ -243,7 +242,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 			case r := <-newJoltifyTxChan:
 				result := r.Data.(tmtypes.EventDataTx).Result
 				if result.Code != 0 {
-					//this means this tx is not a successful tx
+					// this means this tx is not a successful tx
 					zlog.Warn().Msgf("not a valid top up message with error code %v (%v)", result.Code, result.Log)
 					continue
 				}
@@ -343,7 +342,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltChain *joltifybri
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
 						joltChain.AddItem(item)
 					} else {
-						//though we submit the tx successful, we may still fail as tx may run out of gas,so we need to check
+						// though we submit the tx successful, we may still fail as tx may run out of gas,so we need to check
 						go func() {
 							err := pi.CheckTxStatus(txHash)
 							if err == nil {

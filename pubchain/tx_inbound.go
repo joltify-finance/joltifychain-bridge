@@ -5,17 +5,18 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"html"
+	"math"
+	"math/big"
+	"time"
+
 	"github.com/cenkalti/backoff"
-	"github.com/ethereum/go-ethereum"
+	goethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/crypto"
 	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
-	"html"
-	"math"
-	"math/big"
-	"time"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -341,7 +342,7 @@ func (pi *PubChainInstance) PopMoveFundItem() (*bcommon.PoolInfo, int64) {
 	return nil, 0
 }
 
-//PopMoveFundItemAfterBlock pop up the item after the given block duration
+// PopMoveFundItemAfterBlock pop up the item after the given block duration
 func (pi *PubChainInstance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
 	min := int64(math.MaxInt64)
 	pi.moveFundReq.Range(func(key, value interface{}) bool {
@@ -359,7 +360,6 @@ func (pi *PubChainInstance) PopMoveFundItemAfterBlock(currentBlockHeight int64) 
 }
 
 func (pi *PubChainInstance) moveBnb(senderPk string, receiver common.Address, amount *big.Int, nonce uint64, blockHeight int64) (string, error) {
-
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel()
 	chainID, err := pi.EthClient.NetworkID(ctx)
@@ -373,7 +373,7 @@ func (pi *PubChainInstance) moveBnb(senderPk string, receiver common.Address, am
 		return "", err
 	}
 
-	gasLimit, err := pi.EthClient.EstimateGas(context.Background(), ethereum.CallMsg{
+	gasLimit, err := pi.EthClient.EstimateGas(context.Background(), goethereum.CallMsg{
 		To:   &receiver,
 		Data: nil,
 	})
@@ -433,7 +433,6 @@ func (pi *PubChainInstance) moveBnb(senderPk string, receiver common.Address, am
 }
 
 func (pi *PubChainInstance) moveERC20Token(senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64) (string, error) {
-
 	txHash, err := pi.SendToken(senderPk, sender, receiver, balance, blockheight)
 	if err != nil {
 		if err.Error() == "already known" {
@@ -473,24 +472,23 @@ func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, receiver c
 		return true, nil
 	}
 
-	var erc20TxHash, bnbTxHash string
 	if balance.Cmp(big.NewInt(0)) == 1 {
-		erc20TxHash, err = pi.moveERC20Token(previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight)
-		//if we fail erc20 token transfer, we should not transfer the bnb otherwise,we do not have enough fee to pay retry
+		erc20TxHash, err := pi.moveERC20Token(previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight)
+		// if we fail erc20 token transfer, we should not transfer the bnb otherwise,we do not have enough fee to pay retry
 		if err != nil {
 			return false, errors.New("fail to transfer erc20 token")
 		} else {
-			//next round, we will handle bnb transfer
+			zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain with tx (ERC20): %v", tick, erc20TxHash)
 			return false, nil
 		}
 	} else {
 		pi.logger.Warn().Msg("0 ERC20 balance do not need to move as")
 	}
 
-	//now we move the bnb
-
+	// now we move the bnb
+	var bnbTxHash string
 	if balanceBnB.Cmp(big.NewInt(0)) == 1 {
-		//we move the bnb
+		// we move the bnb
 		nonce, err := pi.EthClient.NonceAt(context.Background(), previousPool.EthAddress, nil)
 		if err != nil {
 			return false, err
@@ -502,7 +500,7 @@ func (pi *PubChainInstance) MoveFunds(previousPool *bcommon.PoolInfo, receiver c
 	}
 
 	tick = html.UnescapeString("&#" + "127974" + ";")
-	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain with tx (ERC20): %v, (BNB): %v", tick, erc20TxHash, bnbTxHash)
+	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain with tx (BNB): %v", tick, bnbTxHash)
 
 	return false, nil
 }
@@ -517,9 +515,8 @@ func (pi *PubChainInstance) checkEachTx(h common.Hash) (uint64, error) {
 	return receipt.Status, nil
 }
 
-//CheckTxStatus check whether the tx is already in the chain
+// CheckTxStatus check whether the tx is already in the chain
 func (pi *PubChainInstance) CheckTxStatus(hashStr string) error {
-
 	bf := backoff.NewExponentialBackOff()
 	bf.InitialInterval = time.Second
 	bf.MaxInterval = time.Second * 3

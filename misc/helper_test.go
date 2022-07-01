@@ -6,7 +6,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,11 +35,10 @@ func TestPoolPubkeyToEthAddress(t *testing.T) {
 	}
 
 	// we generate the eth address from jolt
-	poolPk := legacybech32.MustMarshalPubKey(legacybech32.AccPK, &cpk)
+	poolPk := legacybech32.MustMarshalPubKey(legacybech32.AccPK, &cpk) //nolint
 	ethAddr, err := PoolPubKeyToEthAddress(poolPk)
-
+	require.NoError(t, err)
 	addrJolt, err := types.AccAddressFromHex(cpk.Address().String())
-
 	require.Nil(t, err)
 	require.EqualValues(t, ethAddr.Hex(), expectedAddr.Hex())
 	require.EqualValues(t, addrJolt.String(), "jolt1txtsnx4gr4effr8542778fsxc20j5vzqxet7t0")

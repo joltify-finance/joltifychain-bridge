@@ -134,13 +134,13 @@ func (m MintTestSuite) TestProcessInbound() {
 	valAddr, err := misc.PoolPubKeyToJoltAddress(pkstr)
 	m.Require().NoError(err)
 	tx := pubchain.NewAccountInboundReq(m.network.Validators[0].Address, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100))
-	err = jc.ProcessInBound(&tx)
+	_, _, err = jc.ProcessInBound(&tx)
 	m.Require().EqualError(err, "not enough signer")
 
 	// need to be called twice
 
-	//err = jc.CreatePoolAccInfo(m.network.Validators[0].Address.String())
-	//m.Require().NoError(err)
+	// err = jc.CreatePoolAccInfo(m.network.Validators[0].Address.String())
+	// m.Require().NoError(err)
 	send := banktypes.NewMsgSend(valAddr, accs[0].joltAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
 	acc, err := queryAccount(accs[0].joltAddr.String(), jc.grpcClient)
@@ -164,7 +164,7 @@ func (m MintTestSuite) TestProcessInbound() {
 
 	// err = jc.CreatePoolAccInfo(accs[0].joltAddr.String())
 	// m.Require().NoError(err)
-	err = jc.ProcessInBound(&tx)
+	_, _, err = jc.ProcessInBound(&tx)
 	m.Require().Error(err)
 }
 

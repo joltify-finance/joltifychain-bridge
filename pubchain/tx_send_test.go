@@ -2,15 +2,16 @@ package pubchain
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 	"math/big"
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
+
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	types2 "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/joltify/joltifychain-bridge/common"
@@ -21,13 +22,16 @@ func generateRandomPrivKey(n int) ([]account, error) {
 	randomAccounts := make([]account, n)
 	for i := 0; i < n; i++ {
 		sk := secp256k1.GenPrivKey()
-		pk := legacybech32.MustMarshalPubKey(legacybech32.AccPK, sk.PubKey())
+		pk := legacybech32.MustMarshalPubKey(legacybech32.AccPK, sk.PubKey()) //nolint
 
 		ethAddr, err := misc.PoolPubKeyToEthAddress(pk)
 		if err != nil {
 			return nil, err
 		}
 		addrJolt, err := types.AccAddressFromHex(sk.PubKey().Address().String())
+		if err != nil {
+			return nil, err
+		}
 		tAccount := account{
 			sk,
 			pk,
@@ -112,7 +116,8 @@ func TestSendToken(t *testing.T) {
 		},
 	}
 
-	pubChain.UpdatePool(&poolInfo)
+	err = pubChain.UpdatePool(&poolInfo)
+	require.NoError(t, err)
 
 	// we firstly test the subscription of the pubchain new block
 	ctx, cancel := context.WithCancel(context.Background())
@@ -123,10 +128,8 @@ func TestSendToken(t *testing.T) {
 
 	counter := 0
 	for {
-		select {
-		case <-sbHead:
-			counter += 1
-		}
+		<-sbHead
+		counter += 1
 		if counter > 2 {
 			cancel()
 			break

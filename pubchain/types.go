@@ -24,7 +24,6 @@ import (
 
 const (
 	reqCacheSize      = 512
-	retryCacheSize    = 128
 	chainQueryTimeout = time.Second * 5
 	GasLimit          = 2100000
 	GasPrice          = "0.00000001"
@@ -90,7 +89,6 @@ func (pi *PubChainInstance) ShowItems() {
 		pi.logger.Warn().Msgf("tx in the prepare pool %v:%v\n", key, el.txID)
 		return true
 	})
-	return
 }
 
 type inboundTx struct {

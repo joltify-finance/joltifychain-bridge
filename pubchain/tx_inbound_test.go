@@ -3,12 +3,13 @@ package pubchain
 import (
 	"encoding/hex"
 	"fmt"
-	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 	"hash"
 	"math/big"
 	"strings"
 	"sync"
 	"testing"
+
+	vaulttypes "gitlab.com/joltify/joltifychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -747,7 +748,8 @@ func TestProcessBlockFeeAhead(t *testing.T) {
 	}
 
 	pi.pendingInboundsBnB.Store(hex.EncodeToString([]byte("test1")), &bnbTx)
-	pi.processInboundTx(hex.EncodeToString([]byte("test1")), uint64(10), accs[1].joltAddr, accs[2].commAddr, big.NewInt(11), accs[0].commAddr)
+	err = pi.processInboundTx(hex.EncodeToString([]byte("test1")), uint64(10), accs[1].joltAddr, accs[2].commAddr, big.NewInt(11), accs[0].commAddr)
+	require.NoError(t, err)
 
 	counter := 0
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
@@ -772,7 +774,8 @@ func TestProcessBlockFeeAhead(t *testing.T) {
 	}
 
 	pi.pendingInboundsBnB.Store(hex.EncodeToString([]byte("test2")), &bnbTx2)
-	pi.processInboundTx(hex.EncodeToString([]byte("test2")), uint64(10), accs[1].joltAddr, accs[2].commAddr, big.NewInt(11), accs[0].commAddr)
+	err = pi.processInboundTx(hex.EncodeToString([]byte("test2")), uint64(10), accs[1].joltAddr, accs[2].commAddr, big.NewInt(11), accs[0].commAddr)
+	require.NoError(t, err)
 
 	counter = 0
 	pi.pendingInbounds.Range(func(key, value interface{}) bool {
@@ -799,6 +802,7 @@ func TestAccountVerify(t *testing.T) {
 	}
 
 	addr, err := sdk.AccAddressFromBech32("jolt1ljh48799pqcnezpsjr69ukpfq4mgapvpr7kzhm")
+	require.NoError(t, err)
 
 	minFee, err := sdk.NewDecFromStr(config.InBoundFeeMin)
 	assert.Nil(t, err)

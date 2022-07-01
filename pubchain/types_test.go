@@ -10,7 +10,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/joltify-finance/tss/blame"
 	"github.com/joltify-finance/tss/common"
 	"github.com/joltify-finance/tss/keygen"
 	"github.com/joltify-finance/tss/keysign"
@@ -45,13 +44,13 @@ func (tm *TssMock) KeySign(pk string, msgs []string, blockHeight int64, signers 
 	vEncoded := base64.StdEncoding.EncodeToString(v)
 
 	sig := keysign.Signature{
-		msgs[0],
-		rEncoded,
-		sEncoded,
-		vEncoded,
+		Msg:        msgs[0],
+		R:          rEncoded,
+		S:          sEncoded,
+		RecoveryID: vEncoded,
 	}
 
-	return keysign.Response{[]keysign.Signature{sig}, common.Success, blame.Blame{}}, nil
+	return keysign.Response{Signatures: []keysign.Signature{sig}, Status: common.Success}, nil
 }
 
 func (tm *TssMock) KeyGen(keys []string, blockHeight int64, version string) (keygen.Response, error) {
@@ -63,7 +62,6 @@ func (tm *TssMock) GetTssNodeID() string {
 }
 
 func (tm *TssMock) Stop() {
-	return
 }
 
 type sortInboundReq []*InboundReq
