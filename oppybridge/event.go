@@ -83,6 +83,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64) error {
 			return nil
 		}
 		// now we put the tss key on pub_chain
+		// fixme we need to allow user to choose the name of the key
 		creator, err := oc.Keyring.Key("operator")
 		if err != nil {
 			oc.logger.Error().Msgf("fail to get the operator key :%v", err)

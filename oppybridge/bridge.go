@@ -376,12 +376,6 @@ func (oc *OppyChainInstance) BroadcastTx(ctx context.Context, txBytes []byte, is
 func (oc *OppyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, height string) error {
 	msg := types.NewMsgCreateCreatePool(creator, pubKey, height)
 
-	acc, err := queryAccount(creator.String(), oc.grpcClient)
-	if err != nil {
-		oc.logger.Error().Err(err).Msg("Fail to query the account")
-		return err
-	}
-
 	dHeight, err := strconv.ParseInt(height, 10, 64)
 	if err != nil {
 		oc.logger.Error().Err(err).Msgf("fail to parse the height")
@@ -390,7 +384,7 @@ func (oc *OppyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, heig
 
 	item := tssPoolMsg{
 		msg,
-		acc,
+		creator,
 		pubKey,
 		dHeight,
 	}
@@ -423,12 +417,18 @@ func (oc *OppyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, string
 	}
 	el := oc.keyGenCache[0]
 	oc.poolUpdateLocker.Unlock()
-	if el.blockHeight >= blockHeight {
+	if el.blockHeight <= blockHeight {
 		oc.logger.Info().Msgf("we are submit the block at height>>>>>>>>%v\n", el.blockHeight)
 		ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 		defer cancel()
 
-		gasWanted, err := oc.GasEstimation([]sdk.Msg{el.msg}, el.acc.GetSequence(), nil)
+		acc, err := queryAccount(el.creator.String(), oc.grpcClient)
+		if err != nil {
+			oc.logger.Error().Err(err).Msg("Fail to query the account")
+			return false, ""
+		}
+
+		gasWanted, err := oc.GasEstimation([]sdk.Msg{el.msg}, acc.GetSequence(), nil)
 		if err != nil {
 			oc.logger.Error().Err(err).Msg("Fail to get the gas estimation")
 			return false, ""
@@ -438,7 +438,7 @@ func (oc *OppyChainInstance) CheckAndUpdatePool(blockHeight int64) (bool, string
 			oc.logger.Error().Err(err).Msg("fail to get the operator key")
 			return false, ""
 		}
-		txBuilder, err := oc.genSendTx(key, []sdk.Msg{el.msg}, el.acc.GetSequence(), el.acc.GetAccountNumber(), gasWanted, nil)
+		txBuilder, err := oc.genSendTx(key, []sdk.Msg{el.msg}, acc.GetSequence(), acc.GetAccountNumber(), gasWanted, nil)
 		if err != nil {
 			oc.logger.Error().Err(err).Msg("fail to generate the tx")
 			return false, ""

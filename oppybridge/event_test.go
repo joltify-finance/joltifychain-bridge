@@ -3,7 +3,6 @@ package oppybridge
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"strconv"
 	"testing"
 
@@ -157,12 +156,11 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 	e.Require().Equal(len(oc.keyGenCache), 0)
 	tss.keygenSuccess = true
 
+	// we set the keyring as the validator key, it should run the keygen successfully
 	oc.Keyring = e.validatorky
-	info, err := oc.Keyring.Key("operator")
-	e.Require().NoError(err)
-	errorMSg := fmt.Sprintf("rpc error: code = NotFound desc = rpc error: code = NotFound desc = account %v not found: key not found", info.GetAddress().String())
 	err = oc.HandleUpdateValidators(100)
-	e.Require().EqualError(err, errorMSg)
+	e.Require().NoError(err)
+	e.Require().Equal(len(oc.keyGenCache), 1)
 }
 
 func TestEvent(t *testing.T) {

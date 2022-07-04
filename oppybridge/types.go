@@ -10,7 +10,6 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/ethereum/go-ethereum/common"
 	grpc1 "github.com/gogo/protobuf/grpc"
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
@@ -34,7 +33,7 @@ const (
 // tssPoolMsg this is the pool pre-submit message for the given height
 type tssPoolMsg struct {
 	msg         *types.MsgCreateCreatePool
-	acc         authtypes.AccountI
+	creator     sdk.AccAddress
 	poolPubKey  string
 	blockHeight int64
 }
