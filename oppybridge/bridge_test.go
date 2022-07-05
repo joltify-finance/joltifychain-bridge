@@ -212,7 +212,7 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 	b.Require().NoError(err)
 	err = oc.prepareTssPool(b.network.Validators[0].Address, creatorPk, "10")
 	b.Require().NoError(err)
-	b.Require().Equal(len(oc.msgSendCache), 1)
+	b.Require().Equal(len(oc.keyGenCache), 1)
 	ret, _ := oc.CheckAndUpdatePool(10)
 	b.Require().False(ret)
 }
