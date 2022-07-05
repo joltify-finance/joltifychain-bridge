@@ -41,7 +41,7 @@ func (oc *OppyChainInstance) FeedTx(lastPoolInfo *vaulttypes.PoolInfo, pi *pubch
 		}
 
 		el.SetAccountInfoAndHeight(accNum, accSeq, address, poolPubkey, roundBlockHeight)
-		accSeq += 1
+		accSeq++
 		pi.InboundReqChan <- el
 	}
 	return nil

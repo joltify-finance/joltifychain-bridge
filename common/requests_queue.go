@@ -43,9 +43,10 @@ func (i *OutBoundReq) Index() *big.Int {
 }
 
 // SetItemHeightAndNonce sets the block height of the tx
-func (o *OutBoundReq) SetItemHeightAndNonce(roundBlockHeight, blockHeight int64, nonce uint64) {
+func (o *OutBoundReq) SetItemHeightAndNonce(roundBlockHeight, blockHeight int64, fromPoolAddr common.Address, nonce uint64) {
 	o.RoundBlockHeight = roundBlockHeight
 	o.BlockHeight = blockHeight
+	o.FromPoolAddr = fromPoolAddr
 	o.Nonce = nonce
 }
 

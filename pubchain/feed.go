@@ -26,8 +26,8 @@ func (pi *Instance) FeedTx(currentBlockHeight int64, lastPoolInfo *vaulttypes.Po
 	roundBlockHeight := currentBlockHeight / ROUNDBLOCK
 	// for BSC we need to use the next nonce while for oppy, we used the returned nonce
 	for _, el := range outboundReqs {
-		el.SetItemHeightAndNonce(roundBlockHeight, currentBlockHeight, nonce)
-		nonce += 1
+		el.SetItemHeightAndNonce(roundBlockHeight, currentBlockHeight, poolEthAddress, nonce)
+		nonce++
 	}
 	return nil
 }

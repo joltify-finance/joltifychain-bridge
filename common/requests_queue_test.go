@@ -8,6 +8,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/simulation"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 )
@@ -50,7 +51,8 @@ func TestOutBoundTx(t *testing.T) {
 	outboundreqs := createdTestOutBoundReqs(100)
 	index := outboundreqs[0].Index()
 	assert.NotNil(t, index)
-	outboundreqs[0].SetItemHeightAndNonce(2, 100, 23)
+	addr := common.Address{}
+	outboundreqs[0].SetItemHeightAndNonce(2, 100, addr, 23)
 	h := outboundreqs[0].Hash()
 	assert.NotNil(t, h.Bytes())
 	_, _, _, _, blockheight, nonce := outboundreqs[0].GetOutBoundInfo()
