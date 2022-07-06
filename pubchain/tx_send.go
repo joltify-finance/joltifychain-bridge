@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"html"
 	"math/big"
 	"sync"
@@ -24,7 +25,7 @@ import (
 )
 
 // CheckTxStatus check whether the tx has been done successfully
-func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) error {
+func (pi *Instance) waitToSend(poolAddress common.Address, targetNonce uint64) error {
 	//bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)\
 	bf := backoff.NewExponentialBackOff()
 	bf.MaxElapsedTime = time.Minute * 2
@@ -32,7 +33,6 @@ func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) 
 
 	alreadyPassed := false
 	op := func() error {
-
 		ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 		defer cancel()
 
@@ -58,7 +58,78 @@ func (pi *Instance) waitAndSend(poolAddress common.Address, targetNonce uint64) 
 		return errors.New("already passed the seq")
 	}
 	return err
+}
 
+// SendNativeToken sends the native token to the public chain
+func (pi *Instance) SendNativeToken(wg *sync.WaitGroup, signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int, tokenAddr string) (common.Hash, error) {
+	if signerPk == "" {
+		lastPool := pi.GetPool()[1]
+		signerPk = lastPool.Pk
+	}
+	txo, err := pi.composeTx(signerPk, sender, pi.chainID, blockHeight)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	if nonce != nil {
+		txo.Nonce = nonce
+	}
+
+	txo.Value = amount
+
+	// fixme, we set the fixed gaslimit
+	gasLimit := uint64(config.DEFAULTETHGAS) // in units
+	gasPrice, err := pi.EthClient.SuggestGasPrice(context.Background())
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
+		return common.Hash{}, err
+	}
+
+	var data []byte
+	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: gasLimit, To: &receiver, Value: amount, Data: data})
+
+	signedTx, err := txo.Signer(sender, tx)
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to sign the tx")
+		return common.Hash{}, err
+	}
+
+	ctxSend, cancelSend := context.WithTimeout(context.Background(), chainQueryTimeout)
+	defer cancelSend()
+
+	if nonce != nil {
+		err = pi.waitToSend(sender, nonce.Uint64())
+		if err != nil {
+			return signedTx.Hash(), err
+		}
+	}
+
+	err = pi.sendTransactionWithLock(ctxSend, signedTx)
+	if err != nil {
+		// we reset the ethcliet
+		fmt.Printf("error of the ethclient is %v\n", err)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second*10), 3)
+
+			op := func() error {
+				ethClient, err := ethclient.Dial(pi.configAddr)
+				if err != nil {
+					pi.logger.Error().Err(err).Msg("fail to dial the websocket")
+					return err
+				}
+				pi.renewEthClientWithLock(ethClient)
+				return nil
+			}
+
+			err := backoff.Retry(op, bf)
+			if err != nil {
+				fmt.Printf("#########we fail all the retries#########")
+				return
+			}
+		}()
+	}
+	return signedTx.Hash(), err
 }
 
 // SendToken sends the token to the public chain
@@ -90,7 +161,7 @@ func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, recei
 	defer cancelSend()
 
 	if nonce != nil {
-		err = pi.waitAndSend(sender, nonce.Uint64())
+		err = pi.waitToSend(sender, nonce.Uint64())
 		if err != nil {
 			return readyTx.Hash(), err
 		}
@@ -120,16 +191,20 @@ func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, recei
 				return
 			}
 		}()
-
 	}
-
 	return readyTx.Hash(), err
 }
 
 // ProcessOutBound send the money to public chain
 func (pi *Instance) ProcessOutBound(wg *sync.WaitGroup, toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, blockHeight int64, nonce uint64) (string, error) {
 	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v of %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18), tokenAddr)
-	txHash, err := pi.SendToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce), tokenAddr)
+	var txHash common.Hash
+	var err error
+	if tokenAddr == NativeSign {
+		txHash, err = pi.SendNativeToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce), tokenAddr)
+	} else {
+		txHash, err = pi.SendToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce), tokenAddr)
+	}
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")

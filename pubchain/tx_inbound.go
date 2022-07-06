@@ -20,7 +20,7 @@ import (
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
@@ -48,17 +48,17 @@ func (pi *Instance) retrieveAddrfromRawTx(tx *ethTypes.Transaction) (types.AccAd
 	return transferFrom, nil
 }
 
-func (pi *Instance) getBalance(value *big.Int) (sdk.Coin, error) {
-	amount, err := sdk.NewDecFromStr(config.InBoundFeeMin)
+func (pi *Instance) getBalance(value *big.Int) (types.Coin, error) {
+	amount, err := types.NewDecFromStr(config.InBoundFeeMin)
 	if err != nil {
 		panic("the constant value should never fail")
 	}
-	minFee := sdk.NewCoin(config.InBoundDenomFee, sdk.NewIntFromBigInt(amount.BigInt()))
-	total := sdk.NewCoin(config.InBoundDenomFee, sdk.NewIntFromBigInt(value))
+	minFee := types.NewCoin(config.InBoundDenomFee, types.NewIntFromBigInt(amount.BigInt()))
+	total := types.NewCoin(config.InBoundDenomFee, types.NewIntFromBigInt(value))
 	balance := total.Sub(minFee)
 	if balance.IsNegative() {
 		pi.logger.Error().Msg("insufficient fund")
-		return sdk.Coin{}, errors.New("insufficient fund")
+		return types.Coin{}, errors.New("insufficient fund")
 	}
 	return balance, nil
 
@@ -99,7 +99,7 @@ func (pi *Instance) updateInboundTx(txID string, amount *big.Int, blockNum uint6
 		inBnB := InboundTxBnb{
 			BlockHeight: blockNum,
 			TxID:        txID,
-			Fee:         sdk.NewCoin(config.InBoundDenomFee, sdk.NewIntFromBigInt(amount)),
+			Fee:         types.NewCoin(config.InBoundDenomFee, types.NewIntFromBigInt(amount)),
 		}
 		pi.pendingInboundsBnB.Store(txID, &inBnB)
 		return nil
@@ -252,7 +252,7 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 				}
 
 				roundBlockHeight := oppyBlockHeight / ROUNDBLOCK
-				item := bcommon.NewAccountInboundReq(accountAddress, *tx.To(), balance, payTxID, oppyBlockHeight, roundBlockHeight)
+				item := bcommon.NewAccountInboundReq(accountAddress, *tx.To(), balance, tx.Hash().Bytes(), oppyBlockHeight, roundBlockHeight)
 				// we add to the retry pool to  sort the tx
 				pi.AddItem(&item)
 
@@ -361,11 +361,11 @@ func (a *InboundTx) Verify() error {
 	if a.Fee.Denom != config.InBoundDenomFee {
 		return fmt.Errorf("invalid inbound fee denom with fee demo : %v and want %v", a.Fee.Denom, a.Token.Denom)
 	}
-	amount, err := sdk.NewDecFromStr(config.InBoundFeeMin)
+	amount, err := types.NewDecFromStr(config.InBoundFeeMin)
 	if err != nil {
 		return errors.New("invalid minimal inbound fee")
 	}
-	if a.Fee.Amount.LT(sdk.NewIntFromBigInt(amount.BigInt())) {
+	if a.Fee.Amount.LT(types.NewIntFromBigInt(amount.BigInt())) {
 		return errors.New("the fee is not enough")
 	}
 	return nil
@@ -416,11 +416,11 @@ func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *bi
 
 	totalBnb := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(gasLimit))
 
-	totalBnbDec := sdk.NewDecFromBigIntWithPrec(totalBnb, sdk.Precision)
-	totalBnbDec = totalBnbDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO))
+	totalBnbDec := types.NewDecFromBigIntWithPrec(totalBnb, types.Precision)
+	totalBnbDec = totalBnbDec.Mul(types.MustNewDecFromStr(config.GASFEERATIO))
 
 	moveFund := amount.Sub(amount, totalBnbDec.BigInt())
-	moveFundS := sdk.NewDecFromBigIntWithPrec(moveFund, sdk.Precision)
+	moveFundS := types.NewDecFromBigIntWithPrec(moveFund, types.Precision)
 	if moveFund.Cmp(big.NewInt(0)) != 1 {
 		pi.logger.Warn().Msgf("we do not have any bnb to move")
 		return "", nil
@@ -428,7 +428,7 @@ func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *bi
 
 	pi.logger.Info().Msgf("we need to move %v bnb", moveFundS.String())
 
-	dustBnb, err := sdk.NewDecFromStr(config.DUSTBNB)
+	dustBnb, err := types.NewDecFromStr(config.DUSTBNB)
 	if err != nil {
 		panic("invalid parameter")
 	}
@@ -524,7 +524,7 @@ func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver comm
 		return false, err
 	}
 
-	dustBnb, err := sdk.NewDecFromStr(config.DUSTBNB)
+	dustBnb, err := types.NewDecFromStr(config.DUSTBNB)
 	if err != nil {
 		panic("invalid parameter")
 	}

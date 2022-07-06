@@ -469,9 +469,9 @@ func (oc *OppyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertype
 		return
 	}
 	poolAddress := []sdk.AccAddress{pools[0].OppyAddress, pools[1].OppyAddress}
-	config := oc.encoding
+	encodingConfig := oc.encoding
 
-	tx, err := config.TxConfig.TxDecoder()(rawTx)
+	tx, err := encodingConfig.TxConfig.TxDecoder()(rawTx)
 	if err != nil {
 		oc.logger.Info().Msgf("fail to decode the data and skip this tx")
 		return
