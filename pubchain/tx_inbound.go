@@ -91,39 +91,7 @@ func (pi *Instance) ProcessNewBlock(number *big.Int, oppyBlockHeight int64) erro
 	return nil
 }
 
-// updateInboundTx update the top-up token with fee
-func (pi *Instance) updateInboundTx(txID string, amount *big.Int, blockNum uint64) *InboundTx {
-	data, ok := pi.pendingInbounds.Load(txID)
-	if !ok {
-		pi.logger.Warn().Msgf("inbound fail to get the stored tx from pool with %v\n", pi.pendingInbounds)
-		inBnB := InboundTxBnb{
-			BlockHeight: blockNum,
-			TxID:        txID,
-			Fee:         types.NewCoin(config.InBoundDenomFee, types.NewIntFromBigInt(amount)),
-		}
-		pi.pendingInboundsBnB.Store(txID, &inBnB)
-		return nil
-	}
-
-	thisAccount := data.(*InboundTx)
-	thisAccount.Fee.Amount = thisAccount.Fee.Amount.Add(types.NewIntFromBigInt(amount))
-	err := thisAccount.Verify()
-	if err != nil {
-		pi.pendingInbounds.Store(txID, thisAccount)
-		pi.logger.Warn().Msgf("the account cannot be processed on oppy pub_chain this round with err %v\n", err)
-		return nil
-	}
-	// since this tx is processed,we do not need to store it any longer
-	pi.pendingInbounds.Delete(txID)
-	return thisAccount
-}
-
 func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
-	_, ok := pi.pendingInbounds.Load(txID)
-	if ok {
-		pi.logger.Error().Msgf("the tx already exist!!")
-		return errors.New("tx existed")
-	}
 	// this is repeated check for tokenAddr which is cheked at function 'processEachBlock'
 	tokenDenom, exit := pi.TokenList.GetTokenDenom(addr.Hex())
 	if !exit {
@@ -136,38 +104,13 @@ func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types
 		Amount: types.NewIntFromBigInt(value),
 	}
 
-	inTxBnB, ok := pi.pendingInboundsBnB.LoadAndDelete(txID)
-	if !ok {
-		fee := types.Coin{
-			Denom:  config.InBoundDenomFee,
-			Amount: types.NewInt(0),
-		}
-
-		tx := InboundTx{
-			txID,
-			from,
-			blockHeight,
-			token,
-			fee,
-		}
-		pi.logger.Info().Msgf("we add the tokens tx(%v):%v", txID, tx.Token.String())
-		pi.pendingInbounds.Store(txID, &tx)
-		return nil
-	}
-	fee := inTxBnB.(*InboundTxBnb).Fee
 	tx := InboundTx{
 		txID,
 		from,
 		blockHeight,
 		token,
-		fee,
 	}
-	err := tx.Verify()
-	if err != nil {
-		pi.pendingInbounds.Store(txID, &tx)
-		pi.logger.Warn().Msgf("the account cannot be processed on oppy pub_chain this round with err %v\n", err)
-		return nil
-	}
+
 	txIDBytes, err := hex.DecodeString(txID)
 	if err != nil {
 		pi.logger.Warn().Msgf("invalid tx ID %v\n", txIDBytes)
@@ -175,7 +118,7 @@ func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types
 	}
 	roundBlockHeight := blockHeight / ROUNDBLOCK
 	item := bcommon.NewAccountInboundReq(tx.Address, to, tx.Token, txIDBytes, int64(blockHeight), int64(roundBlockHeight))
-	pi.InboundReqChan <- &item
+	pi.AddItem(&item)
 	return nil
 }
 
@@ -255,16 +198,6 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 				item := bcommon.NewAccountInboundReq(accountAddress, *tx.To(), balance, tx.Hash().Bytes(), oppyBlockHeight, roundBlockHeight)
 				// we add to the retry pool to  sort the tx
 				pi.AddItem(&item)
-
-				// we have finished processed this tx
-				continue
-			}
-			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
-			if account != nil {
-				roundBlockHeight := oppyBlockHeight / ROUNDBLOCK
-				item := bcommon.NewAccountInboundReq(account.Address, *tx.To(), account.Token, payTxID, oppyBlockHeight, roundBlockHeight)
-				// we add to the retry pool to  sort the tx
-				pi.AddItem(&item)
 			}
 		}
 	}
@@ -323,52 +256,6 @@ func (pi *Instance) checkToBridge(dest common.Address) bool {
 		}
 	}
 	return false
-}
-
-// DeleteExpired delete the expired tx
-func (pi *Instance) DeleteExpired(currentHeight uint64) {
-	var expiredTx []string
-	var expiredTxBnb []string
-	pi.pendingInbounds.Range(func(key, value interface{}) bool {
-		el := value.(*InboundTx)
-		if currentHeight-el.PubBlockHeight > config.TxTimeout {
-			expiredTx = append(expiredTx, key.(string))
-		}
-		return true
-	})
-
-	for _, el := range expiredTx {
-		pi.logger.Warn().Msgf("we delete the expired tx %s", el)
-		pi.pendingInbounds.Delete(el)
-	}
-
-	pi.pendingInboundsBnB.Range(func(key, value interface{}) bool {
-		el := value.(*InboundTxBnb)
-		if currentHeight-el.BlockHeight > config.TxTimeout {
-			expiredTxBnb = append(expiredTxBnb, key.(string))
-		}
-		return true
-	})
-
-	for _, el := range expiredTxBnb {
-		pi.logger.Warn().Msgf("we delete the expired tx %s in inbound bnb", el)
-		pi.pendingInboundsBnB.Delete(el)
-	}
-}
-
-// Verify is the function  to verify the correctness of the account on oppy_bridge
-func (a *InboundTx) Verify() error {
-	if a.Fee.Denom != config.InBoundDenomFee {
-		return fmt.Errorf("invalid inbound fee denom with fee demo : %v and want %v", a.Fee.Denom, a.Token.Denom)
-	}
-	amount, err := types.NewDecFromStr(config.InBoundFeeMin)
-	if err != nil {
-		return errors.New("invalid minimal inbound fee")
-	}
-	if a.Fee.Amount.LT(types.NewIntFromBigInt(amount.BigInt())) {
-		return errors.New("the fee is not enough")
-	}
-	return nil
 }
 
 func (pi *Instance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64) {

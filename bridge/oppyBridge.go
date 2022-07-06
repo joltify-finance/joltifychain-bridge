@@ -154,30 +154,6 @@ func NewBridgeService(config config.Config) {
 		fmt.Printf("we have loaded the unprocessed inbound tx")
 	}
 
-	pfsm := storage.NewPendingTxStateMgr(config.HomeDir)
-	// now we load the existing inbound pending txs
-	inBoundPendingTx, err := pfsm.LoadPendingItems()
-	if err != nil {
-		fmt.Printf("we do not need to have the pending tx to be loaded")
-	}
-	if inBoundPendingTx != nil {
-		for _, el := range inBoundPendingTx {
-			pi.AddPendingTx(el)
-		}
-		fmt.Printf("we have loaded the unprocessed inbound pending tx")
-	}
-
-	inBoundPendingBnbTx, err := pfsm.LoadPendingBnbItems()
-	if err != nil {
-		fmt.Printf("we do not need to have the pending bnb tx to be loded")
-	}
-	if inBoundPendingBnbTx != nil {
-		for _, el := range inBoundPendingBnbTx {
-			pi.AddPendingTxBnb(el)
-		}
-		fmt.Printf("we have loaded the unprocessed inbound bnb pending tx")
-	}
-
 	addEventLoop(ctx, &wg, oppyBridge, pi, metrics, fsm, int64(config.OppyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl)
 	<-c
 	cancel()
@@ -196,18 +172,6 @@ func NewBridgeService(config config.Config) {
 	}
 
 	zlog.Info().Msgf("we have saved the unprocessed outbound txs")
-
-	pendingitemsexported := pi.ExportPendingItems()
-	err = pfsm.SavePendingItems(pendingitemsexported)
-	if err != nil {
-		zlog.Logger.Error().Err(err).Msgf("fail to save the pending tx!!!")
-	}
-
-	pendingbnbitemsexported := pi.ExportPendingBnbItems()
-	err = pfsm.SavePendingBnbItems(pendingbnbitemsexported)
-	if err != nil {
-		zlog.Logger.Error().Err(err).Msgf("fail to save the pending bnb tx!!!")
-	}
 
 	zlog.Info().Msgf("we have saved the unprocessed inbound pending txs")
 
@@ -391,8 +355,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
 				}
-				// we delete the expired tx
-				pi.DeleteExpired(head.Number.Uint64())
 
 				isMoveFund := false
 				previousPool, _ := pi.PopMoveFundItemAfterBlock(head.Number.Int64())

@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
-	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"math/big"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/rs/zerolog"
@@ -42,7 +43,6 @@ type InboundTx struct {
 	Address        sdk.AccAddress `json:"address"`
 	PubBlockHeight uint64         `json:"pub_block_height"` // this variable is used to delete the expired tx
 	Token          sdk.Coin       `json:"token"`
-	Fee            sdk.Coin       `json:"fee"`
 }
 
 type InboundTxBnb struct {
@@ -53,22 +53,20 @@ type InboundTxBnb struct {
 
 // Instance hold the oppy_bridge entity
 type Instance struct {
-	EthClient          *ethclient.Client
-	ethClientLocker    *sync.RWMutex
-	configAddr         string
-	chainID            *big.Int
-	tokenAbi           *abi.ABI
-	logger             zerolog.Logger
-	pendingInbounds    *sync.Map
-	pendingInboundsBnB *sync.Map
-	lastTwoPools       []*bcommon.PoolInfo
-	poolLocker         *sync.RWMutex
-	tssServer          tssclient.TssInstance
-	InboundReqChan     chan *bcommon.InBoundReq
-	RetryInboundReq    *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
-	moveFundReq        *sync.Map
-	CurrentHeight      int64
-	TokenList          *tokenlist.TokenList
+	EthClient       *ethclient.Client
+	ethClientLocker *sync.RWMutex
+	configAddr      string
+	chainID         *big.Int
+	tokenAbi        *abi.ABI
+	logger          zerolog.Logger
+	lastTwoPools    []*bcommon.PoolInfo
+	poolLocker      *sync.RWMutex
+	tssServer       tssclient.TssInstance
+	InboundReqChan  chan *bcommon.InBoundReq
+	RetryInboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
+	moveFundReq     *sync.Map
+	CurrentHeight   int64
+	TokenList       *tokenlist.TokenList
 }
 
 // NewChainInstance initialize the oppy_bridge entity
@@ -95,21 +93,19 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl *tokenlist.
 	}
 
 	return &Instance{
-		logger:             logger,
-		EthClient:          ethClient,
-		ethClientLocker:    &sync.RWMutex{},
-		configAddr:         ws,
-		chainID:            chainID,
-		tokenAbi:           &tAbi,
-		pendingInbounds:    new(sync.Map),
-		pendingInboundsBnB: new(sync.Map),
-		poolLocker:         &sync.RWMutex{},
-		tssServer:          tssServer,
-		lastTwoPools:       make([]*bcommon.PoolInfo, 2),
-		InboundReqChan:     make(chan *bcommon.InBoundReq, inboundprosSize),
-		RetryInboundReq:    &sync.Map{},
-		moveFundReq:        &sync.Map{},
-		TokenList:          tl,
+		logger:          logger,
+		EthClient:       ethClient,
+		ethClientLocker: &sync.RWMutex{},
+		configAddr:      ws,
+		chainID:         chainID,
+		tokenAbi:        &tAbi,
+		poolLocker:      &sync.RWMutex{},
+		tssServer:       tssServer,
+		lastTwoPools:    make([]*bcommon.PoolInfo, 2),
+		InboundReqChan:  make(chan *bcommon.InBoundReq, inboundprosSize),
+		RetryInboundReq: &sync.Map{},
+		moveFundReq:     &sync.Map{},
+		TokenList:       tl,
 	}, nil
 }
 

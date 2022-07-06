@@ -20,32 +20,6 @@ func (pi *Instance) ExportItems() []*common.InBoundReq {
 	return items
 }
 
-func (pi *Instance) AddPendingTx(pendingTx *InboundTx) {
-	pi.pendingInbounds.Store(pendingTx.TxID, pendingTx)
-}
-
-func (pi *Instance) AddPendingTxBnb(pendingTxBnb *InboundTxBnb) {
-	pi.pendingInboundsBnB.Store(pendingTxBnb.TxID, pendingTxBnb)
-}
-
-func (pi *Instance) ExportPendingItems() []*InboundTx {
-	var items []*InboundTx
-	pi.pendingInbounds.Range(func(_, value interface{}) bool {
-		items = append(items, value.(*InboundTx))
-		return true
-	})
-	return items
-}
-
-func (pi *Instance) ExportPendingBnbItems() []*InboundTxBnb {
-	var items []*InboundTxBnb
-	pi.pendingInboundsBnB.Range(func(key, value interface{}) bool {
-		items = append(items, value.(*InboundTxBnb))
-		return true
-	})
-	return items
-}
-
 func (pi *Instance) PopItem(n int) []*common.InBoundReq {
 	var allkeys []*big.Int
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
