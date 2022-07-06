@@ -289,7 +289,6 @@ func (oc *OppyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssS
 			return 0, err
 		}
 		pubKey = cPk
-
 	}
 
 	sigV2 := signing.SignatureV2{

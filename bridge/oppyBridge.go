@@ -305,6 +305,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						zlog.Logger.Error().Err(err).Msgf("error in get block to process %v", err)
 						continue
 					}
+
+					// here we process the outbound tx
 					for _, el := range processableBlock.Data.Txs {
 						oppyChain.CheckOutBoundTx(processableBlockHeight, el)
 					}

@@ -1,6 +1,7 @@
 package pubchain
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -27,8 +28,7 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
-// ProcessInBoundERC20 process the inbound contract token top-up
-func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, transferTo common.Address, amount *big.Int, blockHeight uint64) error {
+func (pi *Instance) retrieveAddrfromRawTx(tx *ethTypes.Transaction) (types.AccAddress, error) {
 	v, r, s := tx.RawSignatureValues()
 	signer := ethTypes.LatestSignerForChainID(tx.ChainId())
 	plainV := misc.RecoverRecID(tx.ChainId().Uint64(), v)
@@ -37,15 +37,39 @@ func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, tra
 	sigPublicKey, err := crypto.Ecrecover(signer.Hash(tx).Bytes(), sigBytes)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to recover the public key")
-		return err
+		return types.AccAddress{}, err
 	}
 
 	transferFrom, err := misc.EthSignPubKeyToOppyAddr(sigPublicKey)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to recover the oppy Address")
+		return types.AccAddress{}, err
+	}
+	return transferFrom, nil
+}
+
+func (pi *Instance) getBalance(value *big.Int) (sdk.Coin, error) {
+	amount, err := sdk.NewDecFromStr(config.InBoundFeeMin)
+	if err != nil {
+		panic("the constant value should never fail")
+	}
+	minFee := sdk.NewCoin(config.InBoundDenomFee, sdk.NewIntFromBigInt(amount.BigInt()))
+	total := sdk.NewCoin(config.InBoundDenomFee, sdk.NewIntFromBigInt(value))
+	balance := total.Sub(minFee)
+	if balance.IsNegative() {
+		pi.logger.Error().Msg("insufficient fund")
+		return sdk.Coin{}, errors.New("insufficient fund")
+	}
+	return balance, nil
+
+}
+
+// ProcessInBoundERC20 process the inbound contract token top-up
+func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, transferTo common.Address, amount *big.Int, blockHeight uint64) error {
+	transferFrom, err := pi.retrieveAddrfromRawTx(tx)
+	if err != nil {
 		return err
 	}
-
 	err = pi.processInboundTx(tx.Hash().Hex()[2:], blockHeight, transferFrom, transferTo, amount, tokenAddr)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
@@ -180,7 +204,6 @@ func (pi *Instance) checkErc20(data []byte) (common.Address, *big.Int, error) {
 	return common.Address{}, nil, errors.New("invalid method for decode")
 }
 
-// fixme we need to check timeout to remove the pending transactions
 func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int64) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
@@ -215,8 +238,27 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 				pi.logger.Warn().Msgf("we have received unknown fund")
 				continue
 			}
-
 			payTxID := tx.Data()
+			if bytes.Equal(payTxID, []byte(NativeSign)) {
+				// this indicates it is a native bnb transfer
+				balance, err := pi.getBalance(tx.Value())
+				if err != nil {
+					continue
+				}
+
+				accountAddress, err := pi.retrieveAddrfromRawTx(tx)
+				if err != nil {
+					continue
+				}
+
+				roundBlockHeight := oppyBlockHeight / ROUNDBLOCK
+				item := bcommon.NewAccountInboundReq(accountAddress, *tx.To(), balance, payTxID, oppyBlockHeight, roundBlockHeight)
+				// we add to the retry pool to  sort the tx
+				pi.AddItem(&item)
+
+				// we have finished processed this tx
+				continue
+			}
 			account := pi.updateInboundTx(hex.EncodeToString(payTxID), tx.Value(), block.NumberU64())
 			if account != nil {
 				roundBlockHeight := oppyBlockHeight / ROUNDBLOCK

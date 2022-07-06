@@ -3,8 +3,7 @@ package config
 import "time"
 
 const (
-	InBoundDenomFee = "BNB"
-
+	InBoundDenomFee  = "abnb"
 	OutBoundDenomFee = "pjolt"
 
 	InBoundFeeMin    = "0.00000000000000001"

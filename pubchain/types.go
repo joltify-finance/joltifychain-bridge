@@ -34,6 +34,7 @@ const (
 	submitBackoff     = time.Second * 4
 	GroupBlockGap     = 8
 	GroupSign         = 4
+	NativeSign        = "native"
 )
 
 type InboundTx struct {

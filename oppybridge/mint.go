@@ -20,7 +20,6 @@ func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string
 
 // ProcessInBound mint the token in oppy chain
 func (oc *OppyChainInstance) ProcessInBound(item *common.InBoundReq) (string, string, error) {
-
 	accSeq, accNum, poolAddress, poolPk := item.GetAccountInfo()
 	// we need to check against the previous account sequence
 	index := item.Hash().Hex()
