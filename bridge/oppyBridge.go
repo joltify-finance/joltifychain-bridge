@@ -171,10 +171,6 @@ func NewBridgeService(config config.Config) {
 		zlog.Logger.Error().Err(err).Msgf("fail to save the outbound requests!!!")
 	}
 
-	zlog.Info().Msgf("we have saved the unprocessed outbound txs")
-
-	zlog.Info().Msgf("we have saved the unprocessed inbound pending txs")
-
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 

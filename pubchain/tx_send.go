@@ -206,7 +206,7 @@ func (pi *Instance) ProcessOutBound(wg *sync.WaitGroup, toAddr, fromAddr common.
 	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v of %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18), tokenAddr)
 	var txHash common.Hash
 	var err error
-	if tokenAddr == NativeSign {
+	if tokenAddr == config.NativeSign {
 		txHash, err = pi.SendNativeToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce), tokenAddr)
 	} else {
 		txHash, err = pi.SendToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce), tokenAddr)

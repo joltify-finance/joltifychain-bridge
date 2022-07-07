@@ -4,14 +4,13 @@ import "time"
 
 const (
 	OutBoundDenomFee = "abnb"
-	NativeToken      = "abnb"
+	NativeSign       = "native"
 
-	OUTBoundFeeOut           = "0.000000000001"
 	TxTimeout                = 300
 	GASFEERATIO              = "1.5"
 	DUSTBNB                  = "0.0001"
 	MINCHECKBLOCKGAP         = 6
-	DefaultPUBChainGasWanted = "25000"
+	DefaultPUBChainGasWanted = "100000"
 )
 
 var ChainID = "oppyChain-1"

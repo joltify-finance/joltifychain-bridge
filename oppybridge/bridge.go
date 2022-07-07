@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"strconv"
 	"sync"
 
@@ -469,6 +470,16 @@ func (oc *OppyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertype
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
+	memo := txWithMemo.GetMemo()
+	//this is the length of erc20 the address
+	if len(memo) < 42 {
+		return
+	}
+	toAddr := memo[len(memo)-42:]
+	if !ethcommon.IsHexAddress(toAddr) {
+		oc.logger.Error().Msgf("not a valid erc20 address")
+		return
+	}
 	for _, msg := range txWithMemo.GetMsgs() {
 		switch eachMsg := msg.(type) {
 		case *banktypes.MsgSend:
@@ -486,7 +497,7 @@ func (oc *OppyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertype
 				continue
 			}
 
-			err = oc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, eachMsg, rawTx.Hash())
+			err = oc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, ethcommon.HexToAddress(toAddr), eachMsg, rawTx.Hash())
 			if err != nil {
 				if err.Error() != "not a top up message to the pool" {
 					oc.logger.Error().Err(err).Msgf("fail to process the message, it is not a top up message")

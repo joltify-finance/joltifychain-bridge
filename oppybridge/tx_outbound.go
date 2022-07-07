@@ -18,7 +18,7 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
-func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID string, blockHeight int64, wrapFromEthAddr types.AccAddress, currEthAddr ethcommon.Address) error {
+func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID string, blockHeight int64, receiverAddr ethcommon.Address, currEthAddr ethcommon.Address) error {
 	addr, tokenExist := oc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
 	if !tokenExist {
 		return errors.New("token is not on our token list")
@@ -26,11 +26,11 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 	tokenDenom := msg.Amount[0].GetDenom()
 	tokenAddr := addr
 
-	if addr != config.NativeToken {
+	if addr != config.NativeSign {
 		return errors.New("not a native token")
 	}
 
-	item := oc.processNativeFee(txID, blockHeight, wrapFromEthAddr, tokenDenom, msg.Amount[0].Amount)
+	item := oc.processNativeFee(txID, blockHeight, receiverAddr, tokenDenom, msg.Amount[0].Amount)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
 		roundBlockHeight := blockHeight / ROUNDBLOCK
@@ -43,7 +43,7 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 
 }
 
-func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID string, blockHeight int64, wrapFromEthAddr types.AccAddress, currEthAddr ethcommon.Address) error {
+func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID string, blockHeight int64, receiverAddr ethcommon.Address, currEthAddr ethcommon.Address) error {
 	// now we search for the index of the outboundemo and the outbounddemofee
 	found := false
 	indexDemo := 0
@@ -71,7 +71,7 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 		return errors.New("invalid fee pair")
 	}
 
-	item := oc.processErc20DemonAndFee(txID, blockHeight, wrapFromEthAddr, tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
+	item := oc.processErc20DemonAndFee(txID, blockHeight, receiverAddr, tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
 		roundBlockHeight := blockHeight / ROUNDBLOCK
@@ -85,31 +85,12 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 }
 
 // processMsg handle the oppychain transactions
-func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte) error {
+func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr, receiverAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 
 	toAddress, err := types.AccAddressFromBech32(msg.ToAddress)
 	if err != nil {
 		oc.logger.Error().Err(err).Msg("fail to parse the to outReceiverAddress")
-		return err
-	}
-
-	// here we need to calculate the node's eth address from public key rather than the oppy chain address
-	acc, err := queryAccount(msg.FromAddress, oc.grpcClient)
-	if err != nil {
-		oc.logger.Error().Err(err).Msg("Fail to query the account")
-		return err
-	}
-
-	fromEthAddr, err := misc.AccountPubKeyToEthAddress(acc.GetPubKey())
-	if err != nil {
-		oc.logger.Error().Err(err).Msg("Fail to get the eth address")
-		return err
-	}
-	// now we wrap the fromEthAddress with oppy hex address
-	wrapFromEthAddr, err := types.AccAddressFromHex(fromEthAddr.Hex()[2:])
-	if err != nil {
-		oc.logger.Error().Err(err).Msg("Fail to wrap the eth address")
 		return err
 	}
 
@@ -122,13 +103,13 @@ func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAd
 	// it means the sender pay the fee in one tx
 	switch len(msg.Amount) {
 	case 1:
-		err := oc.processNativeRequest(msg, txID, blockHeight, wrapFromEthAddr, curEthAddr)
+		err := oc.processNativeRequest(msg, txID, blockHeight, receiverAddr, curEthAddr)
 		if err != nil {
 			oc.logger.Error().Err(err).Msg("")
 			return errors.New("fail to process the native token outbound request")
 		}
 	case 2:
-		err := oc.processErc20Request(msg, txID, blockHeight, wrapFromEthAddr, curEthAddr)
+		err := oc.processErc20Request(msg, txID, blockHeight, receiverAddr, curEthAddr)
 		if err != nil {
 			return errors.New("fail to process the outbound erc20 request")
 		}
@@ -138,7 +119,7 @@ func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAd
 	return nil
 }
 
-func (oc *OppyChainInstance) processNativeFee(txID string, blockHeight int64, fromAddress types.AccAddress, demonName string, demonAmount types.Int) *outboundTx {
+func (oc *OppyChainInstance) processNativeFee(txID string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount types.Int) *outboundTx {
 
 	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
 	if !ok {
@@ -147,7 +128,7 @@ func (oc *OppyChainInstance) processNativeFee(txID string, blockHeight int64, fr
 
 	price := oc.GetPubChainGasPrice()
 	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
-	expectedFee := types.NewCoin(config.NativeToken, types.NewIntFromBigInt(expectedFeeAmount))
+	expectedFee := types.NewCoin(config.OutBoundDenomFee, types.NewIntFromBigInt(expectedFeeAmount))
 
 	tokenAddr, exit := oc.TokenList.GetTokenAddress(demonName)
 	if !exit {
@@ -167,7 +148,7 @@ func (oc *OppyChainInstance) processNativeFee(txID string, blockHeight int64, fr
 		Amount: AmountTransfer,
 	}
 	tx := outboundTx{
-		ethcommon.BytesToAddress(fromAddress.Bytes()),
+		receiverAddr,
 		uint64(blockHeight),
 		token,
 		tokenAddr,
@@ -178,7 +159,7 @@ func (oc *OppyChainInstance) processNativeFee(txID string, blockHeight int64, fr
 
 }
 
-func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, blockHeight int64, fromAddress types.AccAddress, demonName string, demonAmount, feeAmount types.Int) *outboundTx {
+func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount, feeAmount types.Int) *outboundTx {
 	token := types.Coin{
 		Denom:  demonName,
 		Amount: demonAmount,
@@ -193,7 +174,7 @@ func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, blockHeight in
 		return nil
 	}
 	tx := outboundTx{
-		ethcommon.BytesToAddress(fromAddress.Bytes()),
+		receiverAddr,
 		uint64(blockHeight),
 		token,
 		tokenAddr,
@@ -206,8 +187,7 @@ func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, blockHeight in
 		panic("fail to load the gas wanted")
 	}
 	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
-	expectedFee := types.NewCoin(config.NativeToken, types.NewIntFromBigInt(expectedFeeAmount))
-	fmt.Printf(">>>>>>>expected fee>>>>>>>%v\n", expectedFee)
+	expectedFee := types.NewCoin(config.OutBoundDenomFee, types.NewIntFromBigInt(expectedFeeAmount))
 
 	if !fee.IsGTE(expectedFee) {
 		oc.logger.Error().Msgf("the transaction is invalid,as fee we want is %v, and you have paid %v", expectedFee.String(), fee.String())

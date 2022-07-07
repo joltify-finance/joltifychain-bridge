@@ -48,7 +48,7 @@ func (pi *Instance) retrieveAddrfromRawTx(tx *ethTypes.Transaction) (types.AccAd
 }
 
 func (pi *Instance) getBalance(value *big.Int) (types.Coin, error) {
-	total := types.NewCoin(config.NativeToken, types.NewIntFromBigInt(value))
+	total := types.NewCoin(config.OutBoundDenomFee, types.NewIntFromBigInt(value))
 	if total.IsNegative() {
 		pi.logger.Error().Msg("incorrect amount")
 		return types.Coin{}, errors.New("insufficient fund")
