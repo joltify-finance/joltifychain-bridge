@@ -40,6 +40,21 @@ func (oc *OppyChainInstance) ExportItems() []*common.OutBoundReq {
 	return items
 }
 
+func (oc *OppyChainInstance) Import(items []*OutboundTx) {
+	for _, el := range items {
+		oc.pendingTx.Store(el.TxID, el)
+	}
+}
+
+func (oc *OppyChainInstance) Export() []*OutboundTx {
+	var exported []*OutboundTx
+	oc.pendingTx.Range(func(key, value any) bool {
+		exported = append(exported, value.(*OutboundTx))
+		return true
+	})
+	return exported
+}
+
 func (oc *OppyChainInstance) AddItem(req *common.OutBoundReq) {
 	oc.RetryOutboundReq.Store(req.Index(), req)
 }

@@ -51,11 +51,7 @@ func (s *FourNodeTestSuite) SetUpTest(c *C) {
 	misc.SetupBech32Prefix()
 
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	//s.ports = []int{
-	//	16666, 16667, 16668, 16669,
-	//}
-	//s.bootstrapPeer = "/ip4/127.0.0.1/tcp/16667/p2p/16Uiu2HAmACG5DtqmQsHtXg4G2sLS65ttv84e7MrL4kapkjfmhxAp"
-	//s.preParams = getPreparams(c)
+
 	s.servers = make([]*BridgeTssServer, partyNum)
 
 	conf := config.TssConfig{

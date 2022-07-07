@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 	"strconv"
 	"sync"
+
+	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
@@ -73,21 +75,13 @@ func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, t
 	oppyBridge.inBoundGas = atomic.NewInt64(250000)
 	oppyBridge.outBoundGasPrice = atomic.NewInt64(5000000000)
 
-	// we put the dummy query here to avoid the panic
-	//query := "tm.event = 'Tx' AND transfer.sender = 'jolt1x'"
-	//out, err := client.Subscribe(context.Background(), "query", query)
-	//if err != nil {
-	//	zlog.Logger.Error().Err(err).Msg("fail to subscribe the new transfer pool address")
-	//}
-	//oppyBridge.TransferChan = make([]*<-chan ctypes.ResultEvent, 2)
-	//oppyBridge.TransferChan = []*<-chan ctypes.ResultEvent{&out, &out}
-
 	encode := MakeEncodingConfig()
 	oppyBridge.encoding = &encode
 	oppyBridge.OutboundReqChan = make(chan *bcommon.OutBoundReq, reqCacheSize)
 	oppyBridge.RetryOutboundReq = &sync.Map{}
 	oppyBridge.moveFundReq = &sync.Map{}
 	oppyBridge.TokenList = tl
+	oppyBridge.pendingTx = &sync.Map{}
 	return &oppyBridge, nil
 }
 
@@ -471,12 +465,19 @@ func (oc *OppyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertype
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 	memo := txWithMemo.GetMemo()
-	//this is the length of erc20 the address
-	if len(memo) < 42 {
+
+	dat, err := hex.DecodeString(memo)
+	if err != nil {
+		oc.logger.Error().Err(err).Msgf("fail to decode hex memo with %v", memo)
 		return
 	}
-	toAddr := memo[len(memo)-42:]
-	if !ethcommon.IsHexAddress(toAddr) {
+	var txMemo OutBoundMemo
+	err = json.Unmarshal(dat, &txMemo)
+	if err != nil {
+		oc.logger.Error().Err(err).Msgf("fail to parse the memo with %v", memo)
+		return
+	}
+	if !ethcommon.IsHexAddress(txMemo.Dest) {
 		oc.logger.Error().Msgf("not a valid erc20 address")
 		return
 	}
@@ -497,7 +498,7 @@ func (oc *OppyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertype
 				continue
 			}
 
-			err = oc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, ethcommon.HexToAddress(toAddr), eachMsg, rawTx.Hash())
+			err = oc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, txMemo, eachMsg, rawTx.Hash())
 			if err != nil {
 				if err.Error() != "not a top up message to the pool" {
 					oc.logger.Error().Err(err).Msgf("fail to process the message, it is not a top up message")

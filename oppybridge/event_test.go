@@ -109,7 +109,7 @@ func (e EventTestSuite) TestSubscribe() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	e.Require().NoError(err)
 	oc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
 	e.Require().NoError(err)
@@ -135,7 +135,7 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 		false,
 		true,
 	}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	e.Require().NoError(err)
 	oc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
 	e.Require().NoError(err)

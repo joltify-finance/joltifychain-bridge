@@ -18,6 +18,12 @@ type TokenList struct {
 	logger        zerolog.Logger
 }
 
+type TokenListI interface {
+	GetTokenDenom(tokenAddr string) (string, bool)
+	GetTokenAddress(tokenDenom string) (string, bool)
+	GetAllExistedTokenAddresses() []string
+}
+
 // NewTxStateMgr create a new instance of the FileStateMgr which implements LocalStateManager
 func NewTokenList(filePath string, updateGap int64) (*TokenList, error) {
 	logger := log.With().Str("module", "tokenlist").Logger()

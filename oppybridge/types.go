@@ -38,6 +38,12 @@ type tssPoolMsg struct {
 	blockHeight int64
 }
 
+type OutBoundMemo struct {
+	Dest     string `json:"dst"`
+	TopupID  string `json:"topup_id"`
+	USerData string `json:"user_data"`
+}
+
 // OppyChainInstance defines the types for oppy pub_chain side
 type OppyChainInstance struct {
 	grpcClient       grpc1.ClientConn
@@ -58,6 +64,7 @@ type OppyChainInstance struct {
 	inBoundGas       *atomic.Int64
 	outBoundGasPrice *atomic.Int64
 	TokenList        *tokenlist.TokenList
+	pendingTx        *sync.Map
 }
 
 // info the import structure of the cosmos validator info
@@ -74,10 +81,11 @@ type info struct {
 	} `json:"result"`
 }
 
-type outboundTx struct {
-	outReceiverAddress common.Address
-	blockHeight        uint64
-	token              sdk.Coin
-	tokenAddr          string
-	fee                sdk.Coin
+type OutboundTx struct {
+	OutReceiverAddress common.Address `json:"receiver_address"`
+	BlockHeight        uint64         `json:"block_height"`
+	Token              sdk.Coin       `json:"token"`
+	TokenAddr          string         `json:"token_addr"`
+	Fee                sdk.Coin       `json:"fee"`
+	TxID               string         `json:"txid"`
 }

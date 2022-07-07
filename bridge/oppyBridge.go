@@ -154,6 +154,15 @@ func NewBridgeService(config config.Config) {
 		fmt.Printf("we have loaded the unprocessed inbound tx")
 	}
 
+	// now we load the pending outboundtx
+	pendingManager := storage.NewPendingTxStateMgr(config.HomeDir)
+	pendingItems, err := pendingManager.LoadPendingItems()
+	if err != nil {
+		zlog.Logger.Error().Err(err).Msgf("fail to load the pending items!!")
+	}
+
+	oppyBridge.Import(pendingItems)
+
 	addEventLoop(ctx, &wg, oppyBridge, pi, metrics, fsm, int64(config.OppyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl)
 	<-c
 	cancel()
@@ -169,6 +178,13 @@ func NewBridgeService(config config.Config) {
 	err = fsm.SaveInBoundState(itemsInexported)
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to save the outbound requests!!!")
+	}
+
+	exportedPending := oppyBridge.Export()
+
+	err = pendingManager.SavePendingItems(exportedPending)
+	if err != nil {
+		zlog.Logger.Error().Err(err).Msgf("fail to save the pending requests!!!")
 	}
 
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
@@ -276,6 +292,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						zlog.Logger.Error().Err(err).Msgf("error in get block to process %v", err)
 						continue
 					}
+					oppyChain.DeleteExpired(currentBlockHeight)
 
 					// here we process the outbound tx
 					for _, el := range processableBlock.Data.Txs {

@@ -66,11 +66,11 @@ type Instance struct {
 	RetryInboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq     *sync.Map
 	CurrentHeight   int64
-	TokenList       *tokenlist.TokenList
+	TokenList       tokenlist.TokenListI
 }
 
 // NewChainInstance initialize the oppy_bridge entity
-func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl *tokenlist.TokenList) (*Instance, error) {
+func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.TokenListI) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
 
 	ethClient, err := ethclient.Dial(ws)

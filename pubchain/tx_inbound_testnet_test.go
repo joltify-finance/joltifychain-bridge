@@ -57,7 +57,7 @@ func (tn *TestNetTestSuite) SetupSuite() {
 	tn.sk2 = &sk2
 
 	tss := TssMock{sk: &sk}
-	tl, err := createMockTokenlist("0xeB42ff4cA651c91EB248f8923358b6144c6B4b79", "JUSD")
+	tl, err := createMockTokenlist([]string{"0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"}, []string{"JUSD"})
 	if err != nil {
 		panic(err)
 	}
@@ -128,6 +128,8 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	err = tn.pubChain.UpdatePool(&poolInfo2)
 	tn.Require().NoError(err)
 
+	// if the this test fail, you need to disable the check for pool1->pool2 and
+	// run the test once to allow the fund move from pool2 back to pool1
 	ret := tn.pubChain.MoveFound(&wg, 100, &pool)
 	time.Sleep(time.Second * 10)
 	tn.Require().True(ret)
@@ -139,6 +141,7 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	time.Sleep(time.Second * 10)
 	tn.Require().True(ret)
 
+	// move token back
 	tn.pubChain.tssServer = &TssMock{sk: tn.sk2}
 	err = tn.pubChain.UpdatePool(&poolInfo1)
 	tn.Require().NoError(err)

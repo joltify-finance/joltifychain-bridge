@@ -116,7 +116,7 @@ func (b BridgeTestSuite) TestBridgeTx() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	b.Require().NoError(err)
 	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
@@ -192,7 +192,7 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	b.Require().NoError(err)
 	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
@@ -217,7 +217,7 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 	b.Require().False(ret)
 }
 
-func createMockTokenlist(tokenAddr string, tokenDenom string) (*tokenlist.TokenList, error) {
+func createMockTokenlist(tokenAddrs []string, tokenDenoms []string) (*tokenlist.TokenList, error) {
 	// init the token list file path
 	current, err := os.Getwd()
 	if err != nil {
@@ -226,7 +226,9 @@ func createMockTokenlist(tokenAddr string, tokenDenom string) (*tokenlist.TokenL
 	// write the temp file for mockTokenlist
 	tokenlistPath := path.Join(current, "../test_data/tokenlist/tokenlist_mock.json")
 	tempTL := make(map[string]string)
-	tempTL[tokenAddr] = tokenDenom
+	for i, el := range tokenAddrs {
+		tempTL[el] = tokenDenoms[i]
+	}
 	buf, err := json.Marshal(&tempTL)
 	if err != nil {
 		return nil, err
@@ -252,7 +254,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	b.Require().NoError(err)
 	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)

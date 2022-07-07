@@ -3,8 +3,14 @@ package oppybridge
 import (
 	"fmt"
 	"math/big"
+	"math/rand"
+	"sort"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/cosmos/cosmos-sdk/types/simulation"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -35,6 +41,7 @@ func TestConfig(t *testing.T) {
 		RetryOutboundReq: &sync.Map{},
 		OutboundReqChan:  make(chan *common.OutBoundReq, 10),
 		moveFundReq:      &sync.Map{},
+		pendingTx:        &sync.Map{},
 	}
 
 	for _, el := range reqs {
@@ -82,4 +89,59 @@ func TestConfig(t *testing.T) {
 
 	popedItem, _ = oc.popMoveFundItemAfterBlock(20)
 	assert.Equal(t, popedItem.Pk, accs[0].pk)
+
+	// we test imported data
+	data := createdTestPendingTxs(100)
+	oc.Import(data)
+	var saved []*OutboundTx
+
+	for _, el := range data {
+		dat, ok := oc.pendingTx.Load(el.TxID)
+		assert.Equal(t, ok, true)
+		saved = append(saved, dat.(*OutboundTx))
+	}
+
+	for i := 0; i < 100; i++ {
+		assert.Equal(t, saved[i].OutReceiverAddress.String(), data[i].OutReceiverAddress.String())
+		assert.True(t, saved[i].Fee.IsEqual(data[i].Fee))
+		assert.Equal(t, saved[i].BlockHeight, data[i].BlockHeight)
+	}
+
+	exportedData := oc.Export()
+
+	sort.Slice(exportedData, func(i, j int) bool {
+		return exportedData[i].TxID < exportedData[j].TxID
+	})
+
+	sort.Slice(data, func(i, j int) bool {
+		return data[i].TxID < data[j].TxID
+	})
+
+	for i := 0; i < 100; i++ {
+		assert.Equal(t, exportedData[i].OutReceiverAddress.String(), data[i].OutReceiverAddress.String())
+		assert.True(t, exportedData[i].Fee.IsEqual(data[i].Fee))
+		assert.Equal(t, exportedData[i].BlockHeight, data[i].BlockHeight)
+	}
+
+}
+
+func createdTestPendingTxs(n int) []*OutboundTx {
+	r := rand.New(rand.NewSource(time.Now().Unix()))
+	accs := simulation.RandomAccounts(r, n)
+	pendingTxs := make([]*OutboundTx, n)
+	for i := 0; i < n; i++ {
+		txid := fmt.Sprintf("testTXID %v", i)
+		testToken := sdk.NewCoin("testToken", sdk.NewInt(32))
+		testFee := sdk.NewCoin("testFee", sdk.NewInt(32))
+		tx := OutboundTx{
+			TxID:               txid,
+			OutReceiverAddress: ethcommon.HexToAddress(accs[i].Address.String()),
+			BlockHeight:        uint64(i),
+			Token:              testToken,
+			Fee:                testFee,
+			TokenAddr:          "testAddress",
+		}
+		pendingTxs[i] = &tx
+	}
+	return pendingTxs
 }

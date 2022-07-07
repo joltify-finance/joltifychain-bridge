@@ -18,7 +18,53 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
-func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID string, blockHeight int64, receiverAddr ethcommon.Address, currEthAddr ethcommon.Address) error {
+func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHeight int64, currEthAddr ethcommon.Address, memo OutBoundMemo) error {
+	addr, tokenExist := oc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
+	if !tokenExist || msg.Amount[0].GetDenom() != config.OutBoundDenomFee {
+		return errors.New("token is not on our token list or not fee demon")
+	}
+	tokenAddr := addr
+
+	dat, ok := oc.pendingTx.LoadAndDelete(memo.TopupID)
+	if !ok {
+		return fmt.Errorf("saved tx not found invalid top up message %v", memo)
+	}
+
+	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
+	if !ok {
+		panic("fail to load the gas wanted")
+	}
+	price := oc.GetPubChainGasPrice()
+	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
+	expectedFee := types.NewCoin(config.OutBoundDenomFee, types.NewIntFromBigInt(expectedFeeAmount))
+
+	savedTx := dat.(*OutboundTx)
+
+	if savedTx.TokenAddr == config.NativeSign {
+		savedTx.Token = savedTx.Token.AddAmount(msg.Amount[0].Amount)
+		if !savedTx.Token.IsGTE(expectedFee) {
+			oc.logger.Error().Msgf("the transaction is invalid,as fee we want is %v, and you have paid %v", expectedFee.String(), savedTx.Fee.String())
+			oc.pendingTx.Store(memo.TopupID, savedTx)
+			return nil
+		}
+		savedTx.Token = savedTx.Token.SubAmount(expectedFee.Amount)
+	} else {
+		// now we process the erc20 topup
+		savedTx.Fee = savedTx.Fee.AddAmount(msg.Amount[0].Amount)
+		if !savedTx.Fee.IsGTE(expectedFee) {
+			oc.logger.Error().Msgf("the transaction is invalid,as fee we want is %v, and you have paid %v", expectedFee.String(), savedTx.Fee.String())
+			oc.pendingTx.Store(memo.TopupID, savedTx)
+			return nil
+		}
+	}
+	roundBlockHeight := blockHeight / ROUNDBLOCK
+	itemReq := bcommon.NewOutboundReq(memo.TopupID, savedTx.OutReceiverAddress, currEthAddr, savedTx.Token, tokenAddr, blockHeight, roundBlockHeight)
+	oc.AddItem(&itemReq)
+	oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, oc.CurrentHeight)
+	return nil
+}
+
+func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID string, blockHeight int64, currEthAddr ethcommon.Address, memo OutBoundMemo) error {
 	addr, tokenExist := oc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
 	if !tokenExist {
 		return errors.New("token is not on our token list")
@@ -30,20 +76,20 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 		return errors.New("not a native token")
 	}
 
-	item := oc.processNativeFee(txID, blockHeight, receiverAddr, tokenDenom, msg.Amount[0].Amount)
+	item := oc.processNativeFee(txID, blockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[0].Amount)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
 		roundBlockHeight := blockHeight / ROUNDBLOCK
-		itemReq := bcommon.NewOutboundReq(txID, item.outReceiverAddress, currEthAddr, item.token, tokenAddr, blockHeight, roundBlockHeight)
+		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, blockHeight, roundBlockHeight)
 		oc.AddItem(&itemReq)
 		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, oc.CurrentHeight)
 		return nil
 	}
-	return errors.New("fail to process the native token")
+	return nil
 
 }
 
-func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID string, blockHeight int64, receiverAddr ethcommon.Address, currEthAddr ethcommon.Address) error {
+func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID string, blockHeight int64, currEthAddr ethcommon.Address, memo OutBoundMemo) error {
 	// now we search for the index of the outboundemo and the outbounddemofee
 	found := false
 	indexDemo := 0
@@ -71,21 +117,20 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 		return errors.New("invalid fee pair")
 	}
 
-	item := oc.processErc20DemonAndFee(txID, blockHeight, receiverAddr, tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
+	item := oc.processErc20DemonAndFee(txID, blockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
 		roundBlockHeight := blockHeight / ROUNDBLOCK
-		itemReq := bcommon.NewOutboundReq(txID, item.outReceiverAddress, currEthAddr, item.token, tokenAddr, blockHeight, roundBlockHeight)
+		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, blockHeight, roundBlockHeight)
 		oc.AddItem(&itemReq)
 		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, oc.CurrentHeight)
 		return nil
 	}
-	return errors.New("not enough fee")
-
+	return nil
 }
 
 // processMsg handle the oppychain transactions
-func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr, receiverAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte) error {
+func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, memo OutBoundMemo, msg *banktypes.MsgSend, txHash []byte) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 
 	toAddress, err := types.AccAddressFromBech32(msg.ToAddress)
@@ -103,24 +148,32 @@ func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAd
 	// it means the sender pay the fee in one tx
 	switch len(msg.Amount) {
 	case 1:
-		err := oc.processNativeRequest(msg, txID, blockHeight, receiverAddr, curEthAddr)
+		if len(memo.TopupID) != 0 {
+			err := oc.processTopUpRequest(msg, blockHeight, curEthAddr, memo)
+			if err != nil {
+				oc.logger.Error().Err(err).Msg("")
+				return errors.New("fail to process the native token top up request")
+			}
+			return nil
+		}
+		err := oc.processNativeRequest(msg, txID, blockHeight, curEthAddr, memo)
 		if err != nil {
 			oc.logger.Error().Err(err).Msg("")
 			return errors.New("fail to process the native token outbound request")
 		}
+		return nil
 	case 2:
-		err := oc.processErc20Request(msg, txID, blockHeight, receiverAddr, curEthAddr)
+		err := oc.processErc20Request(msg, txID, blockHeight, curEthAddr, memo)
 		if err != nil {
 			return errors.New("fail to process the outbound erc20 request")
 		}
+		return nil
 	default:
 		return errors.New("incorrect msg format")
 	}
-	return nil
 }
 
-func (oc *OppyChainInstance) processNativeFee(txID string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount types.Int) *outboundTx {
-
+func (oc *OppyChainInstance) processNativeFee(txID string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount types.Int) *OutboundTx {
 	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
 	if !ok {
 		panic("fail to load the gas wanted")
@@ -136,30 +189,36 @@ func (oc *OppyChainInstance) processNativeFee(txID string, blockHeight int64, re
 		return nil
 	}
 
-	AmountTransfer := demonAmount.Sub(expectedFee.Amount)
-
-	if AmountTransfer.IsNegative() {
-		oc.logger.Error().Msgf("The amount to transfer is smaller than the fee")
-		return nil
-	}
-
 	token := types.Coin{
 		Denom:  demonName,
-		Amount: AmountTransfer,
+		Amount: demonAmount,
 	}
-	tx := outboundTx{
+
+	tx := OutboundTx{
 		receiverAddr,
 		uint64(blockHeight),
 		token,
 		tokenAddr,
 		expectedFee,
+		txID,
 	}
-	oc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.token.String())
+
+	AmountTransfer := demonAmount.Sub(expectedFee.Amount)
+
+	if AmountTransfer.IsNegative() {
+		oc.logger.Warn().Msgf("The amount to transfer is smaller than the fee")
+		oc.pendingTx.Store(txID, &tx)
+		return nil
+	}
+
+	tx.Token = tx.Token.SubAmount(expectedFee.Amount)
+
+	oc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.Token.String())
 	return &tx
 
 }
 
-func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount, feeAmount types.Int) *outboundTx {
+func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount, feeAmount types.Int) *OutboundTx {
 	token := types.Coin{
 		Denom:  demonName,
 		Amount: demonAmount,
@@ -173,12 +232,13 @@ func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, blockHeight in
 		oc.logger.Error().Msgf("The token is not existed in the white list")
 		return nil
 	}
-	tx := outboundTx{
+	tx := OutboundTx{
 		receiverAddr,
 		uint64(blockHeight),
 		token,
 		tokenAddr,
 		fee,
+		txID,
 	}
 	price := oc.GetPubChainGasPrice()
 
@@ -191,9 +251,10 @@ func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, blockHeight in
 
 	if !fee.IsGTE(expectedFee) {
 		oc.logger.Error().Msgf("the transaction is invalid,as fee we want is %v, and you have paid %v", expectedFee.String(), fee.String())
+		oc.pendingTx.Store(txID, &tx)
 		return nil
 	}
-	oc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.token.String())
+	oc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.Token.String())
 	return &tx
 }
 
@@ -277,4 +338,21 @@ func (oc *OppyChainInstance) DoMoveFunds(fromPool *bcommon.PoolInfo, to types.Ac
 		return false, errors.New("fail to process the inbound tx")
 	}
 	return false, nil
+}
+
+// DeleteExpired remove the expired pending tx
+func (oc *OppyChainInstance) DeleteExpired(currentHeight int64) {
+	var expiredTx []string
+	oc.pendingTx.Range(func(key, value interface{}) bool {
+		el := value.(*OutboundTx)
+		if currentHeight-int64(el.BlockHeight) > config.TxTimeout {
+			expiredTx = append(expiredTx, key.(string))
+		}
+		return true
+	})
+
+	for _, el := range expiredTx {
+		oc.logger.Warn().Msgf("we delete the expired tx %s", el)
+		oc.pendingTx.Delete(el)
+	}
 }

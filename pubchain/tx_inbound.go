@@ -87,8 +87,8 @@ func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types
 	// this is repeated check for tokenAddr which is cheked at function 'processEachBlock'
 	tokenDenom, exit := pi.TokenList.GetTokenDenom(addr.Hex())
 	if !exit {
-		pi.logger.Error().Msgf("incorrect top up token")
-		return errors.New("incorrect top up token")
+		pi.logger.Error().Msgf("Token is not on our token list")
+		return errors.New("token is not on our token list")
 	}
 
 	token := types.Coin{
@@ -166,8 +166,8 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 				zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
 				continue
 			}
+			continue
 		}
-
 		if pi.checkToBridge(*tx.To()) {
 			if tx.Data() == nil {
 				pi.logger.Warn().Msgf("we have received unknown fund")

@@ -100,7 +100,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	s.Require().NoError(err)
 	oc, err := NewOppyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, &tss, tl)
 	s.Require().NoError(err)

@@ -38,7 +38,7 @@ func TestFeedTx(t *testing.T) {
 
 	assert.NilError(t, err)
 	tssServer := TssMock{acc[0].sk}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	assert.NilError(t, err)
 	pi, err := NewChainInstance(websocketTest, &tssServer, tl)
 	assert.NilError(t, err)

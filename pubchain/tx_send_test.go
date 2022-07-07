@@ -49,12 +49,10 @@ func TestPubChainInstance_composeTx(t *testing.T) {
 	assert.Nil(t, err)
 	tssServer := TssMock{accs[1].sk}
 	pi := Instance{
-		lastTwoPools:       make([]*common.PoolInfo, 2),
-		poolLocker:         &sync.RWMutex{},
-		pendingInbounds:    &sync.Map{},
-		pendingInboundsBnB: &sync.Map{},
-		InboundReqChan:     make(chan *common.InBoundReq, 1),
-		tssServer:          &tssServer,
+		lastTwoPools:   make([]*common.PoolInfo, 2),
+		poolLocker:     &sync.RWMutex{},
+		InboundReqChan: make(chan *common.InBoundReq, 1),
+		tssServer:      &tssServer,
 	}
 
 	poolInfo0 := vaulttypes.PoolInfo{
@@ -123,7 +121,7 @@ func TestSendToken(t *testing.T) {
 	}
 	websocketTest := "ws://rpc.test.oppy.zone:8456/"
 	tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	assert.Nil(t, err)
 	pubChain, err := NewChainInstance(websocketTest, &tss, tl)
 	assert.Nil(t, err)

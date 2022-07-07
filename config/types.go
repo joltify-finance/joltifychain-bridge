@@ -8,7 +8,7 @@ const (
 
 	TxTimeout                = 300
 	GASFEERATIO              = "1.5"
-	DUSTBNB                  = "0.0001"
+	DUSTBNB                  = "0.0005"
 	MINCHECKBLOCKGAP         = 6
 	DefaultPUBChainGasWanted = "100000"
 )
