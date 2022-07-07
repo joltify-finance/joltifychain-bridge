@@ -16,6 +16,9 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPoo
 	// movefund according to the history tokenlist
 	existedTokenAddresses := pi.TokenList.GetAllExistedTokenAddresses()
 	for _, tokenAddr := range existedTokenAddresses {
+		if tokenAddr == "native" {
+			continue
+		}
 		tokenIsEmpty, err := pi.doMoveTokenFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight, tokenAddr)
 		// once there exists one token in the current pool, then we need to addMoveFundItem
 		if err != nil {

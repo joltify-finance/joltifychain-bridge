@@ -36,6 +36,7 @@ const (
 	GroupBlockGap     = 8
 	GroupSign         = 4
 	NativeSign        = "native"
+	PRICEUPDATEGAP    = 10
 )
 
 type InboundTx struct {

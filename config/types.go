@@ -3,16 +3,15 @@ package config
 import "time"
 
 const (
-	InBoundDenomFee  = "abnb"
-	OutBoundDenomFee = "pjolt"
+	OutBoundDenomFee = "abnb"
+	NativeToken      = "abnb"
 
-	InBoundFeeMin    = "0.00000000000000001"
-	OUTBoundFeeOut   = "0.00000000000000001"
-	TxTimeout        = 300
-	GASFEERATIO      = "1.5"
-	DUSTBNB          = "0.0001"
-	MINCHECKBLOCKGAP = 6
-	DEFAULTETHGAS    = 45000
+	OUTBoundFeeOut           = "0.000000000001"
+	TxTimeout                = 300
+	GASFEERATIO              = "1.5"
+	DUSTBNB                  = "0.0001"
+	MINCHECKBLOCKGAP         = 6
+	DefaultPUBChainGasWanted = "25000"
 )
 
 var ChainID = "oppyChain-1"

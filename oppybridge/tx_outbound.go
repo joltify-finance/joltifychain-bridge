@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
@@ -17,6 +18,73 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
+func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID string, blockHeight int64, wrapFromEthAddr types.AccAddress, currEthAddr ethcommon.Address) error {
+	addr, tokenExist := oc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
+	if !tokenExist {
+		return errors.New("token is not on our token list")
+	}
+	tokenDenom := msg.Amount[0].GetDenom()
+	tokenAddr := addr
+
+	if addr != config.NativeToken {
+		return errors.New("not a native token")
+	}
+
+	item := oc.processNativeFee(txID, blockHeight, wrapFromEthAddr, tokenDenom, msg.Amount[0].Amount)
+	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
+	if item != nil {
+		roundBlockHeight := blockHeight / ROUNDBLOCK
+		itemReq := bcommon.NewOutboundReq(txID, item.outReceiverAddress, currEthAddr, item.token, tokenAddr, blockHeight, roundBlockHeight)
+		oc.AddItem(&itemReq)
+		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, oc.CurrentHeight)
+		return nil
+	}
+	return errors.New("fail to process the native token")
+
+}
+
+func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID string, blockHeight int64, wrapFromEthAddr types.AccAddress, currEthAddr ethcommon.Address) error {
+	// now we search for the index of the outboundemo and the outbounddemofee
+	found := false
+	indexDemo := 0
+	indexDemoFee := 0
+	tokenDenom := ""
+	tokenAddr := ""
+	addr, tokenExist := oc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
+	if tokenExist && msg.Amount[1].GetDenom() == config.OutBoundDenomFee {
+		tokenDenom = msg.Amount[0].GetDenom()
+		tokenAddr = addr
+		indexDemo = 0
+		indexDemoFee = 1
+		found = true
+	}
+
+	addr, tokenExist = oc.TokenList.GetTokenAddress(msg.Amount[1].GetDenom())
+	if tokenExist && msg.Amount[0].GetDenom() == config.OutBoundDenomFee {
+		tokenDenom = msg.Amount[1].GetDenom()
+		tokenAddr = addr
+		indexDemo = 1
+		indexDemoFee = 0
+		found = true
+	}
+	if !found {
+		return errors.New("invalid fee pair")
+	}
+
+	item := oc.processErc20DemonAndFee(txID, blockHeight, wrapFromEthAddr, tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
+	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
+	if item != nil {
+		roundBlockHeight := blockHeight / ROUNDBLOCK
+		itemReq := bcommon.NewOutboundReq(txID, item.outReceiverAddress, currEthAddr, item.token, tokenAddr, blockHeight, roundBlockHeight)
+		oc.AddItem(&itemReq)
+		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, oc.CurrentHeight)
+		return nil
+	}
+	return errors.New("not enough fee")
+
+}
+
+// processMsg handle the oppychain transactions
 func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, msg *banktypes.MsgSend, txHash []byte) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 
@@ -52,50 +120,65 @@ func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAd
 	}
 
 	// it means the sender pay the fee in one tx
-	if len(msg.Amount) == 2 {
-		// now we search for the index of the outboundemo and the outbounddemofee
-		found := false
-		indexDemo := 0
-		indexDemoFee := 0
-		tokenDenom := ""
-		tokenAddr := ""
-		addr, tokenExist := oc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
-		if tokenExist && msg.Amount[1].GetDenom() == config.OutBoundDenomFee {
-			tokenDenom = msg.Amount[0].GetDenom()
-			tokenAddr = addr
-			indexDemo = 0
-			indexDemoFee = 1
-			found = true
+	switch len(msg.Amount) {
+	case 1:
+		err := oc.processNativeRequest(msg, txID, blockHeight, wrapFromEthAddr, curEthAddr)
+		if err != nil {
+			oc.logger.Error().Err(err).Msg("")
+			return errors.New("fail to process the native token outbound request")
 		}
-
-		addr, tokenExist = oc.TokenList.GetTokenAddress(msg.Amount[1].GetDenom())
-		if tokenExist && msg.Amount[0].GetDenom() == config.OutBoundDenomFee {
-			tokenDenom = msg.Amount[1].GetDenom()
-			tokenAddr = addr
-			indexDemo = 1
-			indexDemoFee = 0
-			found = true
+	case 2:
+		err := oc.processErc20Request(msg, txID, blockHeight, wrapFromEthAddr, curEthAddr)
+		if err != nil {
+			return errors.New("fail to process the outbound erc20 request")
 		}
-		if !found {
-			return errors.New("invalid fee pair")
-		}
-
-		item := oc.processDemonAndFee(txID, blockHeight, wrapFromEthAddr, tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
-		// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
-		if item != nil {
-			roundBlockHeight := blockHeight / ROUNDBLOCK
-			itemReq := bcommon.NewOutboundReq(txID, item.outReceiverAddress, curEthAddr, item.token, tokenAddr, blockHeight, roundBlockHeight)
-			oc.AddItem(&itemReq)
-			oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, oc.CurrentHeight)
-			return nil
-		}
-		return errors.New("not enough fee")
+	default:
+		return errors.New("incorrect msg format")
 	}
-
-	return errors.New("we only allow fee and top up in one tx now")
+	return nil
 }
 
-func (oc *OppyChainInstance) processDemonAndFee(txID string, blockHeight int64, fromAddress types.AccAddress, demonName string, demonAmount, feeAmount types.Int) *outboundTx {
+func (oc *OppyChainInstance) processNativeFee(txID string, blockHeight int64, fromAddress types.AccAddress, demonName string, demonAmount types.Int) *outboundTx {
+
+	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
+	if !ok {
+		panic("fail to load the gas wanted")
+	}
+
+	price := oc.GetPubChainGasPrice()
+	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
+	expectedFee := types.NewCoin(config.NativeToken, types.NewIntFromBigInt(expectedFeeAmount))
+
+	tokenAddr, exit := oc.TokenList.GetTokenAddress(demonName)
+	if !exit {
+		oc.logger.Error().Msgf("The token is not existed in the white list")
+		return nil
+	}
+
+	AmountTransfer := demonAmount.Sub(expectedFee.Amount)
+
+	if AmountTransfer.IsNegative() {
+		oc.logger.Error().Msgf("The amount to transfer is smaller than the fee")
+		return nil
+	}
+
+	token := types.Coin{
+		Denom:  demonName,
+		Amount: AmountTransfer,
+	}
+	tx := outboundTx{
+		ethcommon.BytesToAddress(fromAddress.Bytes()),
+		uint64(blockHeight),
+		token,
+		tokenAddr,
+		expectedFee,
+	}
+	oc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.token.String())
+	return &tx
+
+}
+
+func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, blockHeight int64, fromAddress types.AccAddress, demonName string, demonAmount, feeAmount types.Int) *outboundTx {
 	token := types.Coin{
 		Denom:  demonName,
 		Amount: demonAmount,
@@ -116,9 +199,18 @@ func (oc *OppyChainInstance) processDemonAndFee(txID string, blockHeight int64, 
 		tokenAddr,
 		fee,
 	}
-	err := tx.Verify()
-	if err != nil {
-		oc.logger.Error().Err(err).Msgf("the transaction is invalid")
+	price := oc.GetPubChainGasPrice()
+
+	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
+	if !ok {
+		panic("fail to load the gas wanted")
+	}
+	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
+	expectedFee := types.NewCoin(config.NativeToken, types.NewIntFromBigInt(expectedFeeAmount))
+	fmt.Printf(">>>>>>>expected fee>>>>>>>%v\n", expectedFee)
+
+	if !fee.IsGTE(expectedFee) {
+		oc.logger.Error().Msgf("the transaction is invalid,as fee we want is %v, and you have paid %v", expectedFee.String(), fee.String())
 		return nil
 	}
 	oc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.token.String())
@@ -205,19 +297,4 @@ func (oc *OppyChainInstance) DoMoveFunds(fromPool *bcommon.PoolInfo, to types.Ac
 		return false, errors.New("fail to process the inbound tx")
 	}
 	return false, nil
-}
-
-// Verify checks whether the outbound tx has paid enough fee
-func (a *outboundTx) Verify() error {
-	if a.fee.Denom != config.OutBoundDenomFee {
-		return errors.New("invalid outbound fee denom")
-	}
-	amount, err := types.NewDecFromStr(config.OUTBoundFeeOut)
-	if err != nil {
-		return errors.New("invalid minimal inbound fee")
-	}
-	if a.fee.Amount.LT(types.NewIntFromBigInt(amount.BigInt())) {
-		return fmt.Errorf("the fee is not enough with %s<%s", a.fee.Amount, amount.BigInt().String())
-	}
-	return nil
 }

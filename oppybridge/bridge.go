@@ -69,7 +69,8 @@ func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, t
 	oppyBridge.keyGenCache = []tssPoolMsg{}
 	oppyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
 	oppyBridge.poolUpdateLocker = &sync.RWMutex{}
-	oppyBridge.inboundGas = atomic.NewInt64(250000)
+	oppyBridge.inBoundGas = atomic.NewInt64(250000)
+	oppyBridge.outBoundGasPrice = atomic.NewInt64(5000000000)
 
 	// we put the dummy query here to avoid the panic
 	//query := "tm.event = 'Tx' AND transfer.sender = 'jolt1x'"
@@ -321,21 +322,6 @@ func (oc *OppyChainInstance) GasEstimation(sdkMsg []sdk.Msg, accSeq uint64, tssS
 	gasUsedDec := sdk.NewDecFromIntWithPrec(sdk.NewIntFromUint64(gasUsed), 0)
 	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO)).RoundInt64()
 	return uint64(gasWanted), nil
-}
-
-// UpdateGas update the gas needed from the last tx
-func (oc *OppyChainInstance) UpdateGas(gasUsed int64) {
-	oc.inboundGas.Store(gasUsed)
-}
-
-// GetGasEstimation get the gas estimation
-func (oc *OppyChainInstance) GetGasEstimation() int64 {
-	previousGasUsed := oc.inboundGas.Load()
-	gasUsedDec := sdk.NewDecFromIntWithPrec(sdk.NewIntFromUint64(uint64(previousGasUsed)), 0)
-	gasWanted := gasUsedDec.Mul(sdk.MustNewDecFromStr(config.GASFEERATIO)).RoundInt64()
-	_ = gasWanted
-	// todo we need to get the gas dynamically in future, if different node get different fee, tss will fail
-	return 50000000
 }
 
 // BroadcastTx broadcast the tx to the oppyChain

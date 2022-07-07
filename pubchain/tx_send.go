@@ -8,6 +8,7 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"html"
 	"math/big"
+	"strconv"
 	"sync"
 	"time"
 
@@ -77,12 +78,17 @@ func (pi *Instance) SendNativeToken(wg *sync.WaitGroup, signerPk string, sender,
 	txo.Value = amount
 
 	// fixme, we set the fixed gaslimit
-	gasLimit := uint64(config.DEFAULTETHGAS) // in units
+	gasLimit, err := strconv.ParseUint(config.DefaultPUBChainGasWanted, 10, 64)
+	if err != nil {
+		panic("fail to parse the default pubchain gas wanted")
+	}
+	//fixme need to check what is the gas price here
 	gasPrice, err := pi.EthClient.SuggestGasPrice(context.Background())
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
 		return common.Hash{}, err
 	}
+	fmt.Printf(">>>>>>>>>>>>>>>>gas price is %v\n", gasPrice.String())
 
 	var data []byte
 	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: gasLimit, To: &receiver, Value: amount, Data: data})

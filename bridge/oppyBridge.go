@@ -261,6 +261,17 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					zlog.Logger.Warn().Msgf("error in updating token list %v", err)
 				}
 
+				if currentBlockHeight%pubchain.PRICEUPDATEGAP == 0 {
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+					defer cancel()
+					price, err := pi.EthClient.SuggestGasPrice(ctx)
+					if err == nil {
+						oppyChain.UpdatePubChainGasPrice(price.Int64())
+					} else {
+						zlog.Logger.Error().Err(err).Msg("fail to get the suggest gas price")
+					}
+				}
+
 				// we update the tx new, if there exits a processable block
 				if currentBlockHeight > oppyRollbackGap {
 					processableBlockHeight := currentBlockHeight - oppyRollbackGap

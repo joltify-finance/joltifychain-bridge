@@ -1,7 +1,6 @@
 package pubchain
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -49,19 +48,12 @@ func (pi *Instance) retrieveAddrfromRawTx(tx *ethTypes.Transaction) (types.AccAd
 }
 
 func (pi *Instance) getBalance(value *big.Int) (types.Coin, error) {
-	amount, err := types.NewDecFromStr(config.InBoundFeeMin)
-	if err != nil {
-		panic("the constant value should never fail")
-	}
-	minFee := types.NewCoin(config.InBoundDenomFee, types.NewIntFromBigInt(amount.BigInt()))
-	total := types.NewCoin(config.InBoundDenomFee, types.NewIntFromBigInt(value))
-	balance := total.Sub(minFee)
-	if balance.IsNegative() {
-		pi.logger.Error().Msg("insufficient fund")
+	total := types.NewCoin(config.NativeToken, types.NewIntFromBigInt(value))
+	if total.IsNegative() {
+		pi.logger.Error().Msg("incorrect amount")
 		return types.Coin{}, errors.New("insufficient fund")
 	}
-	return balance, nil
-
+	return total, nil
 }
 
 // ProcessInBoundERC20 process the inbound contract token top-up
@@ -181,24 +173,21 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 				pi.logger.Warn().Msgf("we have received unknown fund")
 				continue
 			}
-			payTxID := tx.Data()
-			if bytes.Equal(payTxID, []byte(NativeSign)) {
-				// this indicates it is a native bnb transfer
-				balance, err := pi.getBalance(tx.Value())
-				if err != nil {
-					continue
-				}
-
-				accountAddress, err := pi.retrieveAddrfromRawTx(tx)
-				if err != nil {
-					continue
-				}
-
-				roundBlockHeight := oppyBlockHeight / ROUNDBLOCK
-				item := bcommon.NewAccountInboundReq(accountAddress, *tx.To(), balance, tx.Hash().Bytes(), oppyBlockHeight, roundBlockHeight)
-				// we add to the retry pool to  sort the tx
-				pi.AddItem(&item)
+			// this indicates it is a native bnb transfer
+			balance, err := pi.getBalance(tx.Value())
+			if err != nil {
+				continue
 			}
+
+			accountAddress, err := pi.retrieveAddrfromRawTx(tx)
+			if err != nil {
+				continue
+			}
+
+			roundBlockHeight := oppyBlockHeight / ROUNDBLOCK
+			item := bcommon.NewAccountInboundReq(accountAddress, *tx.To(), balance, tx.Hash().Bytes(), oppyBlockHeight, roundBlockHeight)
+			// we add to the retry pool to  sort the tx
+			pi.AddItem(&item)
 		}
 	}
 }

@@ -55,7 +55,8 @@ type OppyChainInstance struct {
 	RetryOutboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq      *sync.Map
 	CurrentHeight    int64
-	inboundGas       *atomic.Int64
+	inBoundGas       *atomic.Int64
+	outBoundGasPrice *atomic.Int64
 	TokenList        *tokenlist.TokenList
 }
 
