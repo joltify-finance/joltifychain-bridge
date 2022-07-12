@@ -1,7 +1,9 @@
 package pubchain
 
 import (
+	"context"
 	"encoding/hex"
+	"encoding/json"
 	"hash"
 	"math/big"
 	"strings"
@@ -48,21 +50,21 @@ type MockTokenList struct {
 }
 
 func (mt *MockTokenList) GetTokenDenom(tokenAddr string) (string, bool) {
-	tokenDenom, exist := mt.pubTokenList.Load(tokenAddr)
+	tokenDenom, exist := mt.pubTokenList.Load(strings.ToLower(tokenAddr))
 	tokenDenomStr, _ := tokenDenom.(string)
-	return tokenDenomStr, exist
+	return strings.ToLower(tokenDenomStr), exist
 }
 func (mt *MockTokenList) GetTokenAddress(tokenDenom string) (string, bool) {
 	tokenAddr, exist := mt.oppyTokenList.Load(tokenDenom)
 	tokenAddrStr, _ := tokenAddr.(string)
-	return tokenAddrStr, exist
+	return strings.ToLower(tokenAddrStr), exist
 }
 
 func (mt *MockTokenList) GetAllExistedTokenAddresses() []string {
 	tokenInfo := []string{}
 	mt.pubTokenList.Range(func(tokenAddr, tokenDenom interface{}) bool {
 		tokenAddrStr, _ := tokenAddr.(string)
-		tokenInfo = append(tokenInfo, tokenAddrStr)
+		tokenInfo = append(tokenInfo, strings.ToLower(tokenAddrStr))
 		return true
 	})
 	return tokenInfo
@@ -71,8 +73,8 @@ func (mt *MockTokenList) GetAllExistedTokenAddresses() []string {
 func createMockTokenlist(tokenAddr []string, tokenDenom []string) (tokenlist.TokenListI, error) {
 	mTokenList := MockTokenList{&sync.Map{}, &sync.Map{}}
 	for i, el := range tokenAddr {
-		mTokenList.oppyTokenList.Store(tokenDenom[i], el)
-		mTokenList.pubTokenList.Store(el, tokenDenom[i])
+		mTokenList.oppyTokenList.Store(strings.ToLower(tokenDenom[i]), strings.ToLower(el))
+		mTokenList.pubTokenList.Store(strings.ToLower(el), strings.ToLower(tokenDenom[i]))
 	}
 	return &mTokenList, nil
 }
@@ -212,7 +214,14 @@ func TestProcessInBound(t *testing.T) {
 	nonExistedTokenAddrStr := "0xthisisanonexitedtoken1234567890123456789"
 	nonExistedTokenAddr := common.HexToAddress(nonExistedTokenAddrStr)
 
-	err = pi.ProcessInBoundERC20(tx, nonExistedTokenAddr, transferTo, testAmount, uint64(10))
+	erc20Tx := Erc20TxInfo{
+		fromAddr:     sdk.AccAddress{},
+		tokenAddress: nonExistedTokenAddr,
+		toAddr:       transferTo,
+		Amount:       testAmount,
+	}
+
+	err = pi.ProcessInBoundERC20(tx, &erc20Tx, uint64(10))
 	require.EqualError(t, err, "token is not on our token list")
 
 	ExistedTokenAddrStr := "0x15fb343d82cD1C22542261dF408dA8396A829F6B"
@@ -220,16 +229,17 @@ func TestProcessInBound(t *testing.T) {
 	pi.TokenList, err = createMockTokenlist([]string{ExistedTokenAddrStr}, []string{"testDenom"})
 	assert.Nil(t, err)
 
-	err = pi.ProcessInBoundERC20(tx, ExistedTokenAddr, transferTo, testAmount, uint64(10))
+	erc20Tx.tokenAddress = ExistedTokenAddr
+
+	err = pi.ProcessInBoundERC20(tx, &erc20Tx, uint64(10))
 	require.Nil(t, err)
 
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		data := value.(*common2.InBoundReq)
-		expected := sdk.Coin{Denom: "testDenom", Amount: sdk.NewInt(100)}
+		expected := sdk.Coin{Denom: "testdenom", Amount: sdk.NewInt(100)}
 		assert.True(t, data.Coin.Equal(expected))
 		return true
 	})
-
 }
 
 type testHasher struct {
@@ -373,7 +383,7 @@ func TestProcessEachBlock(t *testing.T) {
 
 	tBlock := ethTypes.Block{}
 
-	tAbi, err := abi.JSON(strings.NewReader(generated.TokenMetaData.ABI))
+	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
 	assert.Nil(t, err)
 
 	allTxs := []*ethTypes.Transaction{emptyEip2718Tx, emptyEip2718TxNotToBridge, emptyEip2718TxGoodTopUpFee, emptyEip2718TxGoodTopUpEmptyData, emptyEip2718TxGoodTopUpFeeBeforeERC20}
@@ -442,14 +452,14 @@ func TestProcessEachBlock(t *testing.T) {
 }
 
 func TestProcessEachBlockErc20(t *testing.T) {
-	accs, err := generateRandomPrivKey(3)
+	accs, err := generateRandomPrivKey(5)
 	assert.Nil(t, err)
-	tAbi, err := abi.JSON(strings.NewReader(generated.TokenMetaData.ABI))
+	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
 	assert.Nil(t, err)
 	tl, err := createMockTokenlist([]string{accs[0].commAddr.String()}, []string{"abnb"})
 	assert.Nil(t, err)
 
-	tl2, err := createMockTokenlist([]string{accs[1].commAddr.String()}, []string{"testToken"})
+	tl2, err := createMockTokenlist([]string{accs[4].commAddr.String()}, []string{"testtoken"})
 	assert.Nil(t, err)
 
 	tl3, err := createMockTokenlist([]string{"native"}, []string{"abnb"})
@@ -484,11 +494,22 @@ func TestProcessEachBlockErc20(t *testing.T) {
 		Extra:      []byte("coolest block on pub_chain"),
 	}
 
-	method, ok := tAbi.Methods["transfer"]
+	method, ok := tAbi.Methods["oppyTransfer"]
 	assert.True(t, ok)
+
+	// address toAddress, uint256 amount, address contractAddress, bytes memo
 	// this address should be the same as the pool address as ERC20 contract definition
-	dataRaw, err := method.Inputs.Pack(accs[1].commAddr, big.NewInt(10))
+
+	memo := common2.BridgeMemo{
+		Dest: accs[3].oppyAddr.String(),
+	}
+
+	memoByte, err := json.Marshal(memo)
 	assert.Nil(t, err)
+
+	dataRaw, err := method.Inputs.Pack(accs[1].commAddr, big.NewInt(10), accs[4].commAddr, memoByte)
+	assert.Nil(t, err)
+
 	// we need to put 4 leading 0 to match the format in test
 	data := append([]byte("0000"), dataRaw...)
 
@@ -522,10 +543,11 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	s := signature[32:64]
 	v := signature[64:65]
 
+	contractAddressEth := common.HexToAddress(OppyContractAddress)
 	// though to the token addr but not to the pool, so we ignore this tx
 	Eip2718TxGoodPass := ethTypes.MustSignNewTx(testKey, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
 		Nonce:    2,
-		To:       &accs[1].commAddr,
+		To:       &contractAddressEth,
 		Value:    big.NewInt(10),
 		Gas:      params.CallNewAccountGas,
 		GasPrice: big.NewInt(1),
@@ -542,7 +564,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 		Value:    big.NewInt(101),
 		Gas:      params.CallNewAccountGas,
 		GasPrice: big.NewInt(1),
-		Data:     []byte(hex.EncodeToString([]byte("native"))),
+		Data:     memoByte,
 		R:        new(big.Int).SetBytes(r),
 		S:        new(big.Int).SetBytes(s),
 		V:        new(big.Int).SetBytes(v),
@@ -582,7 +604,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	// we test that the tx is not to the pool
 	pi.processEachBlock(tBlock, 10)
 	pi.RetryInboundReq.Range(func(key, value any) bool {
-		panic("should not bhave items")
+		panic("should not have items")
 	})
 
 	mockPoolInfo := vaulttypes.PoolInfo{BlockHeight: "10", CreatePool: &vaulttypes.PoolProposal{PoolPubKey: accs[1].pk, PoolAddr: accs[1].oppyAddr}}
@@ -610,6 +632,63 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	})
 
 	// we should have native and erc20 token request in retry request
-	expected := []sdk.Coin{{"testToken", sdk.NewInt(10)}, {"abnb", sdk.NewInt(101)}}
+	expected := []sdk.Coin{{Denom: "testtoken", Amount: sdk.NewInt(10)}, {Denom: "abnb", Amount: sdk.NewInt(101)}}
 	assert.True(t, storedToken.IsEqual(expected))
+}
+func TestProcessERC20InBoundOnBSC(t *testing.T) {
+	misc.SetupBech32Prefix()
+	websocketTest := "ws://rpc.test.oppy.zone:8456"
+	acc, err := generateRandomPrivKey(3)
+	assert.Nil(t, err)
+	tssServer := TssMock{acc[0].sk}
+	tl, err := createMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
+	assert.Nil(t, err)
+	pi, err := NewChainInstance(websocketTest, &tssServer, tl)
+	assert.Nil(t, err)
+
+	txid := common.HexToHash("0xec80b9209979cb24c7d41fa6165082c67c587d648fd2ad8165175d0ed86a3281")
+	tx, _, err := pi.EthClient.TransactionByHash(context.Background(), txid)
+	assert.Nil(t, err)
+
+	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
+	assert.Nil(t, err)
+	pi.tokenAbi = &tAbi
+	txInfo, err := pi.checkErc20(tx.Data(), tx.To().Hex())
+	assert.Nil(t, err)
+	assert.Equal(t, txInfo.fromAddr.String(), "oppy12gflne2dadajtzn5h7x8z4udfpd7f22dvly0zg")
+}
+
+func TestProcessNativeInBoundOnBSC(t *testing.T) {
+	misc.SetupBech32Prefix()
+	websocketTest := "ws://rpc.test.oppy.zone:8456"
+	acc, err := generateRandomPrivKey(3)
+	assert.Nil(t, err)
+	tssServer := TssMock{acc[0].sk}
+	tl, err := createMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
+	assert.Nil(t, err)
+	pi, err := NewChainInstance(websocketTest, &tssServer, tl)
+
+	poolInfo := common2.PoolInfo{
+		EthAddress: common.HexToAddress("0x1f65cc33558b6825db119e9fe4c73b436211667e"),
+	}
+
+	pi.lastTwoPools = []*common2.PoolInfo{&poolInfo, &poolInfo}
+	assert.Nil(t, err)
+
+	b, err := pi.EthClient.BlockByNumber(context.Background(), big.NewInt(20989266))
+	assert.Nil(t, err)
+
+	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
+	assert.Nil(t, err)
+	pi.tokenAbi = &tAbi
+	pi.processEachBlock(b, 101)
+
+	pi.RetryInboundReq.Range(func(key, value any) bool {
+		item := value.(*common2.InBoundReq)
+		assert.Equal(t, item.Coin.Denom, "abnb")
+		assert.Equal(t, item.Coin.Amount.String(), "1234567890000000")
+		assert.Equal(t, common.BytesToHash(item.TxID).String(), "0xfe172d0a5c4344a31cab330163861c8fbd257fdb5ff31759abb52e63043ef396")
+		assert.Equal(t, item.Address.String(), "oppy12gflne2dadajtzn5h7x8z4udfpd7f22dvly0zg")
+		return true
+	})
 }

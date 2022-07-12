@@ -26,16 +26,17 @@ import (
 )
 
 const (
-	inboundprosSize   = 512
-	sbchannelsize     = 20000
-	chainQueryTimeout = time.Second * 15
-	GasLimit          = 2100000
-	GasPrice          = "0.00000001"
-	ROUNDBLOCK        = 50
-	submitBackoff     = time.Second * 4
-	GroupBlockGap     = 8
-	GroupSign         = 4
-	PRICEUPDATEGAP    = 10
+	inboundprosSize     = 512
+	sbchannelsize       = 20000
+	chainQueryTimeout   = time.Second * 15
+	GasLimit            = 2100000
+	GasPrice            = "0.00000001"
+	ROUNDBLOCK          = 50
+	submitBackoff       = time.Second * 4
+	GroupBlockGap       = 8
+	GroupSign           = 4
+	PRICEUPDATEGAP      = 10
+	OppyContractAddress = "0x94277968dff216265313657425d9d7577ad32dd1"
 )
 
 type InboundTx struct {
@@ -43,6 +44,13 @@ type InboundTx struct {
 	Address        sdk.AccAddress `json:"address"`
 	PubBlockHeight uint64         `json:"pub_block_height"` // this variable is used to delete the expired tx
 	Token          sdk.Coin       `json:"token"`
+}
+
+type Erc20TxInfo struct {
+	fromAddr     sdk.AccAddress // address that we should send token to
+	toAddr       common.Address // address to the pool
+	Amount       *big.Int       // the amount of the token that cross the bridge
+	tokenAddress common.Address // the erc20 contract address (we need to ensure the token address is 100% correct)
 }
 
 type InboundTxBnb struct {
@@ -87,7 +95,7 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.T
 		return nil, err
 	}
 
-	tAbi, err := abi.JSON(strings.NewReader(generated.TokenMetaData.ABI))
+	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
 	if err != nil {
 		return nil, fmt.Errorf("fail to get the tokenABI with err %v", err)
 	}

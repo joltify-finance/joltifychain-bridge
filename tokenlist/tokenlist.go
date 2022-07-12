@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"strings"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -56,8 +57,9 @@ func NewTokenList(filePath string, updateGap int64) (*TokenList, error) {
 
 	// load token list
 	for tokenAddr, tokenDenom := range result {
-		tl.pubTokenList.Store(tokenAddr, tokenDenom.(string))
-		tl.oppyTokenList.Store(tokenDenom.(string), tokenAddr)
+		tokenDenomD := tokenDenom.(string)
+		tl.pubTokenList.Store(strings.ToLower(tokenAddr), strings.ToLower(tokenDenomD))
+		tl.oppyTokenList.Store(strings.ToLower(tokenDenomD), strings.ToLower(tokenAddr))
 	}
 	tl.logger.Info().Msgf("token list is created from %v", tl.filePath)
 	return tl, nil
@@ -90,9 +92,11 @@ func (tl *TokenList) UpdateTokenList(currentBlockHeight int64) error {
 	// create a new token list
 	newOppyTokenlist := &sync.Map{}
 	newPubTokenlist := &sync.Map{}
+
 	for tokenAddr, tokenDenom := range result {
-		newPubTokenlist.Store(tokenAddr, tokenDenom.(string))
-		newOppyTokenlist.Store(tokenDenom.(string), tokenAddr)
+		tokenDenomD := tokenDenom.(string)
+		newPubTokenlist.Store(strings.ToLower(tokenAddr), strings.ToLower(tokenDenomD))
+		newOppyTokenlist.Store(strings.ToLower(tokenDenomD), strings.ToLower(tokenAddr))
 	}
 
 	// update the token list
@@ -103,22 +107,22 @@ func (tl *TokenList) UpdateTokenList(currentBlockHeight int64) error {
 }
 
 func (tl *TokenList) GetTokenDenom(tokenAddr string) (string, bool) {
-	tokenDenom, exist := tl.pubTokenList.Load(tokenAddr)
+	tokenDenom, exist := tl.pubTokenList.Load(strings.ToLower(tokenAddr))
 	tokenDenomStr, _ := tokenDenom.(string)
-	return tokenDenomStr, exist
+	return strings.ToLower(tokenDenomStr), exist
 }
 
 func (tl *TokenList) GetTokenAddress(tokenDenom string) (string, bool) {
-	tokenAddr, exist := tl.oppyTokenList.Load(tokenDenom)
+	tokenAddr, exist := tl.oppyTokenList.Load(strings.ToLower(tokenDenom))
 	tokenAddrStr, _ := tokenAddr.(string)
-	return tokenAddrStr, exist
+	return strings.ToLower(tokenAddrStr), exist
 }
 
 func (tl *TokenList) GetAllExistedTokenAddresses() []string {
 	tokenInfo := []string{}
 	tl.pubTokenList.Range(func(tokenAddr, tokenDenom interface{}) bool {
 		tokenAddrStr, _ := tokenAddr.(string)
-		tokenInfo = append(tokenInfo, tokenAddrStr)
+		tokenInfo = append(tokenInfo, strings.ToLower(tokenAddrStr))
 		return true
 	})
 	return tokenInfo

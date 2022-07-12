@@ -18,7 +18,7 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
-func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHeight int64, currEthAddr ethcommon.Address, memo OutBoundMemo) error {
+func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
 	addr, tokenExist := oc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
 	if !tokenExist || msg.Amount[0].GetDenom() != config.OutBoundDenomFee {
 		return errors.New("token is not on our token list or not fee demon")
@@ -64,7 +64,7 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHe
 	return nil
 }
 
-func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID string, blockHeight int64, currEthAddr ethcommon.Address, memo OutBoundMemo) error {
+func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID string, blockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
 	addr, tokenExist := oc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
 	if !tokenExist {
 		return errors.New("token is not on our token list")
@@ -89,7 +89,7 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 
 }
 
-func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID string, blockHeight int64, currEthAddr ethcommon.Address, memo OutBoundMemo) error {
+func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID string, blockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
 	// now we search for the index of the outboundemo and the outbounddemofee
 	found := false
 	indexDemo := 0
@@ -130,7 +130,7 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 }
 
 // processMsg handle the oppychain transactions
-func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, memo OutBoundMemo, msg *banktypes.MsgSend, txHash []byte) error {
+func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, memo bcommon.BridgeMemo, msg *banktypes.MsgSend, txHash []byte) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 
 	toAddress, err := types.AccAddressFromBech32(msg.ToAddress)

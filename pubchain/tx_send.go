@@ -88,7 +88,6 @@ func (pi *Instance) SendNativeToken(wg *sync.WaitGroup, signerPk string, sender,
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
 		return common.Hash{}, err
 	}
-	fmt.Printf(">>>>>>>>>>>>>>>>gas price is %v\n", gasPrice.String())
 
 	var data []byte
 	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: gasLimit, To: &receiver, Value: amount, Data: data})

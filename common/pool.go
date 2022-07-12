@@ -41,3 +41,9 @@ type InBoundReq struct {
 	PoolOppyAddress  types.AccAddress `json:"pool_oppy_address"`
 	PoolPk           string           `json:"pool_pk"`
 }
+
+type BridgeMemo struct {
+	Dest     string `json:"dest"`
+	TopupID  string `json:"topup_id"`
+	USerData string `json:"user_data"`
+}

@@ -260,10 +260,8 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	oc.grpcClient = o.network.Validators[0].ClientCtx
 	baseBlockHeight := int64(100)
 	msg := banktypes.MsgSend{}
-	memo := OutBoundMemo{
-		accs[0].commAddr.String(),
-		"",
-		"",
+	memo := common2.BridgeMemo{
+		Dest: accs[0].commAddr.String(),
 	}
 
 	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, memo, &msg, []byte("msg1"))
@@ -399,10 +397,8 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 	blockHeight := 100
 	receiverAddr := accs[0].commAddr
 
-	memo := OutBoundMemo{
-		accs[2].commAddr.String(),
-		"",
-		"",
+	memo := common2.BridgeMemo{
+		Dest: accs[2].commAddr.String(),
 	}
 
 	coin1 := sdk.NewCoin("testToken", sdk.NewInt(100))
@@ -431,10 +427,9 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 	o.Require().Equal(val.(*OutboundTx).OutReceiverAddress.String(), accs[2].commAddr.String())
 	o.Require().True(val.(*OutboundTx).Token.Amount.Equal(coinFee.Amount))
 
-	memo = OutBoundMemo{
-		accs[0].commAddr.String(),
-		txIDNotEnoughFee + "invalid",
-		"",
+	memo = common2.BridgeMemo{
+		Dest:    accs[0].commAddr.String(),
+		TopupID: txIDNotEnoughFee + "invalid",
 	}
 
 	msg.Amount = []sdk.Coin{coin1}
@@ -475,13 +470,12 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 	err = oc.processTopUpRequest(&msg, int64(101), receiverAddr, memo)
 	o.Require().NoError(err)
 
-	val, ok = oc.pendingTx.Load(txIDNotEnoughFee)
+	_, ok = oc.pendingTx.Load(txIDNotEnoughFee)
 	o.Require().False(ok)
 	items := oc.PopItem(1)
 
 	oc.pendingTx.Range(func(key, value any) bool {
 		panic("it should be empty")
-		return true
 	})
 
 	o.Require().Equal(items[0].TxID, txIDNotEnoughFee)
@@ -516,10 +510,8 @@ func (o OutBoundTestSuite) TestProcessNativeToken() {
 	blockHeight := 100
 	receiverAddr := accs[0].commAddr
 
-	memo := OutBoundMemo{
-		accs[2].commAddr.String(),
-		"",
-		"",
+	memo := common2.BridgeMemo{
+		Dest: accs[2].commAddr.String(),
 	}
 
 	coin3 := sdk.NewCoin("invalid", sdk.NewInt(100))
@@ -558,7 +550,6 @@ func (o OutBoundTestSuite) TestProcessNativeToken() {
 	o.Require().Equal(items[0].OutReceiverAddress.String(), accs[2].commAddr.String())
 	o.Require().Equal(items[0].Coin.Denom, "abnb")
 	o.Require().Equal(items[0].Coin.Amount.Int64(), int64(0))
-
 }
 
 func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
@@ -586,10 +577,8 @@ func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
 	blockHeight := 100
 	receiverAddr := accs[0].commAddr
 
-	memo := OutBoundMemo{
-		accs[2].commAddr.String(),
-		"",
-		"",
+	memo := common2.BridgeMemo{
+		Dest: accs[2].commAddr.String(),
 	}
 
 	fee := sdk.NewCoin("abnb", sdk.NewInt(100))
@@ -615,12 +604,11 @@ func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
 		ToAddress:   "testto",
 		Amount:      []sdk.Coin{fee},
 	}
-	memo = OutBoundMemo{
-		"aa",
-		txIDNotEnoughFee,
-		"",
+	memo = common2.BridgeMemo{
+		Dest:    "aa",
+		TopupID: txIDNotEnoughFee,
 	}
-	oc.processTopUpRequest(&msg, int64(101), receiverAddr, memo)
+	err = oc.processTopUpRequest(&msg, int64(101), receiverAddr, memo)
 	o.Require().NoError(err)
 	val, ok = oc.pendingTx.Load(txIDNotEnoughFee)
 	o.Require().True(ok)
@@ -634,10 +622,9 @@ func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
 		ToAddress:   "testto",
 		Amount:      []sdk.Coin{sdk.NewCoin("testToken", sdk.NewInt(100))},
 	}
-	memo = OutBoundMemo{
-		"aa",
-		txIDNotEnoughFee,
-		"",
+	memo = common2.BridgeMemo{
+		Dest:    "aa",
+		TopupID: txIDNotEnoughFee,
 	}
 	err = oc.processTopUpRequest(&msg, int64(101), receiverAddr, memo)
 	o.Require().EqualError(err, "token is not on our token list or not fee demon")
@@ -651,20 +638,18 @@ func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
 		ToAddress:   "testto",
 		Amount:      []sdk.Coin{exactFee},
 	}
-	memo = OutBoundMemo{
-		"aa",
-		txIDNotEnoughFee,
-		"",
+	memo = common2.BridgeMemo{
+		Dest:    "aa",
+		TopupID: txIDNotEnoughFee,
 	}
 	err = oc.processTopUpRequest(&msg, int64(101), receiverAddr, memo)
 	o.Require().NoError(err)
-	val, ok = oc.pendingTx.Load(txIDNotEnoughFee)
+	_, ok = oc.pendingTx.Load(txIDNotEnoughFee)
 	o.Require().False(ok)
 	items := oc.PopItem(1)
 
 	oc.pendingTx.Range(func(key, value any) bool {
 		panic("it should be empty")
-		return true
 	})
 
 	o.Require().Equal(items[0].TxID, txIDNotEnoughFee)

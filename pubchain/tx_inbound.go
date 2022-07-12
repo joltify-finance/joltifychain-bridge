@@ -3,11 +3,13 @@ package pubchain
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
 	"math"
 	"math/big"
+	"strings"
 	"sync"
 
 	"github.com/cenkalti/backoff"
@@ -27,7 +29,7 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
-func (pi *Instance) retrieveAddrfromRawTx(tx *ethTypes.Transaction) (types.AccAddress, error) {
+func (pi *Instance) retrieveAddrfromRawTx(tx *ethTypes.Transaction) (types.AccAddress, error) { //nolint
 	v, r, s := tx.RawSignatureValues()
 	signer := ethTypes.LatestSignerForChainID(tx.ChainId())
 	plainV := misc.RecoverRecID(tx.ChainId().Uint64(), v)
@@ -57,12 +59,8 @@ func (pi *Instance) getBalance(value *big.Int) (types.Coin, error) {
 }
 
 // ProcessInBoundERC20 process the inbound contract token top-up
-func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, tokenAddr, transferTo common.Address, amount *big.Int, blockHeight uint64) error {
-	transferFrom, err := pi.retrieveAddrfromRawTx(tx)
-	if err != nil {
-		return err
-	}
-	err = pi.processInboundTx(tx.Hash().Hex()[2:], blockHeight, transferFrom, transferTo, amount, tokenAddr)
+func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, txInfo *Erc20TxInfo, blockHeight uint64) error {
+	err := pi.processInboundTx(tx.Hash().Hex()[2:], blockHeight, txInfo.fromAddr, txInfo.tokenAddress, txInfo.Amount, txInfo.tokenAddress)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
 		return err
@@ -85,7 +83,7 @@ func (pi *Instance) ProcessNewBlock(number *big.Int, oppyBlockHeight int64) erro
 
 func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
 	// this is repeated check for tokenAddr which is cheked at function 'processEachBlock'
-	tokenDenom, exit := pi.TokenList.GetTokenDenom(addr.Hex())
+	tokenDenom, exit := pi.TokenList.GetTokenDenom(strings.ToLower(addr.Hex()))
 	if !exit {
 		pi.logger.Error().Msgf("Token is not on our token list")
 		return errors.New("token is not on our token list")
@@ -114,29 +112,61 @@ func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types
 	return nil
 }
 
-func (pi *Instance) checkErc20(data []byte) (common.Address, *big.Int, error) {
-	if method, ok := pi.tokenAbi.Methods["transfer"]; ok {
+func (pi *Instance) checkErc20(data []byte, to string) (*Erc20TxInfo, error) {
+	// address toAddress, uint256 amount, address contractAddress, bytes memo
+
+	// check it is from our smart contract
+	if !strings.EqualFold(to, OppyContractAddress) {
+		return nil, errors.New("not our smart contract")
+	}
+
+	if method, ok := pi.tokenAbi.Methods["oppyTransfer"]; ok {
 		if len(data) < 4 {
-			return common.Address{}, nil, errors.New("invalid data")
+			return nil, errors.New("invalid data")
 		}
 		params, err := method.Inputs.Unpack(data[4:])
 		if err != nil {
-			return common.Address{}, nil, err
+			return nil, err
 		}
-		if len(params) != 2 {
-			return common.Address{}, nil, errors.New("invalid transfer parameter")
+		if len(params) != 4 {
+			return nil, errors.New("invalid transfer parameter")
 		}
 		toAddr, ok := params[0].(common.Address)
 		if !ok {
-			return common.Address{}, nil, errors.New("not valid address")
+			return nil, errors.New("not valid address")
 		}
 		amount, ok := params[1].(*big.Int)
 		if !ok {
-			return common.Address{}, nil, errors.New("not valid amount")
+			return nil, errors.New("not valid amount")
 		}
-		return toAddr, amount, nil
+		tokenAddress, ok := params[2].(common.Address)
+		if !ok {
+			return nil, errors.New("not valid address")
+		}
+		memo, ok := params[3].([]byte)
+		if !ok {
+			return nil, errors.New("not valid memo")
+		}
+		var memoInfo bcommon.BridgeMemo
+		err = json.Unmarshal(memo, &memoInfo)
+		if err != nil {
+			return nil, err
+		}
+
+		fromAddr, err := types.AccAddressFromBech32(memoInfo.Dest)
+		if err != nil {
+			return nil, err
+		}
+		ret := Erc20TxInfo{
+			fromAddr:     fromAddr,
+			toAddr:       toAddr,
+			Amount:       amount,
+			tokenAddress: tokenAddress,
+		}
+
+		return &ret, nil
 	}
-	return common.Address{}, nil, errors.New("invalid method for decode")
+	return nil, errors.New("invalid method for decode")
 }
 
 func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int64) {
@@ -149,19 +179,19 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 			continue
 		}
 
-		toAddr, amount, err := pi.checkErc20(tx.Data())
+		txInfo, err := pi.checkErc20(tx.Data(), tx.To().Hex())
 		if err == nil {
-			_, exit := pi.TokenList.GetTokenDenom(tx.To().Hex())
+			_, exit := pi.TokenList.GetTokenDenom(txInfo.tokenAddress.String())
 			if !exit {
 				// this indicates it is not to our smart contract
 				continue
 			}
 			// process the public chain inbound message to the channel
-			if !pi.checkToBridge(toAddr) {
+			if !pi.checkToBridge(txInfo.toAddr) {
 				pi.logger.Warn().Msg("the top up message is not to the bridge, ignored")
 				continue
 			}
-			err := pi.ProcessInBoundERC20(tx, *tx.To(), toAddr, amount, block.NumberU64())
+			err := pi.ProcessInBoundERC20(tx, txInfo, block.NumberU64())
 			if err != nil {
 				zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
 				continue
@@ -169,23 +199,27 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 			continue
 		}
 		if pi.checkToBridge(*tx.To()) {
-			if tx.Data() == nil {
-				pi.logger.Warn().Msgf("we have received unknown fund")
+			var memoInfo bcommon.BridgeMemo
+			err = json.Unmarshal(tx.Data(), &memoInfo)
+			if err != nil {
+				pi.logger.Error().Err(err).Msgf("fail to unmarshal the memo")
 				continue
 			}
+
+			fromAddr, err := types.AccAddressFromBech32(memoInfo.Dest)
+			if err != nil {
+				pi.logger.Error().Err(err).Msgf("fail to the acc address")
+				continue
+			}
+
 			// this indicates it is a native bnb transfer
 			balance, err := pi.getBalance(tx.Value())
 			if err != nil {
 				continue
 			}
 
-			accountAddress, err := pi.retrieveAddrfromRawTx(tx)
-			if err != nil {
-				continue
-			}
-
 			roundBlockHeight := oppyBlockHeight / ROUNDBLOCK
-			item := bcommon.NewAccountInboundReq(accountAddress, *tx.To(), balance, tx.Hash().Bytes(), oppyBlockHeight, roundBlockHeight)
+			item := bcommon.NewAccountInboundReq(fromAddr, *tx.To(), balance, tx.Hash().Bytes(), oppyBlockHeight, roundBlockHeight)
 			// we add to the retry pool to  sort the tx
 			pi.AddItem(&item)
 		}

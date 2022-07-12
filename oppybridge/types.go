@@ -38,12 +38,6 @@ type tssPoolMsg struct {
 	blockHeight int64
 }
 
-type OutBoundMemo struct {
-	Dest     string `json:"dst"`
-	TopupID  string `json:"topup_id"`
-	USerData string `json:"user_data"`
-}
-
 // OppyChainInstance defines the types for oppy pub_chain side
 type OppyChainInstance struct {
 	grpcClient       grpc1.ClientConn

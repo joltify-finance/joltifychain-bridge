@@ -466,13 +466,8 @@ func (oc *OppyChainInstance) CheckOutBoundTx(blockHeight int64, rawTx tendertype
 	defer cancel()
 	memo := txWithMemo.GetMemo()
 
-	dat, err := hex.DecodeString(memo)
-	if err != nil {
-		oc.logger.Error().Err(err).Msgf("fail to decode hex memo with %v", memo)
-		return
-	}
-	var txMemo OutBoundMemo
-	err = json.Unmarshal(dat, &txMemo)
+	var txMemo bcommon.BridgeMemo
+	err = json.Unmarshal([]byte(memo), &txMemo)
 	if err != nil {
 		oc.logger.Error().Err(err).Msgf("fail to parse the memo with %v", memo)
 		return

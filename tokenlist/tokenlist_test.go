@@ -3,6 +3,7 @@ package tokenlist
 import (
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"gotest.tools/assert"
@@ -47,10 +48,10 @@ func TestNewTokenList(t *testing.T) {
 	var tokenDenom string
 	tokenAddr, exit = tl.GetTokenAddress("JUSD")
 	assert.Equal(t, exit, true)
-	assert.Equal(t, tokenAddr, "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79")
+	assert.Equal(t, tokenAddr, strings.ToLower("0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"))
 	tokenAddr, exit = tl.GetTokenAddress("JoltBNB")
 	assert.Equal(t, exit, true)
-	assert.Equal(t, tokenAddr, "0x15fb343d82cD1C22542261dF408dA8396A829F6B")
+	assert.Equal(t, tokenAddr, strings.ToLower("0x15fb343d82cD1C22542261dF408dA8396A829F6B"))
 	tokenAddr, exit = tl.GetTokenAddress("nonExistedDenom")
 	assert.Equal(t, exit, false)
 	assert.Equal(t, tokenAddr, "")
@@ -58,10 +59,10 @@ func TestNewTokenList(t *testing.T) {
 	// check tl.PubTokenlist
 	tokenDenom, exit = tl.GetTokenDenom("0xeB42ff4cA651c91EB248f8923358b6144c6B4b79")
 	assert.Equal(t, exit, true)
-	assert.Equal(t, tokenDenom, "JUSD")
+	assert.Equal(t, tokenDenom, strings.ToLower("JUSD"))
 	tokenDenom, exit = tl.GetTokenDenom("0x15fb343d82cD1C22542261dF408dA8396A829F6B")
 	assert.Equal(t, exit, true)
-	assert.Equal(t, tokenDenom, "JoltBNB")
+	assert.Equal(t, tokenDenom, strings.ToLower("JoltBNB"))
 	tokenDenom, exit = tl.GetTokenDenom("nonExistedAddress")
 	assert.Equal(t, exit, false)
 	assert.Equal(t, tokenDenom, "")
@@ -104,20 +105,20 @@ func TestUpdateTokenList(t *testing.T) {
 	assert.Equal(t, exit, false)
 	tokenAddr, exit = tl.GetTokenAddress("JoltBNB")
 	assert.Equal(t, exit, true)
-	assert.Equal(t, tokenAddr, "0x15fb343d82cD1C22542261dF408dA8396A829F6B")
+	assert.Equal(t, tokenAddr, strings.ToLower("0x15fb343d82cD1C22542261dF408dA8396A829F6B"))
 	tokenAddr, exit = tl.GetTokenAddress("testUpdateDenom")
 	assert.Equal(t, exit, true)
-	assert.Equal(t, tokenAddr, "testUpdateAddress")
+	assert.Equal(t, tokenAddr, strings.ToLower("testUpdateAddress"))
 
 	// check tl.PubTokenlist
 	_, exit = tl.pubTokenList.Load("0xeB42ff4cA651c91EB248f8923358b6144c6B4b79")
 	assert.Equal(t, exit, false)
 	tokenDenom, exit = tl.GetTokenDenom("0x15fb343d82cD1C22542261dF408dA8396A829F6B")
 	assert.Equal(t, exit, true)
-	assert.Equal(t, tokenDenom, "JoltBNB")
+	assert.Equal(t, tokenDenom, strings.ToLower("JoltBNB"))
 	tokenDenom, exit = tl.GetTokenDenom("testUpdateAddress")
 	assert.Equal(t, exit, true)
-	assert.Equal(t, tokenDenom, "testUpdateDenom")
+	assert.Equal(t, tokenDenom, strings.ToLower("testUpdateDenom"))
 }
 
 func TestTokenListAccess(t *testing.T) {
@@ -129,11 +130,11 @@ func TestTokenListAccess(t *testing.T) {
 
 	tokenAddr, exist := tl.GetTokenAddress("JUSD")
 	assert.Equal(t, exist, true)
-	assert.Equal(t, tokenAddr, "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79")
+	assert.Equal(t, tokenAddr, strings.ToLower("0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"))
 
 	tokenAddr, exist = tl.GetTokenAddress("JoltBNB")
 	assert.Equal(t, exist, true)
-	assert.Equal(t, tokenAddr, "0x15fb343d82cD1C22542261dF408dA8396A829F6B")
+	assert.Equal(t, tokenAddr, strings.ToLower("0x15fb343d82cD1C22542261dF408dA8396A829F6B"))
 
 	tokenAddr, exist = tl.GetTokenAddress("nonExistedDenom")
 	assert.Equal(t, exist, false)
@@ -141,11 +142,11 @@ func TestTokenListAccess(t *testing.T) {
 
 	tokenDenom, exist := tl.GetTokenDenom("0xeB42ff4cA651c91EB248f8923358b6144c6B4b79")
 	assert.Equal(t, exist, true)
-	assert.Equal(t, tokenDenom, "JUSD")
+	assert.Equal(t, tokenDenom, strings.ToLower("JUSD"))
 
 	tokenDenom, exist = tl.GetTokenDenom("0x15fb343d82cD1C22542261dF408dA8396A829F6B")
 	assert.Equal(t, exist, true)
-	assert.Equal(t, tokenDenom, "JoltBNB")
+	assert.Equal(t, tokenDenom, strings.ToLower("JoltBNB"))
 
 	tokenDenom, exist = tl.GetTokenDenom("nonExistedAddress")
 	assert.Equal(t, exist, false)
@@ -160,11 +161,11 @@ func TestGetAllExistedTokenAddresses(t *testing.T) {
 	tokenAddresses := tl.GetAllExistedTokenAddresses()
 	count := 0
 	for _, tokenAddr := range tokenAddresses {
-		if tokenAddr == "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79" {
-			count += 1
+		if strings.EqualFold(tokenAddr, "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79") {
+			count++
 		}
-		if tokenAddr == "0x15fb343d82cD1C22542261dF408dA8396A829F6B" {
-			count += 1
+		if strings.EqualFold(tokenAddr, "0x15fb343d82cD1C22542261dF408dA8396A829F6B") {
+			count++
 		}
 	}
 	assert.Equal(t, count, 2)
