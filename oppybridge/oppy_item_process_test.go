@@ -1,6 +1,7 @@
 package oppybridge
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -28,7 +29,7 @@ func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewOutboundReq(txid, addr, addr, testCoin, "testAddr", int64(i), int64(i))
+		item := common.NewOutboundReq(hex.EncodeToString([]byte(txid)), addr, addr, testCoin, "testAddr", int64(i), int64(i))
 		retReq[i] = &item
 	}
 	return retReq

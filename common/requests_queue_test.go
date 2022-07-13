@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -23,7 +24,7 @@ func createdTestOutBoundReqs(n int) []*OutBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := NewOutboundReq(txid, addr, addr, testCoin, addr.Hex(), int64(i), int64(i))
+		item := NewOutboundReq(hex.EncodeToString([]byte(txid)), addr, addr, testCoin, addr.Hex(), int64(i), int64(i))
 		retReq[i] = &item
 	}
 	return retReq

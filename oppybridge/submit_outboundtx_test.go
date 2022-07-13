@@ -2,6 +2,7 @@ package oppybridge
 
 import (
 	"context"
+	"encoding/hex"
 	"testing"
 	"time"
 
@@ -143,12 +144,12 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	s.Require().True(ret)
 
 	req := common.OutBoundReq{
-		TxID:               "testreq",
+		TxID:               hex.EncodeToString([]byte("testreq")),
 		OutReceiverAddress: accs[0].commAddr,
 		OriginalHeight:     5,
 	}
 	s.Require().NoError(err)
-	err = oc.SubmitOutboundTx(info, req.Hash().Hex(), 10, "testpubtx")
+	err = oc.SubmitOutboundTx(info, req.Hash().Hex(), 10, hex.EncodeToString([]byte("testpubtx")))
 	s.Require().NoError(err)
 	_, err = oc.GetPubChainSubmittedTx(req)
 	s.Require().NoError(err)

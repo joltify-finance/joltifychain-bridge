@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/hex"
 	"math/big"
 	"strconv"
 
@@ -10,7 +11,11 @@ import (
 )
 
 func (i *OutBoundReq) Hash() common.Hash {
-	hash := crypto.Keccak256Hash(i.OutReceiverAddress.Bytes(), []byte(i.TxID))
+	data, err := hex.DecodeString(i.TxID)
+	if err != nil {
+		panic(err)
+	}
+	hash := crypto.Keccak256Hash(i.OutReceiverAddress.Bytes(), data)
 	return hash
 }
 
@@ -30,7 +35,11 @@ func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin type
 
 // Index generate the index of a given inbound req
 func (i *OutBoundReq) Index() *big.Int {
-	hash := crypto.Keccak256Hash(i.OutReceiverAddress.Bytes(), []byte(i.TxID))
+	data, err := hex.DecodeString(i.TxID)
+	if err != nil {
+		panic(err)
+	}
+	hash := crypto.Keccak256Hash(i.OutReceiverAddress.Bytes(), data)
 	lower := hash.Big().String()
 	higher := strconv.FormatInt(i.OriginalHeight, 10)
 	indexStr := higher + lower

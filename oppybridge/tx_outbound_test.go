@@ -393,7 +393,7 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 	}()
 
 	msg := banktypes.MsgSend{}
-	txID := "testTxID"
+	txID := hex.EncodeToString([]byte("testTxID"))
 	blockHeight := 100
 	receiverAddr := accs[0].commAddr
 
@@ -413,7 +413,7 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 	err = oc.processErc20Request(&msg, txID, int64(blockHeight), receiverAddr, memo)
 	o.Require().EqualError(err, "invalid fee pair")
 
-	txIDNotEnoughFee := "txnotenoughfee"
+	txIDNotEnoughFee := hex.EncodeToString([]byte("txnotenoughfee"))
 	msg.Amount = sdk.Coins{coin1, coinFee}
 	err = oc.processErc20Request(&msg, txIDNotEnoughFee, int64(blockHeight), receiverAddr, memo)
 	o.Require().NoError(err)
@@ -506,7 +506,7 @@ func (o OutBoundTestSuite) TestProcessNativeToken() {
 	}()
 
 	msg := banktypes.MsgSend{}
-	txID := "testTxID"
+	txID := hex.EncodeToString([]byte("testTxID"))
 	blockHeight := 100
 	receiverAddr := accs[0].commAddr
 
@@ -573,7 +573,7 @@ func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
 	}()
 
 	msg := banktypes.MsgSend{}
-	txIDNotEnoughFee := "testTxID"
+	txIDNotEnoughFee := hex.EncodeToString([]byte("testTxID"))
 	blockHeight := 100
 	receiverAddr := accs[0].commAddr
 
