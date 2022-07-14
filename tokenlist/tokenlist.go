@@ -125,9 +125,9 @@ func (tl *TokenList) GetTokenInfoByAddress(addr string) (TokenItem, bool) {
 
 func (tl *TokenList) GetAllExistedTokenAddresses() []string {
 	var tokenAddresses []string
-	tl.pubTokenList.Range(func(tokenAddr, tokenDenom interface{}) bool {
-		item, _ := tokenAddr.(TokenItem)
-		tokenAddresses = append(tokenAddresses, strings.ToLower(item.TokenAddr))
+	tl.pubTokenList.Range(func(tokenAddr, _ interface{}) bool {
+		item, _ := tokenAddr.(string)
+		tokenAddresses = append(tokenAddresses, strings.ToLower(item))
 		return true
 	})
 	return tokenAddresses
