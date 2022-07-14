@@ -16,6 +16,7 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"gitlab.com/oppy-finance/oppychain/testutil/network"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
@@ -104,7 +105,7 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	m.Require().NoError(err)
 	oc, err := NewOppyBridge(m.network.Validators[0].RPCAddress, m.network.Validators[0].RPCAddress, &tss, tl)
 	m.Require().NoError(err)

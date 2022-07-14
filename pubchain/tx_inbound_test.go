@@ -44,41 +44,6 @@ type account struct {
 	commAddr common.Address
 }
 
-type MockTokenList struct {
-	oppyTokenList *sync.Map
-	pubTokenList  *sync.Map
-}
-
-func (mt *MockTokenList) GetTokenDenom(tokenAddr string) (string, bool) {
-	tokenDenom, exist := mt.pubTokenList.Load(strings.ToLower(tokenAddr))
-	tokenDenomStr, _ := tokenDenom.(string)
-	return strings.ToLower(tokenDenomStr), exist
-}
-func (mt *MockTokenList) GetTokenAddress(tokenDenom string) (string, bool) {
-	tokenAddr, exist := mt.oppyTokenList.Load(tokenDenom)
-	tokenAddrStr, _ := tokenAddr.(string)
-	return strings.ToLower(tokenAddrStr), exist
-}
-
-func (mt *MockTokenList) GetAllExistedTokenAddresses() []string {
-	tokenInfo := []string{}
-	mt.pubTokenList.Range(func(tokenAddr, tokenDenom interface{}) bool {
-		tokenAddrStr, _ := tokenAddr.(string)
-		tokenInfo = append(tokenInfo, strings.ToLower(tokenAddrStr))
-		return true
-	})
-	return tokenInfo
-}
-
-func createMockTokenlist(tokenAddr []string, tokenDenom []string) (tokenlist.TokenListI, error) {
-	mTokenList := MockTokenList{&sync.Map{}, &sync.Map{}}
-	for i, el := range tokenAddr {
-		mTokenList.oppyTokenList.Store(strings.ToLower(tokenDenom[i]), strings.ToLower(el))
-		mTokenList.pubTokenList.Store(strings.ToLower(el), strings.ToLower(tokenDenom[i]))
-	}
-	return &mTokenList, nil
-}
-
 func TestUpdatePoolAndGetPool(t *testing.T) {
 	accs, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
@@ -191,7 +156,7 @@ func TestProcessInBound(t *testing.T) {
 	acc, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 	tssServer := TssMock{acc[0].sk}
-	tl, err := createMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
 	assert.Nil(t, err)
 	pi, err := NewChainInstance(websocketTest, &tssServer, tl)
 	assert.Nil(t, err)
@@ -226,7 +191,7 @@ func TestProcessInBound(t *testing.T) {
 
 	ExistedTokenAddrStr := "0x15fb343d82cD1C22542261dF408dA8396A829F6B"
 	ExistedTokenAddr := common.HexToAddress(ExistedTokenAddrStr)
-	pi.TokenList, err = createMockTokenlist([]string{ExistedTokenAddrStr}, []string{"testDenom"})
+	pi.TokenList, err = tokenlist.CreateMockTokenlist([]string{ExistedTokenAddrStr}, []string{"testDenom"})
 	assert.Nil(t, err)
 
 	erc20Tx.tokenAddress = ExistedTokenAddr
@@ -323,7 +288,7 @@ func newTestBackend(t *testing.T, txs []*ethTypes.Transaction) (*node.Node, []*e
 }
 
 func TestProcessEachBlock(t *testing.T) {
-	tl, err := createMockTokenlist([]string{"testJUSDAddr"}, []string{"JUSD"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testJUSDAddr"}, []string{"JUSD"})
 	assert.Nil(t, err)
 	misc.SetupBech32Prefix()
 	accs, err := generateRandomPrivKey(2)
@@ -456,13 +421,13 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	assert.Nil(t, err)
 	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
 	assert.Nil(t, err)
-	tl, err := createMockTokenlist([]string{accs[0].commAddr.String()}, []string{"abnb"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{accs[0].commAddr.String()}, []string{"abnb"})
 	assert.Nil(t, err)
 
-	tl2, err := createMockTokenlist([]string{accs[4].commAddr.String()}, []string{"testtoken"})
+	tl2, err := tokenlist.CreateMockTokenlist([]string{accs[4].commAddr.String()}, []string{"testtoken"})
 	assert.Nil(t, err)
 
-	tl3, err := createMockTokenlist([]string{"native"}, []string{"abnb"})
+	tl3, err := tokenlist.CreateMockTokenlist([]string{"native"}, []string{"abnb"})
 	assert.Nil(t, err)
 	pi := Instance{
 		ethClientLocker: &sync.RWMutex{},
@@ -641,7 +606,7 @@ func TestProcessERC20InBoundOnBSC(t *testing.T) {
 	acc, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 	tssServer := TssMock{acc[0].sk}
-	tl, err := createMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
 	assert.Nil(t, err)
 	pi, err := NewChainInstance(websocketTest, &tssServer, tl)
 	assert.Nil(t, err)
@@ -664,7 +629,7 @@ func TestProcessNativeInBoundOnBSC(t *testing.T) {
 	acc, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 	tssServer := TssMock{acc[0].sk}
-	tl, err := createMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"native"}, []string{"abnb"})
 	assert.Nil(t, err)
 	pi, err := NewChainInstance(websocketTest, &tssServer, tl)
 

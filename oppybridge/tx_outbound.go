@@ -13,23 +13,14 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
-func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
-	addr, tokenExist := oc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
-	if !tokenExist || msg.Amount[0].GetDenom() != config.OutBoundDenomFee {
-		return errors.New("token is not on our token list or not fee demon")
-	}
-	tokenAddr := addr
-
-	dat, ok := oc.pendingTx.LoadAndDelete(memo.TopupID)
-	if !ok {
-		return fmt.Errorf("saved tx not found invalid top up message %v", memo)
-	}
-
+func (oc *OppyChainInstance) calculateGas() sdk.Coin {
 	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
 	if !ok {
 		panic("fail to load the gas wanted")
@@ -37,7 +28,21 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHe
 	price := oc.GetPubChainGasPrice()
 	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
 	expectedFee := types.NewCoin(config.OutBoundDenomFee, types.NewIntFromBigInt(expectedFeeAmount))
+	return expectedFee
+}
 
+func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
+	tokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenom(msg.Amount[0].GetDenom())
+	if !tokenExist || msg.Amount[0].GetDenom() != config.OutBoundDenomFee {
+		return errors.New("token is not on our token list or not fee demon")
+	}
+	tokenAddr := tokenItem.TokenAddr
+
+	dat, ok := oc.pendingTx.LoadAndDelete(memo.TopupID)
+	if !ok {
+		return fmt.Errorf("saved tx not found invalid top up message %v", memo)
+	}
+	expectedFee := oc.calculateGas()
 	savedTx := dat.(*OutboundTx)
 
 	if savedTx.TokenAddr == config.NativeSign {
@@ -58,6 +63,15 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHe
 		}
 	}
 	roundBlockHeight := blockHeight / ROUNDBLOCK
+
+	// we need to adjust the decimal as some token may not have 18 decimals
+	// in oppy, we apply 18 decimal
+	delta := sdk.Precision - tokenItem.Decimals
+	if delta != 0 {
+		adjustedTokenAmount := bcommon.AdjustInt(savedTx.Token.Amount, int64(delta))
+		savedTx.Token.Amount = adjustedTokenAmount
+	}
+
 	itemReq := bcommon.NewOutboundReq(memo.TopupID, savedTx.OutReceiverAddress, currEthAddr, savedTx.Token, tokenAddr, blockHeight, roundBlockHeight)
 	oc.AddItem(&itemReq)
 	oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, oc.CurrentHeight)
@@ -65,20 +79,25 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHe
 }
 
 func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID string, blockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
-	addr, tokenExist := oc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
+	TokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenom(msg.Amount[0].GetDenom())
 	if !tokenExist {
 		return errors.New("token is not on our token list")
 	}
 	tokenDenom := msg.Amount[0].GetDenom()
-	tokenAddr := addr
+	tokenAddr := TokenItem.TokenAddr
 
-	if addr != config.NativeSign {
+	if tokenAddr != config.NativeSign {
 		return errors.New("not a native token")
 	}
 
-	item := oc.processNativeFee(txID, blockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[0].Amount)
+	item := oc.processNativeFee(txID, tokenAddr, blockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[0].Amount)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
+		delta := sdk.Precision - TokenItem.Decimals
+		if delta != 0 {
+			adjustedTokenAmount := bcommon.AdjustInt(item.Token.Amount, int64(delta))
+			item.Token.Amount = adjustedTokenAmount
+		}
 		roundBlockHeight := blockHeight / ROUNDBLOCK
 		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, blockHeight, roundBlockHeight)
 		oc.AddItem(&itemReq)
@@ -96,19 +115,19 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 	indexDemoFee := 0
 	tokenDenom := ""
 	tokenAddr := ""
-	addr, tokenExist := oc.TokenList.GetTokenAddress(msg.Amount[0].GetDenom())
+	tokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenom(msg.Amount[0].GetDenom())
 	if tokenExist && msg.Amount[1].GetDenom() == config.OutBoundDenomFee {
 		tokenDenom = msg.Amount[0].GetDenom()
-		tokenAddr = addr
+		tokenAddr = tokenItem.TokenAddr
 		indexDemo = 0
 		indexDemoFee = 1
 		found = true
 	}
 
-	addr, tokenExist = oc.TokenList.GetTokenAddress(msg.Amount[1].GetDenom())
+	tokenItem, tokenExist = oc.TokenList.GetTokenInfoByDenom(msg.Amount[1].GetDenom())
 	if tokenExist && msg.Amount[0].GetDenom() == config.OutBoundDenomFee {
 		tokenDenom = msg.Amount[1].GetDenom()
-		tokenAddr = addr
+		tokenAddr = tokenItem.TokenAddr
 		indexDemo = 1
 		indexDemoFee = 0
 		found = true
@@ -117,9 +136,14 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 		return errors.New("invalid fee pair")
 	}
 
-	item := oc.processErc20DemonAndFee(txID, blockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
+	item := oc.processErc20DemonAndFee(txID, tokenAddr, blockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
+		delta := sdk.Precision - tokenItem.Decimals
+		if delta != 0 {
+			adjustedTokenAmount := bcommon.AdjustInt(item.Token.Amount, int64(delta))
+			item.Token.Amount = adjustedTokenAmount
+		}
 		roundBlockHeight := blockHeight / ROUNDBLOCK
 		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, blockHeight, roundBlockHeight)
 		oc.AddItem(&itemReq)
@@ -173,21 +197,8 @@ func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAd
 	}
 }
 
-func (oc *OppyChainInstance) processNativeFee(txID string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount types.Int) *OutboundTx {
-	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
-	if !ok {
-		panic("fail to load the gas wanted")
-	}
-
-	price := oc.GetPubChainGasPrice()
-	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
-	expectedFee := types.NewCoin(config.OutBoundDenomFee, types.NewIntFromBigInt(expectedFeeAmount))
-
-	tokenAddr, exit := oc.TokenList.GetTokenAddress(demonName)
-	if !exit {
-		oc.logger.Error().Msgf("The token is not existed in the white list")
-		return nil
-	}
+func (oc *OppyChainInstance) processNativeFee(txID string, tokenAddr string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount types.Int) *OutboundTx {
+	expectedFee := oc.calculateGas()
 
 	token := types.Coin{
 		Denom:  demonName,
@@ -212,13 +223,12 @@ func (oc *OppyChainInstance) processNativeFee(txID string, blockHeight int64, re
 	}
 
 	tx.Token = tx.Token.SubAmount(expectedFee.Amount)
-
 	oc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.Token.String())
 	return &tx
 
 }
 
-func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount, feeAmount types.Int) *OutboundTx {
+func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, tokenAddr string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount, feeAmount types.Int) *OutboundTx {
 	token := types.Coin{
 		Denom:  demonName,
 		Amount: demonAmount,
@@ -227,11 +237,7 @@ func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, blockHeight in
 		Denom:  config.OutBoundDenomFee,
 		Amount: feeAmount,
 	}
-	tokenAddr, exit := oc.TokenList.GetTokenAddress(demonName)
-	if !exit {
-		oc.logger.Error().Msgf("The token is not existed in the white list")
-		return nil
-	}
+
 	tx := OutboundTx{
 		receiverAddr,
 		uint64(blockHeight),
@@ -240,15 +246,8 @@ func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, blockHeight in
 		fee,
 		txID,
 	}
-	price := oc.GetPubChainGasPrice()
 
-	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
-	if !ok {
-		panic("fail to load the gas wanted")
-	}
-	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
-	expectedFee := types.NewCoin(config.OutBoundDenomFee, types.NewIntFromBigInt(expectedFeeAmount))
-
+	expectedFee := oc.calculateGas()
 	if !fee.IsGTE(expectedFee) {
 		oc.logger.Error().Msgf("the transaction is invalid,as fee we want is %v, and you have paid %v", expectedFee.String(), fee.String())
 		oc.pendingTx.Store(txID, &tx)

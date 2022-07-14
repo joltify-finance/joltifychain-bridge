@@ -83,14 +83,14 @@ func (pi *Instance) ProcessNewBlock(number *big.Int, oppyBlockHeight int64) erro
 
 func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
 	// this is repeated check for tokenAddr which is cheked at function 'processEachBlock'
-	tokenDenom, exit := pi.TokenList.GetTokenDenom(strings.ToLower(addr.Hex()))
+	tokenItem, exit := pi.TokenList.GetTokenInfoByAddress(strings.ToLower(addr.Hex()))
 	if !exit {
 		pi.logger.Error().Msgf("Token is not on our token list")
 		return errors.New("token is not on our token list")
 	}
 
 	token := types.Coin{
-		Denom:  tokenDenom,
+		Denom:  tokenItem.Denom,
 		Amount: types.NewIntFromBigInt(value),
 	}
 
@@ -106,6 +106,13 @@ func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types
 		pi.logger.Warn().Msgf("invalid tx ID %v\n", txIDBytes)
 		return nil
 	}
+
+	delta := types.Precision - tokenItem.Decimals
+	if delta != 0 {
+		adjustedTokenAmount := bcommon.AdjustInt(tx.Token.Amount, int64(delta))
+		tx.Token.Amount = adjustedTokenAmount
+	}
+
 	roundBlockHeight := blockHeight / ROUNDBLOCK
 	item := bcommon.NewAccountInboundReq(tx.Address, to, tx.Token, txIDBytes, int64(blockHeight), int64(roundBlockHeight))
 	pi.AddItem(&item)
@@ -181,7 +188,7 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 
 		txInfo, err := pi.checkErc20(tx.Data(), tx.To().Hex())
 		if err == nil {
-			_, exit := pi.TokenList.GetTokenDenom(txInfo.tokenAddress.String())
+			tokenItem, exit := pi.TokenList.GetTokenInfoByAddress(txInfo.tokenAddress.String())
 			if !exit {
 				// this indicates it is not to our smart contract
 				continue
@@ -191,6 +198,13 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 				pi.logger.Warn().Msg("the top up message is not to the bridge, ignored")
 				continue
 			}
+
+			delta := types.Precision - tokenItem.Decimals
+			if delta != 0 {
+				adjustedTokenAmount := bcommon.AdjustInt(types.NewIntFromBigInt(txInfo.Amount), int64(delta))
+				txInfo.Amount = adjustedTokenAmount.BigInt()
+			}
+
 			err := pi.ProcessInBoundERC20(tx, txInfo, block.NumberU64())
 			if err != nil {
 				zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
@@ -216,6 +230,15 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 			balance, err := pi.getBalance(tx.Value())
 			if err != nil {
 				continue
+			}
+			tokenItem, exist := pi.TokenList.GetTokenInfoByAddress("native")
+			if !exist {
+				panic("native token is not set")
+			}
+			delta := types.Precision - tokenItem.Decimals
+			if delta != 0 {
+				adjustedTokenAmount := bcommon.AdjustInt(balance.Amount, int64(delta))
+				balance.Amount = adjustedTokenAmount
 			}
 
 			roundBlockHeight := oppyBlockHeight / ROUNDBLOCK

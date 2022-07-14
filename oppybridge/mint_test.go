@@ -8,6 +8,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -184,7 +185,7 @@ func (m MintTestSuite) TestProcessInbound() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	m.Require().NoError(err)
 	oc, err := NewOppyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, &tss, tl)
 	m.Require().NoError(err)

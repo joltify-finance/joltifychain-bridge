@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
@@ -57,7 +58,7 @@ func (tn *TestNetTestSuite) SetupSuite() {
 	tn.sk2 = &sk2
 
 	tss := TssMock{sk: &sk}
-	tl, err := createMockTokenlist([]string{"0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"}, []string{"JUSD"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"}, []string{"JUSD"})
 	if err != nil {
 		panic(err)
 	}

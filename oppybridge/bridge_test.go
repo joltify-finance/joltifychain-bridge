@@ -3,8 +3,6 @@ package oppybridge
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -116,7 +114,7 @@ func (b BridgeTestSuite) TestBridgeTx() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	b.Require().NoError(err)
 	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
@@ -192,7 +190,7 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	b.Require().NoError(err)
 	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
@@ -217,34 +215,6 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 	b.Require().False(ret)
 }
 
-func createMockTokenlist(tokenAddrs []string, tokenDenoms []string) (*tokenlist.TokenList, error) {
-	// init the token list file path
-	current, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	// write the temp file for mockTokenlist
-	tokenlistPath := path.Join(current, "../test_data/tokenlist/tokenlist_mock.json")
-	tempTL := make(map[string]string)
-	for i, el := range tokenAddrs {
-		tempTL[el] = tokenDenoms[i]
-	}
-	buf, err := json.Marshal(&tempTL)
-	if err != nil {
-		return nil, err
-	}
-	err = ioutil.WriteFile(tokenlistPath, buf, 0o655)
-	if err != nil {
-		return nil, err
-	}
-	// init the tokenlist with provided tokenAddress,tokenDenom pair
-	tl, err := tokenlist.NewTokenList(tokenlistPath, 100)
-	if err != nil {
-		return nil, err
-	}
-	return tl, nil
-}
-
 func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	accs, err := generateRandomPrivKey(2)
 	b.Require().NoError(err)
@@ -254,7 +224,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	b.Require().NoError(err)
 	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)

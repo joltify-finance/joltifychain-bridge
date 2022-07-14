@@ -57,7 +57,7 @@ type OppyChainInstance struct {
 	CurrentHeight    int64
 	inBoundGas       *atomic.Int64
 	outBoundGasPrice *atomic.Int64
-	TokenList        *tokenlist.TokenList
+	TokenList        tokenlist.TokenListI
 	pendingTx        *sync.Map
 }
 

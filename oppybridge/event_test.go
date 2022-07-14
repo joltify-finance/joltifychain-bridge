@@ -14,6 +14,7 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"gitlab.com/oppy-finance/oppychain/testutil/network"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
@@ -109,7 +110,7 @@ func (e EventTestSuite) TestSubscribe() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	e.Require().NoError(err)
 	oc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
 	e.Require().NoError(err)
@@ -135,7 +136,7 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 		false,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	e.Require().NoError(err)
 	oc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
 	e.Require().NoError(err)

@@ -2,12 +2,12 @@ package oppybridge
 
 import (
 	"encoding/hex"
-	"math/big"
 	"strconv"
 	"testing"
 	"time"
 
 	common2 "gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
@@ -144,7 +144,7 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 		true,
 	}
 	//
-	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	o.Require().NoError(err)
 	oc, err := NewOppyBridge(o.network.Validators[0].APIAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
@@ -245,7 +245,7 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"testAddr", "native"}, []string{"testToken", config.OutBoundDenomFee})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr", "native"}, []string{"testToken", config.OutBoundDenomFee})
 	o.Require().NoError(err)
 	oc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
@@ -314,13 +314,7 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	FeeWeGet := dat.(*OutboundTx).Fee.Amount
 	o.Require().Equal(FeeWeGet, sdk.NewInt(200))
 
-	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
-	if !ok {
-		panic("fail to load the gas wanted")
-	}
-	price := oc.GetPubChainGasPrice()
-	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
-	expectedFee := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewIntFromBigInt(expectedFeeAmount))
+	expectedFee := oc.calculateGas()
 
 	delta := expectedFee.SubAmount(FeeWeGet)
 	memo.TopupID = txID
@@ -381,7 +375,7 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"native", "testAddr2"}, []string{config.OutBoundDenomFee, "testToken"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"native", "testAddr2"}, []string{config.OutBoundDenomFee, "testToken"})
 	o.Require().NoError(err)
 	oc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
@@ -456,14 +450,7 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 	o.Require().True(val.(*OutboundTx).Fee.Amount.Equal(coinFee.Amount.MulRaw(2)))
 
 	// now we pay enough fee
-
-	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
-	if !ok {
-		panic("fail to load the gas wanted")
-	}
-	price := oc.GetPubChainGasPrice()
-	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
-	expectedFee := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewIntFromBigInt(expectedFeeAmount))
+	expectedFee := oc.calculateGas()
 
 	delta := expectedFee.Sub(val.(*OutboundTx).Fee)
 	msg.Amount = []sdk.Coin{delta}
@@ -494,7 +481,7 @@ func (o OutBoundTestSuite) TestProcessNativeToken() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"testAddr", "native"}, []string{"testToken", "abnb"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr", "native"}, []string{"testToken", "abnb"})
 	o.Require().NoError(err)
 	oc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
@@ -524,13 +511,7 @@ func (o OutBoundTestSuite) TestProcessNativeToken() {
 	err = oc.processNativeRequest(&msg, txID, int64(blockHeight), receiverAddr, memo)
 	o.Require().NoError(err)
 
-	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
-	if !ok {
-		panic("fail to load the gas wanted")
-	}
-	price := oc.GetPubChainGasPrice()
-	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
-	expectedFee := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewIntFromBigInt(expectedFeeAmount))
+	expectedFee := oc.calculateGas()
 
 	coin4 = sdk.NewCoin("abnb", expectedFee.Amount)
 	msg.Amount = sdk.Coins{coin4}
@@ -561,7 +542,7 @@ func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"testAddr", "native"}, []string{"testToken", "abnb"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr", "native"}, []string{"testToken", "abnb"})
 	o.Require().NoError(err)
 	oc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
@@ -584,13 +565,7 @@ func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
 	fee := sdk.NewCoin("abnb", sdk.NewInt(100))
 	msg.Amount = sdk.Coins{fee}
 
-	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
-	if !ok {
-		panic("fail to load the gas wanted")
-	}
-	price := oc.GetPubChainGasPrice()
-	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
-	expectedFee := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewIntFromBigInt(expectedFeeAmount))
+	expectedFee := oc.calculateGas()
 	err = oc.processNativeRequest(&msg, txIDNotEnoughFee, int64(blockHeight), receiverAddr, memo)
 	o.Require().NoError(err)
 

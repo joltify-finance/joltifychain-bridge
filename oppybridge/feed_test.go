@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -123,7 +124,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	f.Require().NoError(err)
 	oc, err := NewOppyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl)
 	f.Require().NoError(err)

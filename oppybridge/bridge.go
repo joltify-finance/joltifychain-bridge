@@ -44,7 +44,7 @@ import (
 )
 
 // NewOppyBridge new the instance for the oppy pub_chain
-func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl *tokenlist.TokenList) (*OppyChainInstance, error) {
+func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl tokenlist.TokenListI) (*OppyChainInstance, error) {
 	var oppyBridge OppyChainInstance
 	var err error
 	oppyBridge.logger = zlog.With().Str("module", "oppyChain").Logger()

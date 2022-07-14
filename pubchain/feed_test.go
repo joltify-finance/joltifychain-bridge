@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 	"gotest.tools/assert"
 )
@@ -38,7 +39,7 @@ func TestFeedTx(t *testing.T) {
 
 	assert.NilError(t, err)
 	tssServer := TssMock{acc[0].sk}
-	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	assert.NilError(t, err)
 	pi, err := NewChainInstance(websocketTest, &tssServer, tl)
 	assert.NilError(t, err)

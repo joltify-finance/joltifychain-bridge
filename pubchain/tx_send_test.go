@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -121,7 +122,7 @@ func TestSendToken(t *testing.T) {
 	}
 	websocketTest := "ws://rpc.test.oppy.zone:8456/"
 	tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
-	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	assert.Nil(t, err)
 	pubChain, err := NewChainInstance(websocketTest, &tss, tl)
 	assert.Nil(t, err)

@@ -17,6 +17,7 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"gitlab.com/oppy-finance/oppy-bridge/validators"
 	"gitlab.com/oppy-finance/oppychain/testutil/network"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
@@ -101,7 +102,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	s.Require().NoError(err)
 	oc, err := NewOppyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, &tss, tl)
 	s.Require().NoError(err)
