@@ -188,7 +188,7 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 
 		txInfo, err := pi.checkErc20(tx.Data(), tx.To().Hex())
 		if err == nil {
-			tokenItem, exit := pi.TokenList.GetTokenInfoByAddress(txInfo.tokenAddress.String())
+			_, exit := pi.TokenList.GetTokenInfoByAddress(txInfo.tokenAddress.String())
 			if !exit {
 				// this indicates it is not to our smart contract
 				continue
@@ -197,12 +197,6 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 			if !pi.checkToBridge(txInfo.toAddr) {
 				pi.logger.Warn().Msg("the top up message is not to the bridge, ignored")
 				continue
-			}
-
-			delta := types.Precision - tokenItem.Decimals
-			if delta != 0 {
-				adjustedTokenAmount := bcommon.AdjustInt(types.NewIntFromBigInt(txInfo.Amount), int64(delta))
-				txInfo.Amount = adjustedTokenAmount.BigInt()
 			}
 
 			err := pi.ProcessInBoundERC20(tx, txInfo, block.NumberU64())

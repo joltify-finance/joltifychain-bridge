@@ -66,7 +66,7 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHe
 
 	// we need to adjust the decimal as some token may not have 18 decimals
 	// in oppy, we apply 18 decimal
-	delta := sdk.Precision - tokenItem.Decimals
+	delta := tokenItem.Decimals - sdk.Precision
 	if delta != 0 {
 		adjustedTokenAmount := bcommon.AdjustInt(savedTx.Token.Amount, int64(delta))
 		savedTx.Token.Amount = adjustedTokenAmount
@@ -79,12 +79,12 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHe
 }
 
 func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID string, blockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
-	TokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenom(msg.Amount[0].GetDenom())
+	tokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenom(msg.Amount[0].GetDenom())
 	if !tokenExist {
 		return errors.New("token is not on our token list")
 	}
 	tokenDenom := msg.Amount[0].GetDenom()
-	tokenAddr := TokenItem.TokenAddr
+	tokenAddr := tokenItem.TokenAddr
 
 	if tokenAddr != config.NativeSign {
 		return errors.New("not a native token")
@@ -93,7 +93,7 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 	item := oc.processNativeFee(txID, tokenAddr, blockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[0].Amount)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
-		delta := sdk.Precision - TokenItem.Decimals
+		delta := tokenItem.Decimals - sdk.Precision
 		if delta != 0 {
 			adjustedTokenAmount := bcommon.AdjustInt(item.Token.Amount, int64(delta))
 			item.Token.Amount = adjustedTokenAmount
@@ -139,7 +139,7 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 	item := oc.processErc20DemonAndFee(txID, tokenAddr, blockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
-		delta := sdk.Precision - tokenItem.Decimals
+		delta := tokenItem.Decimals - sdk.Precision
 		if delta != 0 {
 			adjustedTokenAmount := bcommon.AdjustInt(item.Token.Amount, int64(delta))
 			item.Token.Amount = adjustedTokenAmount
