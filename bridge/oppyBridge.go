@@ -381,7 +381,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				}
 
 				isMoveFund := false
-				previousPool, _ := pi.PopMoveFundItemAfterBlock(head.Number.Int64())
+				previousPool, height := pi.PopMoveFundItemAfterBlock(head.Number.Int64())
 				isSigner := false
 				if previousPool != nil {
 					isSigner, err = oppyChain.CheckWhetherSigner(previousPool.PoolInfo)
@@ -392,7 +392,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 
 				if isSigner && previousPool != nil {
 					// we move fund in the public chain
-					isMoveFund = pi.MoveFound(wg, head.Number.Int64(), previousPool)
+					isMoveFund = pi.MoveFound(wg, head.Number.Int64(), previousPool, height)
 				}
 				if isMoveFund {
 					// once we move fund, we do not send tx to be processed

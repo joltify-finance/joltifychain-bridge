@@ -7,8 +7,8 @@ import (
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 )
 
-//MoveFound moves the fund for the public chain
-func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPool *bcommon.PoolInfo) bool {
+// MoveFound moves the fund for the public chain
+func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPool *bcommon.PoolInfo, height int64) bool {
 	// we get the latest pool address and move funds to the latest pool
 	currentPool := pi.GetPool()
 	emptyERC20Tokens := true
@@ -33,24 +33,18 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPoo
 		}
 	}
 
-	var emptyAccount bool
 	if !emptyERC20Tokens {
 		// we add this account to "retry" to ensure it is the empty account in the next balance check
-		pi.AddMoveFundItem(previousPool, pi.CurrentHeight)
-		emptyAccount = emptyERC20Tokens
+		pi.AddMoveFundItem(previousPool, height)
+		return false
 	} else {
 		bnbIsMoved, err := pi.doMoveBNBFunds(previousPool, currentPool[1].EthAddress, blockHeight)
-		if err != nil {
+		if err != nil || !bnbIsMoved {
 			zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v for bnb", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
 			pi.AddMoveFundItem(previousPool, pi.CurrentHeight)
+			// it is not an empty account
+			return false
 		}
-
-		if !bnbIsMoved {
-			pi.AddMoveFundItem(previousPool, pi.CurrentHeight)
-		}
-
-		emptyAccount = bnbIsMoved
+		return true
 	}
-
-	return !emptyAccount
 }
