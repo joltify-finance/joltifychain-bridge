@@ -17,7 +17,7 @@ func (pi *Instance) FeedTx(currentBlockHeight int64, lastPoolInfo *vaulttypes.Po
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
-	nonce, err := pi.EthClient.PendingNonceAt(ctx, poolEthAddress)
+	nonce, err := pi.getPendingNonceWithLock(ctx, poolEthAddress)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to get the nonce of the given pool address")
 		return err

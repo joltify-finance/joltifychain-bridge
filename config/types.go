@@ -10,7 +10,7 @@ const (
 	GASFEERATIO              = "1.5"
 	DUSTBNB                  = "0.0005"
 	MINCHECKBLOCKGAP         = 6
-	DefaultPUBChainGasWanted = "100000"
+	DefaultPUBChainGasWanted = "80000"
 )
 
 var ChainID = "oppyChain-1"

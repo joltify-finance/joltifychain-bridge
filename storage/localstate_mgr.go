@@ -3,13 +3,14 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"gitlab.com/oppy-finance/oppy-bridge/common"
 )
 
 // LocalStateManager provide necessary methods to manage the local state, save it , and read it back

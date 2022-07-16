@@ -5,12 +5,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"html"
 	"math/big"
 	"strconv"
 	"sync"
 	"time"
+
+	"gitlab.com/oppy-finance/oppy-bridge/config"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 
@@ -62,20 +63,7 @@ func (pi *Instance) waitToSend(poolAddress common.Address, targetNonce uint64) e
 }
 
 // SendNativeToken sends the native token to the public chain
-func (pi *Instance) SendNativeToken(wg *sync.WaitGroup, signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int, tokenAddr string) (common.Hash, error) {
-	if signerPk == "" {
-		lastPool := pi.GetPool()[1]
-		signerPk = lastPool.Pk
-	}
-	txo, err := pi.composeTx(signerPk, sender, pi.chainID, blockHeight)
-	if err != nil {
-		return common.Hash{}, err
-	}
-	if nonce != nil {
-		txo.Nonce = nonce
-	}
-
-	txo.Value = amount
+func (pi *Instance) SendNativeToken(wg *sync.WaitGroup, signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int) (common.Hash, bool, error) {
 
 	// fixme, we set the fixed gaslimit
 	gasLimit, err := strconv.ParseUint(config.DefaultPUBChainGasWanted, 10, 64)
@@ -83,19 +71,40 @@ func (pi *Instance) SendNativeToken(wg *sync.WaitGroup, signerPk string, sender,
 		panic("fail to parse the default pubchain gas wanted")
 	}
 	//fixme need to check what is the gas price here
-	gasPrice, err := pi.EthClient.SuggestGasPrice(context.Background())
+	gasPrice, err := pi.GetGasPriceWithLock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
-		return common.Hash{}, err
+		return common.Hash{}, false, err
 	}
 
+	totalFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasLimit)))
+	// this statement is useful in
+	if amount.Cmp(totalFee) != 1 {
+		return common.Hash{}, true, nil
+	}
+
+	if signerPk == "" {
+		lastPool := pi.GetPool()[1]
+		signerPk = lastPool.Pk
+	}
+	txo, err := pi.composeTx(signerPk, sender, pi.chainID, blockHeight)
+	if err != nil {
+		return common.Hash{}, false, err
+	}
+	if nonce != nil {
+		txo.Nonce = nonce
+	}
+
+	sendAmount := new(big.Int).Sub(amount, totalFee)
+	txo.Value = sendAmount
+
 	var data []byte
-	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: gasLimit, To: &receiver, Value: amount, Data: data})
+	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: gasLimit, To: &receiver, Value: sendAmount, Data: data})
 
 	signedTx, err := txo.Signer(sender, tx)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to sign the tx")
-		return common.Hash{}, err
+		return common.Hash{}, false, err
 	}
 
 	ctxSend, cancelSend := context.WithTimeout(context.Background(), chainQueryTimeout)
@@ -104,7 +113,7 @@ func (pi *Instance) SendNativeToken(wg *sync.WaitGroup, signerPk string, sender,
 	if nonce != nil {
 		err = pi.waitToSend(sender, nonce.Uint64())
 		if err != nil {
-			return signedTx.Hash(), err
+			return signedTx.Hash(), false, err
 		}
 	}
 
@@ -134,7 +143,7 @@ func (pi *Instance) SendNativeToken(wg *sync.WaitGroup, signerPk string, sender,
 			}
 		}()
 	}
-	return signedTx.Hash(), err
+	return signedTx.Hash(), false, err
 }
 
 // SendToken sends the token to the public chain
@@ -206,7 +215,7 @@ func (pi *Instance) ProcessOutBound(wg *sync.WaitGroup, toAddr, fromAddr common.
 	var txHash common.Hash
 	var err error
 	if tokenAddr == config.NativeSign {
-		txHash, err = pi.SendNativeToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce), tokenAddr)
+		txHash, _, err = pi.SendNativeToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce))
 	} else {
 		txHash, err = pi.SendToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce), tokenAddr)
 	}

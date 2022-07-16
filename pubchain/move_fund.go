@@ -3,6 +3,7 @@ package pubchain
 import (
 	"sync"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	zlog "github.com/rs/zerolog/log"
 
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
@@ -11,7 +12,7 @@ import (
 // MoveFound moves the fund for the public chain
 // our strategy is we need to run move fund at least twice to ensure the account is empty, even if
 // we move the fund success this round, we still need to run it again to 100% ensure the old pool is empty
-func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPool *bcommon.PoolInfo, height int64) bool {
+func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPool *bcommon.PoolInfo, height int64, ethClient *ethclient.Client) bool {
 	// we get the latest pool address and move funds to the latest pool
 	currentPool := pi.GetPool()
 	emptyERC20Tokens := true
@@ -22,7 +23,7 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPoo
 		if tokenAddr == "native" {
 			continue
 		}
-		tokenIsEmpty, err := pi.doMoveTokenFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight, tokenAddr)
+		tokenIsEmpty, err := pi.doMoveTokenFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight, tokenAddr, ethClient)
 		// once there exists one token in the current pool, then we need to addMoveFundItem
 		if err != nil {
 			zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v for token %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String(), tokenAddr)
@@ -41,7 +42,7 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPoo
 		pi.AddMoveFundItem(previousPool, height+movefundretrygap)
 		return false
 	} else {
-		bnbIsMoved, isEmpty, err := pi.doMoveBNBFunds(previousPool, currentPool[1].EthAddress, blockHeight)
+		bnbIsMoved, isEmpty, err := pi.doMoveBNBFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight)
 		if isEmpty {
 			return true
 		}

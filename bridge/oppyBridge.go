@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/tendermint/tendermint/types"
 	"gitlab.com/oppy-finance/oppy-bridge/storage"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
@@ -165,7 +166,7 @@ func NewBridgeService(config config.Config) {
 		oppyBridge.Import(pendingItems)
 	}
 
-	addEventLoop(ctx, &wg, oppyBridge, pi, metrics, fsm, int64(config.OppyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl)
+	addEventLoop(ctx, &wg, oppyBridge, pi, metrics, fsm, int64(config.OppyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl, config.PubChainConfig.WsAddress)
 	<-c
 	cancel()
 	wg.Wait()
@@ -192,7 +193,7 @@ func NewBridgeService(config config.Config) {
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, oppyRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, oppyRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList, pubChainWsAddress string) {
 	query := "complete_churn.churn = 'oppy_churn'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
@@ -276,9 +277,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				}
 
 				if currentBlockHeight%pubchain.PRICEUPDATEGAP == 0 {
-					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-					defer cancel()
-					price, err := pi.EthClient.SuggestGasPrice(ctx)
+					price, err := pi.GetGasPriceWithLock()
 					if err == nil {
 						oppyChain.UpdatePubChainGasPrice(price.Int64())
 					} else {
@@ -394,7 +393,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 
 				if isSigner && previousPool != nil {
 					// we move fund in the public chain
-					isMoveFund = pi.MoveFound(wg, head.Number.Int64(), previousPool, height)
+					ethClient, err := ethclient.Dial(pubChainWsAddress)
+					if err != nil {
+						pi.AddMoveFundItem(previousPool, height)
+						zlog.Logger.Error().Err(err).Msg("fail to dial the websocket")
+					}
+					isMoveFund = pi.MoveFound(wg, head.Number.Int64(), previousPool, height, ethClient)
+					ethClient.Close()
 				}
 				if isMoveFund {
 					// once we move fund, we do not send tx to be processed

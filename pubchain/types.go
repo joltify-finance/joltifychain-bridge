@@ -132,6 +132,22 @@ func (pi *Instance) getTransactionReceiptWithLock(ctx context.Context, txHash co
 	return receipt, err
 }
 
+func (pi *Instance) GetGasPriceWithLock() (*big.Int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
+	defer cancel()
+	pi.ethClientLocker.RLock()
+	gasPrice, err := pi.EthClient.SuggestGasPrice(ctx)
+	pi.ethClientLocker.RUnlock()
+	return gasPrice, err
+}
+
+func (pi *Instance) getBalanceWithLock(ctx context.Context, ethAddr common.Address) (*big.Int, error) {
+	pi.ethClientLocker.RLock()
+	balanceBnB, err := pi.EthClient.BalanceAt(ctx, ethAddr, nil)
+	pi.ethClientLocker.RUnlock()
+	return balanceBnB, err
+}
+
 func (pi *Instance) getPendingNonceWithLock(ctx context.Context, poolAddress common.Address) (uint64, error) {
 	pi.ethClientLocker.RLock()
 	nonce, err := pi.EthClient.PendingNonceAt(ctx, poolAddress)

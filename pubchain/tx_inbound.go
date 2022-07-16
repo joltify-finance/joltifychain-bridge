@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
@@ -410,8 +411,8 @@ func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, 
 	return txHash.Hex(), nil
 }
 
-func (pi *Instance) doMoveTokenFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64, tokenAddr string) (bool, error) {
-	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), pi.EthClient)
+func (pi *Instance) doMoveTokenFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64, tokenAddr string, ethClient *ethclient.Client) (bool, error) {
+	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), ethClient)
 	if err != nil {
 		return false, err
 	}
@@ -443,35 +444,31 @@ func (pi *Instance) doMoveTokenFunds(wg *sync.WaitGroup, previousPool *bcommon.P
 	return false, nil
 }
 
-func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, bool, error) {
+func (pi *Instance) doMoveBNBFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel()
-	balanceBnB, err := pi.EthClient.BalanceAt(ctx, previousPool.EthAddress, nil)
+	balanceBnB, err := pi.getBalanceWithLock(ctx, previousPool.EthAddress)
 	if err != nil {
 		return false, false, err
-	}
-
-	dustBnb, err := types.NewDecFromStr(config.DUSTBNB)
-	if err != nil {
-		panic("invalid parameter")
 	}
 
 	tick := html.UnescapeString("&#" + "9193" + ";")
 	pi.logger.Info().Msgf(" %v we move fund bnb:%v from %v to %v", tick, balanceBnB, previousPool.EthAddress.String(), receiver.String())
 
-	if balanceBnB.Cmp(dustBnb.BigInt()) != 1 {
-		return true, true, nil
+	// we move the bnb
+	nonce, err := pi.getPendingNonceWithLock(ctx, previousPool.EthAddress)
+	if err != nil {
+		return false, false, err
 	}
 
-	// we move the bnb
-	var bnbTxHash string
-	nonce, err := pi.EthClient.NonceAt(context.Background(), previousPool.EthAddress, nil)
+	bnbTxHash, emptyAccount, err := pi.SendNativeToken(wg, previousPool.Pk, previousPool.EthAddress, receiver, balanceBnB, blockHeight, new(big.Int).SetUint64(nonce))
+	//bnbTxHash, err = pi.moveBnb(previousPool.Pk, receiver, balanceBnB, nonce, blockHeight)
 	if err != nil {
 		return false, false, err
 	}
-	bnbTxHash, err = pi.moveBnb(previousPool.Pk, receiver, balanceBnB, nonce, blockHeight)
-	if err != nil {
-		return false, false, err
+	if emptyAccount {
+		zlog.Logger.Info().Msgf("this is the empry account to move fund")
+		return true, true, nil
 	}
 
 	tick = html.UnescapeString("&#" + "127974" + ";")
