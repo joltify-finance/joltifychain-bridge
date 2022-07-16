@@ -386,7 +386,7 @@ func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *bi
 
 	err = pi.EthClient.SendTransaction(ctx, bTx)
 	if err != nil {
-		if err.Error() == "already known" || err.Error() == "replacement transaction underpriced" {
+		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")
 			return rawTx.Hash().Hex(), nil
 		} else {
@@ -443,12 +443,12 @@ func (pi *Instance) doMoveTokenFunds(wg *sync.WaitGroup, previousPool *bcommon.P
 	return false, nil
 }
 
-func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, error) {
+func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel()
 	balanceBnB, err := pi.EthClient.BalanceAt(ctx, previousPool.EthAddress, nil)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	dustBnb, err := types.NewDecFromStr(config.DUSTBNB)
@@ -460,24 +460,24 @@ func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver comm
 	pi.logger.Info().Msgf(" %v we move fund bnb:%v from %v to %v", tick, balanceBnB, previousPool.EthAddress.String(), receiver.String())
 
 	if balanceBnB.Cmp(dustBnb.BigInt()) != 1 {
-		return true, nil
+		return true, true, nil
 	}
 
 	// we move the bnb
 	var bnbTxHash string
 	nonce, err := pi.EthClient.NonceAt(context.Background(), previousPool.EthAddress, nil)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 	bnbTxHash, err = pi.moveBnb(previousPool.Pk, receiver, balanceBnB, nonce, blockHeight)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	tick = html.UnescapeString("&#" + "127974" + ";")
 	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain (BNB): %v with hash %v", tick, balanceBnB.String(), bnbTxHash)
 
-	return true, nil
+	return true, false, nil
 }
 
 func (pi *Instance) checkEachTx(h common.Hash) (uint64, error) {

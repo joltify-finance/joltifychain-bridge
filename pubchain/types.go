@@ -37,6 +37,7 @@ const (
 	GroupSign           = 4
 	PRICEUPDATEGAP      = 10
 	OppyContractAddress = "0x94277968dff216265313657425d9d7577ad32dd1"
+	movefundretrygap    = 3
 )
 
 type InboundTx struct {

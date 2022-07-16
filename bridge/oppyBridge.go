@@ -161,7 +161,9 @@ func NewBridgeService(config config.Config) {
 		zlog.Logger.Error().Err(err).Msgf("fail to load the pending items!!")
 	}
 
-	oppyBridge.Import(pendingItems)
+	if len(pendingItems) != 0 {
+		oppyBridge.Import(pendingItems)
+	}
 
 	addEventLoop(ctx, &wg, oppyBridge, pi, metrics, fsm, int64(config.OppyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl)
 	<-c
