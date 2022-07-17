@@ -1,6 +1,7 @@
 package pubchain
 
 import (
+	"sort"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -19,10 +20,12 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPoo
 
 	// movefund according to the history tokenlist
 	existedTokenAddresses := pi.TokenList.GetAllExistedTokenAddresses()
+	sort.Strings(existedTokenAddresses)
 	for _, tokenAddr := range existedTokenAddresses {
 		if tokenAddr == "native" {
 			continue
 		}
+		//fixme need to ensure the sequence of the token addr
 		tokenIsEmpty, err := pi.doMoveTokenFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight, tokenAddr, ethClient)
 		// once there exists one token in the current pool, then we need to addMoveFundItem
 		if err != nil {
