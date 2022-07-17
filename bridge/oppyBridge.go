@@ -398,7 +398,9 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						pi.AddMoveFundItem(previousPool, height)
 						zlog.Logger.Error().Err(err).Msg("fail to dial the websocket")
 					}
-					isMoveFund = pi.MoveFound(wg, head.Number.Int64(), previousPool, height, ethClient)
+					if ethClient != nil {
+						isMoveFund = pi.MoveFound(wg, head.Number.Int64(), previousPool, height, ethClient)
+					}
 					ethClient.Close()
 				}
 				if isMoveFund {
