@@ -123,7 +123,7 @@ func NewBridgeService(config config.Config) {
 	}
 
 	// now we monitor the bsc transfer event
-	pi, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, tssServer, tl)
+	pubChainInstance, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, tssServer, tl)
 	if err != nil {
 		fmt.Printf("fail to connect the public pub_chain with address %v\n", config.PubChainConfig.WsAddress)
 		cancel()
@@ -150,7 +150,7 @@ func NewBridgeService(config config.Config) {
 	}
 	if itemsIn != nil {
 		for _, el := range itemsIn {
-			pi.AddItem(el)
+			pubChainInstance.AddItem(el)
 		}
 		fmt.Printf("we have loaded the unprocessed inbound tx")
 	}
@@ -166,7 +166,26 @@ func NewBridgeService(config config.Config) {
 		oppyBridge.Import(pendingItems)
 	}
 
-	addEventLoop(ctx, &wg, oppyBridge, pi, metrics, fsm, int64(config.OppyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl, config.PubChainConfig.WsAddress)
+	moveFundMgr := storage.NewMoveFundStateMgr(config.HomeDir)
+
+	pubItems, oppyItems, err := moveFundMgr.LoadPendingItems()
+	if err != nil {
+		zlog.Logger.Error().Err(err).Msgf("fail to load the pending move fund, we skip!!")
+	}
+
+	if len(pubItems) != 0 {
+		for _, item := range pubItems {
+			pubChainInstance.AddMoveFundItem(item, item.Height)
+		}
+	}
+
+	if len(oppyItems) != 0 {
+		for _, item := range oppyItems {
+			oppyBridge.AddMoveFundItem(item, item.Height)
+		}
+	}
+
+	addEventLoop(ctx, &wg, oppyBridge, pubChainInstance, metrics, int64(config.OppyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl, config.PubChainConfig.WsAddress)
 	<-c
 	cancel()
 	wg.Wait()
@@ -177,7 +196,7 @@ func NewBridgeService(config config.Config) {
 		zlog.Logger.Error().Err(err).Msgf("fail to save the outbound requests!!!")
 	}
 
-	itemsInexported := pi.ExportItems()
+	itemsInexported := pubChainInstance.ExportItems()
 	err = fsm.SaveInBoundState(itemsInexported)
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to save the outbound requests!!!")
@@ -190,10 +209,19 @@ func NewBridgeService(config config.Config) {
 		zlog.Logger.Error().Err(err).Msgf("fail to save the pending requests!!!")
 	}
 
+	// we now save the move fund items
+	pubItemsSave := pubChainInstance.ExportMoveFundItems()
+	oppyItemsSave := oppyBridge.ExportMoveFundItems()
+
+	err = moveFundMgr.SavePendingItems(pubItemsSave, oppyItemsSave)
+	if err != nil {
+		zlog.Logger.Error().Err(err).Msgf("fail to save move fund items")
+	}
+
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, fsm *storage.TxStateMgr, oppyRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList, pubChainWsAddress string) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, oppyRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList, pubChainWsAddress string) {
 	query := "complete_churn.churn = 'oppy_churn'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()

@@ -13,6 +13,17 @@ func (oc *OppyChainInstance) AddMoveFundItem(pool *common.PoolInfo, height int64
 	oc.moveFundReq.Store(height, pool)
 }
 
+func (oc *OppyChainInstance) ExportMoveFundItems() []*common.PoolInfo {
+	var data []*common.PoolInfo
+	oc.moveFundReq.Range(func(key, value any) bool {
+		exported := value.(*common.PoolInfo)
+		exported.Height = key.(int64)
+		data = append(data, exported)
+		return true
+	})
+	return data
+}
+
 // popMoveFundItemAfterBlock pop a move fund item after give block duration
 func (oc *OppyChainInstance) popMoveFundItemAfterBlock(currentBlockHeight int64) (*common.PoolInfo, int64) {
 	min := int64(math.MaxInt64)

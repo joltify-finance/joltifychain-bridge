@@ -8,10 +8,12 @@ import (
 
 // PoolInfo stores the pool and pk of the oppy pool
 type PoolInfo struct {
-	Pk          string
-	OppyAddress types.AccAddress
-	EthAddress  common.Address
-	PoolInfo    *vaulttypes.PoolInfo
+	Pk          string               `json:"pool_pubkey"`
+	OppyAddress types.AccAddress     `json:"oppy_address"`
+	EthAddress  common.Address       `json:"eth_address"`
+	PoolInfo    *vaulttypes.PoolInfo `json:"pool_info"`
+	// the height is only useful in saving the tx
+	Height int64 `json:"height"`
 }
 
 // OutBoundReq is the entity for the outbound tx

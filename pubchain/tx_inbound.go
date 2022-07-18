@@ -303,6 +303,17 @@ func (pi *Instance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64) {
 	pi.moveFundReq.Store(height, pool)
 }
 
+func (pi *Instance) ExportMoveFundItems() []*bcommon.PoolInfo {
+	var data []*bcommon.PoolInfo
+	pi.moveFundReq.Range(func(key, value any) bool {
+		exported := value.(*bcommon.PoolInfo)
+		exported.Height = key.(int64)
+		data = append(data, exported)
+		return true
+	})
+	return data
+}
+
 // PopMoveFundItemAfterBlock pop up the item after the given block duration
 func (pi *Instance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
 	min := int64(math.MaxInt64)
