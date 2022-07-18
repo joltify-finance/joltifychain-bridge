@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
 	"go.uber.org/atomic"
@@ -25,6 +26,7 @@ import (
 const (
 	grpcTimeout   = time.Second * 30
 	reqCacheSize  = 1024
+	channelSize   = 2000
 	ROUNDBLOCK    = 50
 	submitBackoff = time.Millisecond * 500
 	GroupBlockGap = 6
@@ -40,25 +42,33 @@ type tssPoolMsg struct {
 
 // OppyChainInstance defines the types for oppy pub_chain side
 type OppyChainInstance struct {
-	grpcClient       grpc1.ClientConn
-	wsClient         *tmclienthttp.HTTP
-	encoding         *params.EncodingConfig
-	Keyring          keyring.Keyring
-	logger           zerolog.Logger
-	validatorSet     *validators.ValidatorSet
-	myValidatorInfo  info
-	tssServer        tssclient.TssInstance
-	poolUpdateLocker *sync.RWMutex
-	keyGenCache      []tssPoolMsg
-	lastTwoPools     []*bcommon.PoolInfo
-	OutboundReqChan  chan *bcommon.OutBoundReq
-	RetryOutboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
-	moveFundReq      *sync.Map
-	CurrentHeight    int64
-	inBoundGas       *atomic.Int64
-	outBoundGasPrice *atomic.Int64
-	TokenList        tokenlist.TokenListI
-	pendingTx        *sync.Map
+	grpcAddr              string
+	httpAddr              string
+	grpcLock              *sync.RWMutex
+	grpcClient            grpc1.ClientConn
+	wsClient              *tmclienthttp.HTTP
+	encoding              *params.EncodingConfig
+	Keyring               keyring.Keyring
+	logger                zerolog.Logger
+	validatorSet          *validators.ValidatorSet
+	myValidatorInfo       info
+	tssServer             tssclient.TssInstance
+	poolUpdateLocker      *sync.RWMutex
+	keyGenCache           []tssPoolMsg
+	lastTwoPools          []*bcommon.PoolInfo
+	OutboundReqChan       chan *bcommon.OutBoundReq
+	RetryOutboundReq      *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
+	moveFundReq           *sync.Map
+	CurrentHeight         int64
+	inBoundGas            *atomic.Int64
+	outBoundGasPrice      *atomic.Int64
+	TokenList             tokenlist.TokenListI
+	pendingTx             *sync.Map
+	ChannelQueueNewBlock  chan ctypes.ResultEvent
+	ChannelQueueValidator chan ctypes.ResultEvent
+	CurrentNewBlockChan   <-chan ctypes.ResultEvent
+	CurrentNewValidator   <-chan ctypes.ResultEvent
+	retryLock             *sync.Mutex
 }
 
 // info the import structure of the cosmos validator info

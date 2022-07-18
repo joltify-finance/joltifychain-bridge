@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
@@ -82,6 +83,12 @@ func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, t
 	oppyBridge.moveFundReq = &sync.Map{}
 	oppyBridge.TokenList = tl
 	oppyBridge.pendingTx = &sync.Map{}
+	oppyBridge.ChannelQueueNewBlock = make(chan ctypes.ResultEvent, channelSize)
+	oppyBridge.ChannelQueueNewBlock = make(chan ctypes.ResultEvent, channelSize)
+	oppyBridge.grpcLock = &sync.RWMutex{}
+	oppyBridge.grpcAddr = grpcAddr
+	oppyBridge.httpAddr = httpAddr
+	oppyBridge.retryLock = &sync.Mutex{}
 	return &oppyBridge, nil
 }
 

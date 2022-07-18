@@ -222,18 +222,10 @@ func NewBridgeService(config config.Config) {
 }
 
 func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, oppyRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList, pubChainWsAddress string) {
-	query := "complete_churn.churn = 'oppy_churn'"
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
 
-	validatorUpdateChan, err := oppyChain.AddSubscribe(ctxLocal, query)
-	if err != nil {
-		fmt.Printf("fail to start the subscription")
-		return
-	}
-
-	query = "tm.event = 'NewBlock'"
-	newOppyBlock, err := oppyChain.AddSubscribe(ctxLocal, query)
+	err := oppyChain.AddSubscribe(ctxLocal)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return
@@ -270,7 +262,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				zlog.Info().Msgf("we quit the whole process")
 				return
 				// process the update of the validators
-			case vals := <-validatorUpdateChan:
+
+			case vals := <-oppyChain.CurrentNewValidator:
+				oppyChain.ChannelQueueValidator <- vals
+
+			case vals := <-oppyChain.ChannelQueueValidator:
 				height, err := oppyChain.GetLastBlockHeight()
 				if err != nil {
 					continue
@@ -288,7 +284,10 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				}
 
 			// process the new oppy block, validator may need to submit the pool address
-			case block := <-newOppyBlock:
+			case block := <-oppyChain.CurrentNewBlockChan:
+				oppyChain.ChannelQueueNewBlock <- block
+
+			case block := <-oppyChain.ChannelQueueNewBlock:
 				currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
 				ok, _ := oppyChain.CheckAndUpdatePool(currentBlockHeight)
 				if !ok {
@@ -394,6 +393,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					metric.UpdateInboundTxNum(float64(pi.Size()))
 				}
 
+			case head := <-pi.ChannelQueue:
+				pi.SubChannelNow <- head
 				// process the public chain new block event
 			case head := <-pi.SubChannelNow:
 				oppyBlockHeight, errInner := oppyChain.GetLastBlockHeight()

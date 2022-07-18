@@ -1,7 +1,6 @@
 package oppybridge
 
 import (
-	"context"
 	"encoding/base64"
 	"strconv"
 
@@ -11,22 +10,9 @@ import (
 	"github.com/oppyfinance/tss/common"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
-
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
 const capacity = 10000
-
-// AddSubscribe add the subscirbe to the chain
-func (oc *OppyChainInstance) AddSubscribe(ctx context.Context, query string) (<-chan ctypes.ResultEvent, error) {
-	out, err := oc.wsClient.Subscribe(ctx, "oppyBridge", query, capacity)
-	if err != nil {
-		oc.logger.Error().Err(err).Msgf("Failed to subscribe to query with error %v", err)
-		return nil, err
-	}
-
-	return out, nil
-}
 
 // HandleUpdateValidators check whether we need to generate the new tss pool message
 func (oc *OppyChainInstance) HandleUpdateValidators(height int64) error {
