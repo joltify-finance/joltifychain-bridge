@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
@@ -76,10 +77,14 @@ type Instance struct {
 	moveFundReq     *sync.Map
 	CurrentHeight   int64
 	TokenList       tokenlist.TokenListI
+	wg              *sync.WaitGroup
+	SubChannelNow   chan *types.Header
+	ChannelQueue    chan *types.Header
+	SubHandler      ethereum.Subscription
 }
 
 // NewChainInstance initialize the oppy_bridge entity
-func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.TokenListI) (*Instance, error) {
+func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.TokenListI, wg *sync.WaitGroup) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
 
 	ethClient, err := ethclient.Dial(ws)
@@ -115,6 +120,7 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.T
 		RetryInboundReq: &sync.Map{},
 		moveFundReq:     &sync.Map{},
 		TokenList:       tl,
+		wg:              wg,
 	}, nil
 }
 
@@ -122,6 +128,16 @@ func (pi *Instance) getBlockByNumberWithLock(ctx context.Context, number *big.In
 	pi.ethClientLocker.RLock()
 	block, err := pi.EthClient.BlockByNumber(ctx, number)
 	pi.ethClientLocker.RUnlock()
+
+	if err != nil {
+		// we reset the ethcliet
+		fmt.Printf("error of the ethclient is %v\n", err)
+		pi.wg.Add(1)
+		go func() {
+			defer pi.wg.Done()
+			pi.RetryPubChain()
+		}()
+	}
 	return block, err
 }
 
@@ -129,6 +145,16 @@ func (pi *Instance) getTransactionReceiptWithLock(ctx context.Context, txHash co
 	pi.ethClientLocker.RLock()
 	receipt, err := pi.EthClient.TransactionReceipt(ctx, txHash)
 	pi.ethClientLocker.RUnlock()
+
+	if err != nil {
+		// we reset the ethcliet
+		fmt.Printf("error of the ethclient is %v\n", err)
+		pi.wg.Add(1)
+		go func() {
+			defer pi.wg.Done()
+			pi.RetryPubChain()
+		}()
+	}
 	return receipt, err
 }
 
@@ -138,6 +164,16 @@ func (pi *Instance) GetGasPriceWithLock() (*big.Int, error) {
 	pi.ethClientLocker.RLock()
 	gasPrice, err := pi.EthClient.SuggestGasPrice(ctx)
 	pi.ethClientLocker.RUnlock()
+
+	if err != nil {
+		// we reset the ethcliet
+		fmt.Printf("error of the ethclient is %v\n", err)
+		pi.wg.Add(1)
+		go func() {
+			defer pi.wg.Done()
+			pi.RetryPubChain()
+		}()
+	}
 	return gasPrice, err
 }
 
@@ -145,6 +181,16 @@ func (pi *Instance) getBalanceWithLock(ctx context.Context, ethAddr common.Addre
 	pi.ethClientLocker.RLock()
 	balanceBnB, err := pi.EthClient.BalanceAt(ctx, ethAddr, nil)
 	pi.ethClientLocker.RUnlock()
+
+	if err != nil {
+		// we reset the ethcliet
+		fmt.Printf("error of the ethclient is %v\n", err)
+		pi.wg.Add(1)
+		go func() {
+			defer pi.wg.Done()
+			pi.RetryPubChain()
+		}()
+	}
 	return balanceBnB, err
 }
 
@@ -152,6 +198,17 @@ func (pi *Instance) getPendingNonceWithLock(ctx context.Context, poolAddress com
 	pi.ethClientLocker.RLock()
 	nonce, err := pi.EthClient.PendingNonceAt(ctx, poolAddress)
 	pi.ethClientLocker.RUnlock()
+
+	if err != nil {
+		// we reset the ethcliet
+		fmt.Printf("error of the ethclient is %v\n", err)
+		pi.wg.Add(1)
+		go func() {
+			defer pi.wg.Done()
+			pi.RetryPubChain()
+		}()
+	}
+
 	return nonce, err
 }
 
@@ -159,6 +216,16 @@ func (pi *Instance) sendTransactionWithLock(ctx context.Context, tx *types.Trans
 	pi.ethClientLocker.RLock()
 	err := pi.EthClient.SendTransaction(ctx, tx)
 	pi.ethClientLocker.RUnlock()
+
+	if err != nil {
+		// we reset the ethcliet
+		fmt.Printf("error of the ethclient is %v\n", err)
+		pi.wg.Add(1)
+		go func() {
+			defer pi.wg.Done()
+			pi.RetryPubChain()
+		}()
+	}
 	return err
 }
 

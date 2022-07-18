@@ -8,12 +8,9 @@ import (
 	"html"
 	"math/big"
 	"strconv"
-	"sync"
 	"time"
 
 	"gitlab.com/oppy-finance/oppy-bridge/config"
-
-	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/cenkalti/backoff"
 
@@ -63,7 +60,7 @@ func (pi *Instance) waitToSend(poolAddress common.Address, targetNonce uint64) e
 }
 
 // SendNativeToken sends the native token to the public chain
-func (pi *Instance) SendNativeToken(wg *sync.WaitGroup, signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int) (common.Hash, bool, error) {
+func (pi *Instance) SendNativeToken(signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int) (common.Hash, bool, error) {
 
 	// fixme, we set the fixed gaslimit
 	gasLimit, err := strconv.ParseUint(config.DefaultPUBChainGasWanted, 10, 64)
@@ -119,35 +116,13 @@ func (pi *Instance) SendNativeToken(wg *sync.WaitGroup, signerPk string, sender,
 
 	err = pi.sendTransactionWithLock(ctxSend, signedTx)
 	if err != nil {
-		// we reset the ethcliet
-		fmt.Printf("error of the ethclient is %v\n", err)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second*10), 3)
-
-			op := func() error {
-				ethClient, err := ethclient.Dial(pi.configAddr)
-				if err != nil {
-					pi.logger.Error().Err(err).Msg("fail to dial the websocket")
-					return err
-				}
-				pi.renewEthClientWithLock(ethClient)
-				return nil
-			}
-
-			err := backoff.Retry(op, bf)
-			if err != nil {
-				fmt.Printf("#########we fail all the retries#########")
-				return
-			}
-		}()
+		pi.logger.Error().Err(err).Msgf("we fail to send the outbound native tx, have reset the eth client")
 	}
 	return signedTx.Hash(), false, err
 }
 
 // SendToken sends the token to the public chain
-func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int, tokenAddr string) (common.Hash, error) {
+func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int, tokenAddr string) (common.Hash, error) {
 	if signerPk == "" {
 		lastPool := pi.GetPool()[1]
 		signerPk = lastPool.Pk
@@ -183,41 +158,20 @@ func (pi *Instance) SendToken(wg *sync.WaitGroup, signerPk string, sender, recei
 	err = pi.sendTransactionWithLock(ctxSend, readyTx)
 	if err != nil {
 		//we reset the ethcliet
-		fmt.Printf("error of the ethclient is %v\n", err)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second*10), 3)
-
-			op := func() error {
-				ethClient, err := ethclient.Dial(pi.configAddr)
-				if err != nil {
-					pi.logger.Error().Err(err).Msg("fail to dial the websocket")
-					return err
-				}
-				pi.renewEthClientWithLock(ethClient)
-				return nil
-			}
-
-			err := backoff.Retry(op, bf)
-			if err != nil {
-				fmt.Printf("#########we fail all the retries#########")
-				return
-			}
-		}()
+		pi.logger.Error().Err(err).Msgf("we fail to send the outbound ERC20 tx, have reset the eth client")
 	}
 	return readyTx.Hash(), err
 }
 
 // ProcessOutBound send the money to public chain
-func (pi *Instance) ProcessOutBound(wg *sync.WaitGroup, toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, blockHeight int64, nonce uint64) (string, error) {
+func (pi *Instance) ProcessOutBound(toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, blockHeight int64, nonce uint64) (string, error) {
 	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v of %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18), tokenAddr)
 	var txHash common.Hash
 	var err error
 	if tokenAddr == config.NativeSign {
-		txHash, _, err = pi.SendNativeToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce))
+		txHash, _, err = pi.SendNativeToken("", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce))
 	} else {
-		txHash, err = pi.SendToken(wg, "", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce), tokenAddr)
+		txHash, err = pi.SendToken("", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce), tokenAddr)
 	}
 	if err != nil {
 		if err.Error() == "already known" {
@@ -231,24 +185,6 @@ func (pi *Instance) ProcessOutBound(wg *sync.WaitGroup, toAddr, fromAddr common.
 	tick := html.UnescapeString("&#" + "128228" + ";")
 	pi.logger.Info().Msgf("%v we have done the outbound tx %v", tick, txHash)
 	return txHash.Hex(), nil
-}
-
-// StartSubscription start the subscription of the token
-func (pi *Instance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) (chan *types.Header, error) {
-	blockEvent := make(chan *types.Header, sbchannelsize)
-	blockSub, err := pi.EthClient.SubscribeNewHead(ctx, blockEvent)
-	if err != nil {
-		fmt.Printf("fail to subscribe the block event with err %v\n", err)
-		return nil, err
-	}
-
-	go func() {
-		<-ctx.Done()
-		blockSub.Unsubscribe()
-		pi.logger.Info().Msgf("shutdown the public pub_chain subscription channel")
-		wg.Done()
-	}()
-	return blockEvent, nil
 }
 
 func (pi *Instance) tssSign(msg []byte, pk string, blockHeight int64) ([]byte, error) {

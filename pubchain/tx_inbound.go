@@ -410,7 +410,7 @@ func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *bi
 }
 
 func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64, tokenAddr string) (string, error) {
-	txHash, err := pi.SendToken(wg, senderPk, sender, receiver, balance, blockheight, nil, tokenAddr)
+	txHash, err := pi.SendToken(senderPk, sender, receiver, balance, blockheight, nil, tokenAddr)
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")
@@ -472,7 +472,7 @@ func (pi *Instance) doMoveBNBFunds(wg *sync.WaitGroup, previousPool *bcommon.Poo
 		return false, false, err
 	}
 
-	bnbTxHash, emptyAccount, err := pi.SendNativeToken(wg, previousPool.Pk, previousPool.EthAddress, receiver, balanceBnB, blockHeight, new(big.Int).SetUint64(nonce))
+	bnbTxHash, emptyAccount, err := pi.SendNativeToken(previousPool.Pk, previousPool.EthAddress, receiver, balanceBnB, blockHeight, new(big.Int).SetUint64(nonce))
 	//bnbTxHash, err = pi.moveBnb(previousPool.Pk, receiver, balanceBnB, nonce, blockHeight)
 	if err != nil {
 		return false, false, err

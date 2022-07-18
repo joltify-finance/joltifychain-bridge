@@ -123,7 +123,7 @@ func NewBridgeService(config config.Config) {
 	}
 
 	// now we monitor the bsc transfer event
-	pubChainInstance, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, tssServer, tl)
+	pubChainInstance, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddress, tssServer, tl, &wg)
 	if err != nil {
 		fmt.Printf("fail to connect the public pub_chain with address %v\n", config.PubChainConfig.WsAddress)
 		cancel()
@@ -242,7 +242,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 	// pubNewBlockChan is the channel for the new blocks for the public chain
 	subscriptionCtx, cancelsubscription := context.WithCancel(context.Background())
 	wg.Add(1)
-	pubNewBlockChan, err := pi.StartSubscription(subscriptionCtx, wg)
+	err = pi.StartSubscription(subscriptionCtx, wg)
 	if err != nil {
 		fmt.Printf("fail to subscribe the token transfer with err %v\n", err)
 		cancelsubscription()
@@ -384,7 +384,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					}
 
 					pools := oppyChain.GetPool()
-					zlog.Logger.Warn().Msgf("we feed the tx now %v", pools[1].PoolInfo.CreatePool.String())
+					zlog.Logger.Warn().Msgf("we feed the inbound tx now %v", pools[1].PoolInfo.CreatePool.String())
 					err := oppyChain.FeedTx(pools[1].PoolInfo, pi, currentBlockHeight)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
@@ -395,7 +395,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				}
 
 				// process the public chain new block event
-			case head := <-pubNewBlockChan:
+			case head := <-pi.SubChannelNow:
 				oppyBlockHeight, errInner := oppyChain.GetLastBlockHeight()
 				if errInner != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to get the oppy chain block height for this round")
@@ -451,7 +451,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						zlog.Logger.Warn().Msgf("we do not have 2 pools to start the tx")
 						continue
 					}
-					zlog.Logger.Warn().Msgf("we feed the tx now %v", pools[1].PoolInfo.CreatePool.String())
+					zlog.Logger.Warn().Msgf("we feed the outbound tx now %v", pools[1].PoolInfo.CreatePool.String())
 
 					outboundItems := oppyChain.PopItem(pubchain.GroupSign)
 
@@ -531,7 +531,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					}
 
 					toAddr, fromAddr, tokenAddr, amount, roundBlockHeight, nonce := litem.GetOutBoundInfo()
-					txHashCheck, err := pi.ProcessOutBound(wg, toAddr, fromAddr, tokenAddr, amount, roundBlockHeight, nonce)
+					txHashCheck, err := pi.ProcessOutBound(toAddr, fromAddr, tokenAddr, amount, roundBlockHeight, nonce)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
 					}
