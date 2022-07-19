@@ -534,7 +534,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					wg.Add(1)
 					go func(index string) {
 						defer wg.Done()
-						err := oppyChain.CheckTxStatus(grpcClient, index)
+						grpcClientLocal, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
+						if err != nil {
+							zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")
+							return
+						}
+						defer grpcClientLocal.Close()
+
+						err = oppyChain.CheckTxStatus(grpcClientLocal, index)
 						if err != nil {
 							zlog.Logger.Error().Err(err).Msgf("the tx index(%v) has not been successfully submitted retry", index)
 							pi.AddItem(item)
