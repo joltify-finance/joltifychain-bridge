@@ -47,11 +47,15 @@ func (oc *OppyChainInstance) UpdateSubscribe(ctx context.Context) error {
 	}
 
 	if len(oc.CurrentNewBlockChan) > 0 {
+		quite := false
 		for {
 			select {
 			case b := <-oc.CurrentNewValidator:
 				oc.ChannelQueueNewBlock <- b
 			default:
+				quite = true
+			}
+			if quite {
 				break
 			}
 		}
@@ -59,10 +63,14 @@ func (oc *OppyChainInstance) UpdateSubscribe(ctx context.Context) error {
 
 	if len(oc.CurrentNewValidator) > 0 {
 		for {
+			quite := false
 			select {
 			case b := <-oc.CurrentNewValidator:
 				oc.ChannelQueueValidator <- b
 			default:
+				quite = true
+			}
+			if quite {
 				break
 			}
 		}

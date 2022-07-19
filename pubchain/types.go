@@ -219,6 +219,10 @@ func (pi *Instance) sendTransactionWithLock(ctx context.Context, tx *types.Trans
 	pi.ethClientLocker.RUnlock()
 
 	if err != nil {
+		if err.Error() == "already known" {
+			pi.logger.Warn().Err(err).Msgf("the tx has already known online")
+			return nil
+		}
 		// we reset the ethcliet
 		fmt.Printf("error of the ethclient is %v\n", err)
 		pi.wg.Add(1)

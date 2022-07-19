@@ -22,11 +22,15 @@ func (pi *Instance) UpdateSubscription(ctx context.Context) error {
 		return err
 	}
 	if len(pi.SubChannelNow) > 0 {
+		quite := false
 		for {
 			select {
 			case b := <-pi.SubChannelNow:
 				pi.ChannelQueue <- b
 			default:
+				quite = true
+			}
+			if quite {
 				break
 			}
 		}
@@ -63,7 +67,6 @@ func (pi *Instance) RetryPubChain() error {
 			pi.logger.Error().Err(err).Msg("fail to dial the websocket")
 			return err
 		}
-		pi.logger.Warn().Msgf("we renewed the ethclient")
 		pi.renewEthClientWithLock(ethClient)
 		return nil
 	}
@@ -77,8 +80,10 @@ func (pi *Instance) RetryPubChain() error {
 	err = pi.UpdateSubscription(ctx)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("we fail to update the pubchain subscription")
+		return err
 	}
-	return err
+	pi.logger.Warn().Msgf("we renewed the ethclient")
+	return nil
 }
 
 func (pi *Instance) HealthCheckAndReset() {
