@@ -146,7 +146,7 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
 		}
 	}()
-	oc.grpcClient = e.network.Validators[0].ClientCtx
+	oc.GrpcClient = e.network.Validators[0].ClientCtx
 	err = oc.InitValidators(e.network.Validators[0].APIAddress)
 	e.Require().NoError(err)
 	data := base64.StdEncoding.EncodeToString(e.network.Validators[0].PubKey.Bytes())

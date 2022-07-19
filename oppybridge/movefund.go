@@ -4,11 +4,12 @@ import (
 	"html"
 
 	"github.com/cosmos/cosmos-sdk/types"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	zlog "github.com/rs/zerolog/log"
 )
 
 // MoveFound move all the funds for oppy chain
-func (oc *OppyChainInstance) MoveFound(currentBlockHeight int64, toAddress types.AccAddress) bool {
+func (oc *OppyChainInstance) MoveFound(conn grpc1.ClientConn, currentBlockHeight int64, toAddress types.AccAddress) bool {
 	moveFound := false
 	// we move fund if some pool retired
 	previousPool, _ := oc.popMoveFundItemAfterBlock(currentBlockHeight)
@@ -26,7 +27,7 @@ func (oc *OppyChainInstance) MoveFound(currentBlockHeight int64, toAddress types
 		return moveFound
 	}
 	moveFound = true
-	emptyAcc, err := oc.DoMoveFunds(previousPool, toAddress, currentBlockHeight)
+	emptyAcc, err := oc.DoMoveFunds(conn, previousPool, toAddress, currentBlockHeight)
 	if emptyAcc {
 		tick := html.UnescapeString("&#" + "127974" + ";")
 		zlog.Logger.Info().Msgf("%v successfully moved funds from %v to %v", tick, previousPool.OppyAddress.String(), toAddress.String())

@@ -121,7 +121,7 @@ func (b BridgeTestSuite) TestBridgeTx() {
 	oc.Keyring = b.validatorKey
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	oc.grpcClient = b.network.Validators[0].ClientCtx
+	oc.GrpcClient = b.network.Validators[0].ClientCtx
 	defer func() {
 		err := oc.TerminateBridge()
 		if err != nil {
@@ -134,7 +134,7 @@ func (b BridgeTestSuite) TestBridgeTx() {
 		PoolPubKey:  accs[1].pk,
 		BlockHeight: "5",
 	}
-	acc, err := queryAccount(b.network.Validators[0].Address.String(), oc.grpcClient)
+	acc, err := queryAccount(b.network.Validators[0].Address.String(), oc.GrpcClient)
 	b.Require().NoError(err)
 
 	num, seq := acc.GetAccountNumber(), acc.GetSequence()
@@ -197,7 +197,7 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 	oc.Keyring = b.validatorKey
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	oc.grpcClient = b.network.Validators[0].ClientCtx
+	oc.GrpcClient = b.network.Validators[0].ClientCtx
 	defer func() {
 		err := oc.TerminateBridge()
 		if err != nil {
@@ -238,7 +238,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	oc.lastTwoPools[0] = &pool
 	oc.lastTwoPools[1] = &pool
 
-	oc.grpcClient = b.network.Validators[0].ClientCtx
+	oc.GrpcClient = b.network.Validators[0].ClientCtx
 	defer func() {
 		err := oc.TerminateBridge()
 		if err != nil {
@@ -254,7 +254,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 
 	send := banktypes.NewMsgSend(valAddr, accs[0].oppyAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
-	acc, err := queryAccount(valAddr.String(), oc.grpcClient)
+	acc, err := queryAccount(valAddr.String(), oc.GrpcClient)
 	b.Require().NoError(err)
 
 	// txBuilder, err := oc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
@@ -267,7 +267,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	b.Require().True(ret)
 	err = b.network.WaitForNextBlock()
 	b.Require().NoError(err)
-	txClient := cosTx.NewServiceClient(oc.grpcClient)
+	txClient := cosTx.NewServiceClient(oc.GrpcClient)
 	txquery := cosTx.GetTxRequest{Hash: txHash}
 	resp, err := txClient.GetTx(context.Background(), &txquery, nil)
 	b.Require().NoError(err)

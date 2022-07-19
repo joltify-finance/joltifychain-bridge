@@ -45,8 +45,8 @@ type OppyChainInstance struct {
 	grpcAddr              string
 	httpAddr              string
 	grpcLock              *sync.RWMutex
-	grpcClient            grpc1.ClientConn
-	wsClient              *tmclienthttp.HTTP
+	GrpcClient            grpc1.ClientConn
+	WsClient              *tmclienthttp.HTTP
 	encoding              *params.EncodingConfig
 	Keyring               keyring.Keyring
 	logger                zerolog.Logger

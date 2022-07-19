@@ -257,7 +257,7 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	}()
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	oc.grpcClient = o.network.Validators[0].ClientCtx
+	oc.GrpcClient = o.network.Validators[0].ClientCtx
 	baseBlockHeight := int64(100)
 	msg := banktypes.MsgSend{}
 	memo := common2.BridgeMemo{

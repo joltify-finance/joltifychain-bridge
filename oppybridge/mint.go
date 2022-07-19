@@ -2,6 +2,8 @@ package oppybridge
 
 import (
 	"errors"
+
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
@@ -19,11 +21,11 @@ func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string
 }
 
 // ProcessInBound mint the token in oppy chain
-func (oc *OppyChainInstance) ProcessInBound(item *common.InBoundReq) (string, string, error) {
+func (oc *OppyChainInstance) ProcessInBound(conn grpc1.ClientConn, item *common.InBoundReq) (string, string, error) {
 	accSeq, accNum, poolAddress, poolPk := item.GetAccountInfo()
 	// we need to check against the previous account sequence
 	index := item.Hash().Hex()
-	if oc.CheckWhetherAlreadyExist(index) {
+	if oc.CheckWhetherAlreadyExist(conn, index) {
 		oc.logger.Warn().Msg("already submitted by others")
 		return "", "", nil
 	}
@@ -50,7 +52,7 @@ func (oc *OppyChainInstance) ProcessInBound(item *common.InBoundReq) (string, st
 		return "", "", err
 	}
 
-	ok, txHash, err := oc.composeAndSend(key, issueReq, accSeq, accNum, &signMsg, poolAddress)
+	ok, txHash, err := oc.composeAndSend(conn, key, issueReq, accSeq, accNum, &signMsg, poolAddress)
 	if err != nil || !ok {
 		oc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", txHash)
 		return "", index, errors.New("fail to process the inbound tx")

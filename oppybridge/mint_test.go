@@ -192,7 +192,7 @@ func (m MintTestSuite) TestProcessInbound() {
 	oc.Keyring = m.validatorky
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	oc.grpcClient = m.network.Validators[0].ClientCtx
+	oc.GrpcClient = m.network.Validators[0].ClientCtx
 	defer func() {
 		err := oc.TerminateBridge()
 		if err != nil {
@@ -209,7 +209,7 @@ func (m MintTestSuite) TestProcessInbound() {
 	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
 	m.Require().NoError(err)
 
-	acc, err := queryAccount(valAddr.String(), oc.grpcClient)
+	acc, err := queryAccount(valAddr.String(), oc.GrpcClient)
 	m.Require().NoError(err)
 	tx := common.NewAccountInboundReq(valAddr, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100), int64(100))
 

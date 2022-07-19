@@ -3,21 +3,34 @@ package oppybridge
 import (
 	"context"
 	"errors"
+
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
+	grpc1 "github.com/gogo/protobuf/grpc"
+	"google.golang.org/grpc"
 
 	"github.com/cenkalti/backoff"
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	grpc1 "github.com/gogo/protobuf/grpc"
 	types "github.com/tendermint/tendermint/proto/tendermint/types"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 // queryAccount get the current sender account info
-func queryAccount(addr string, grpcClient grpc1.ClientConn) (authtypes.AccountI, error) {
+func queryAccount(grpcClient grpc1.ClientConn, addr, grpcAddr string) (authtypes.AccountI, error) {
+	var err error
+	if grpcClient == nil {
+		grpcClie2, err := grpc.Dial(grpcAddr, grpc.WithInsecure())
+		if err != nil {
+			return nil, err
+		}
+		defer grpcClie2.Close()
+		grpcClient = grpcClie2
+	}
+
 	accQuery := authtypes.NewQueryClient(grpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
@@ -122,12 +135,12 @@ func GetBlockByHeight(grpcClient grpc1.ClientConn, height int64) (*types.Block, 
 }
 
 // CheckTxStatus check whether the tx has been done successfully
-func (oc *OppyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSeq uint64) error {
+func (oc *OppyChainInstance) waitAndSend(conn grpc1.ClientConn, poolAddress sdk.AccAddress, targetSeq uint64) error {
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
 
 	alreadyPassed := false
 	op := func() error {
-		acc, err := queryAccount(poolAddress.String(), oc.grpcClient)
+		acc, err := queryAccount(conn, poolAddress.String(), oc.grpcAddr)
 		if err != nil {
 			oc.logger.Error().Err(err).Msgf("fail to query the account")
 			return errors.New("invalid account query")
@@ -149,7 +162,7 @@ func (oc *OppyChainInstance) waitAndSend(poolAddress sdk.AccAddress, targetSeq u
 	return err
 }
 
-func (oc *OppyChainInstance) composeAndSend(operator keyring.Info, sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
+func (oc *OppyChainInstance) composeAndSend(conn grpc1.ClientConn, operator keyring.Info, sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
 	gasWanted := oc.GetGasEstimation()
 	txBuilder, err := oc.genSendTx(operator, []sdk.Msg{sendMsg}, accSeq, accNum, uint64(gasWanted), signMsg)
 	if err != nil {
@@ -168,15 +181,49 @@ func (oc *OppyChainInstance) composeAndSend(operator keyring.Info, sendMsg sdk.M
 
 	err = nil
 	if signMsg != nil {
-		err = oc.waitAndSend(poolAddress, accSeq)
+		err = oc.waitAndSend(conn, poolAddress, accSeq)
 	}
 	if err == nil {
 		isTssMsg := true
 		if signMsg == nil {
 			isTssMsg = false
 		}
-		ok, resp, err := oc.BroadcastTx(ctx, txBytes, isTssMsg)
+		ok, resp, err := oc.BroadcastTx(ctx, conn, txBytes, isTssMsg)
 		return ok, resp, err
 	}
 	return false, "", err
+}
+
+// BroadcastTx broadcast the tx to the oppyChain
+func (oc *OppyChainInstance) BroadcastTx(ctx context.Context, conn grpc1.ClientConn, txBytes []byte, isTssMsg bool) (bool, string, error) {
+	// Broadcast the tx via gRPC. We create a new client for the Protobuf Tx
+	// service.
+	txClient := cosTx.NewServiceClient(conn)
+	// We then call the BroadcastTx method on this client.
+	grpcRes, err := txClient.BroadcastTx(
+		ctx,
+		&cosTx.BroadcastTxRequest{
+			Mode:    cosTx.BroadcastMode_BROADCAST_MODE_BLOCK,
+			TxBytes: txBytes, // Proto-binary of the signed transaction, see previous step.
+		},
+	)
+	if err != nil {
+		return false, "", err
+	}
+
+	// this mean tx has been submitted by others
+	if grpcRes.GetTxResponse().Code == 19 {
+		return true, "", nil
+	}
+
+	if grpcRes.GetTxResponse().Code != 0 {
+		oc.logger.Error().Err(err).Msgf("fail to broadcast with response %v", grpcRes.TxResponse)
+		return false, "", nil
+	}
+	txHash := grpcRes.GetTxResponse().TxHash
+	if isTssMsg {
+		oc.UpdateGas(grpcRes.GetTxResponse().GasUsed)
+	}
+
+	return true, txHash, nil
 }

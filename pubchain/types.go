@@ -121,7 +121,7 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.T
 		moveFundReq:     &sync.Map{},
 		TokenList:       tl,
 		wg:              wg,
-		ChannelQueue:    make(chan *types.Header, 1),
+		ChannelQueue:    make(chan *types.Header, sbchannelsize),
 	}, nil
 }
 

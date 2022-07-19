@@ -1,6 +1,10 @@
 package oppybridge
 
 import (
+	"strconv"
+	"testing"
+	"time"
+
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -12,9 +16,6 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 	"gitlab.com/oppy-finance/oppychain/testutil/network"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
-	"strconv"
-	"testing"
-	"time"
 )
 
 type ValidatorTestSuite struct {
@@ -120,7 +121,7 @@ func (v *ValidatorTestSuite) SetupSuite() {
 
 func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
 	oc := new(OppyChainInstance)
-	oc.grpcClient = v.network.Validators[0].ClientCtx
+	oc.GrpcClient = v.network.Validators[0].ClientCtx
 	err := oc.InitValidators(v.network.Validators[0].APIAddress)
 	v.Require().Nil(err)
 
@@ -146,16 +147,16 @@ func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
 
 func (v ValidatorTestSuite) TestQueryPool() {
 	oc := new(OppyChainInstance)
-	oc.grpcClient = v.network.Validators[0].ClientCtx
+	oc.GrpcClient = v.network.Validators[0].ClientCtx
 	_, err := oc.QueryLastPoolAddress()
 	v.Require().NoError(err)
 }
 
 func (v ValidatorTestSuite) TestCheckWhetherSigner() {
 	oc := new(OppyChainInstance)
-	oc.grpcClient = v.network.Validators[0].ClientCtx
+	oc.GrpcClient = v.network.Validators[0].ClientCtx
 	oc.Keyring = v.validatorky
-	blockHeight, err := GetLastBlockHeight(oc.grpcClient)
+	blockHeight, err := GetLastBlockHeight(oc.GrpcClient)
 	v.Require().NoError(err)
 	v.Require().GreaterOrEqual(blockHeight, int64(1))
 
@@ -183,7 +184,7 @@ func TestInitValidator(t *testing.T) {
 
 func (v ValidatorTestSuite) TestOppyChainBridge_CheckWhetherAlreadyExist() {
 	oc := new(OppyChainInstance)
-	oc.grpcClient = v.network.Validators[0].ClientCtx
+	oc.GrpcClient = v.network.Validators[0].ClientCtx
 	ret := oc.CheckWhetherAlreadyExist("testindex")
 	v.Require().True(ret)
 

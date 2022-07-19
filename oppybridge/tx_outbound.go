@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"strings"
 
+	grpc1 "github.com/gogo/protobuf/grpc"
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
@@ -299,14 +300,14 @@ func (oc *OppyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.Pool
 	return previousPool
 }
 
-func (oc *OppyChainInstance) DoMoveFunds(fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) (bool, error) {
+func (oc *OppyChainInstance) DoMoveFunds(conn grpc1.ClientConn, fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) (bool, error) {
 	from := fromPool.OppyAddress
-	acc, err := queryAccount(from.String(), oc.grpcClient)
+	acc, err := queryAccount(conn, from.String(), "")
 	if err != nil {
 		oc.logger.Error().Err(err).Msg("Fail to query the pool account")
 		return false, err
 	}
-	coins, err := queryBalance(from.String(), oc.grpcClient)
+	coins, err := queryBalance(from.String(), oc.GrpcClient)
 	if err != nil {
 		oc.logger.Error().Err(err).Msg("Fail to query the balance")
 		return false, err
@@ -331,7 +332,7 @@ func (oc *OppyChainInstance) DoMoveFunds(fromPool *bcommon.PoolInfo, to types.Ac
 		return false, err
 	}
 
-	ok, resp, err := oc.composeAndSend(key, msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, acc.GetAddress())
+	ok, resp, err := oc.composeAndSend(conn, key, msg, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, acc.GetAddress())
 	if err != nil || !ok {
 		oc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", resp)
 		return false, errors.New("fail to process the inbound tx")

@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/cenkalti/backoff"
-	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"time"
 
+	"github.com/cenkalti/backoff"
+	grpc1 "github.com/gogo/protobuf/grpc"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/validators"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 
@@ -22,7 +23,7 @@ import (
 
 // InitValidators initialize the validators
 func (oc *OppyChainInstance) InitValidators(addr string) error {
-	ts := tmservice.NewServiceClient(oc.grpcClient)
+	ts := tmservice.NewServiceClient(oc.GrpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 
@@ -56,7 +57,7 @@ func (oc *OppyChainInstance) InitValidators(addr string) error {
 		return err
 	}
 
-	blockHeight, values, err := QueryTipValidator(oc.grpcClient)
+	blockHeight, values, err := QueryTipValidator(oc.GrpcClient)
 	if err != nil {
 		oc.logger.Error().Err(err).Msg("fail to initialize the validator pool")
 		return err
@@ -76,8 +77,9 @@ func (oc *OppyChainInstance) GetLastValidator() ([]*validators.Validator, int64)
 }
 
 // QueryLastPoolAddress returns the latest two pool outReceiverAddress
-func (oc *OppyChainInstance) QueryLastPoolAddress() ([]*vaulttypes.PoolInfo, error) {
-	poolInfo, err := queryLastValidatorSet(oc.grpcClient)
+func (oc *OppyChainInstance) QueryLastPoolAddress(conn grpc1.ClientConn) ([]*vaulttypes.PoolInfo, error) {
+
+	poolInfo, err := queryLastValidatorSet(conn)
 	if err != nil {
 		oc.logger.Error().Err(err).Msg("fail to get the pool info")
 		return nil, err
@@ -104,8 +106,8 @@ func (oc *OppyChainInstance) CheckWhetherSigner(lastPoolInfo *vaulttypes.PoolInf
 }
 
 // CheckWhetherAlreadyExist check whether it is already existed
-func (oc *OppyChainInstance) CheckWhetherAlreadyExist(index string) bool {
-	ret, err := queryGivenToeknIssueTx(oc.grpcClient, index)
+func (oc *OppyChainInstance) CheckWhetherAlreadyExist(conn grpc1.ClientConn, index string) bool {
+	ret, err := queryGivenToeknIssueTx(conn, index)
 	if err != nil {
 		return false
 	}
@@ -116,14 +118,14 @@ func (oc *OppyChainInstance) CheckWhetherAlreadyExist(index string) bool {
 }
 
 // CheckTxStatus check whether the tx has been done successfully
-func (oc *OppyChainInstance) CheckTxStatus(index string) error {
+func (oc *OppyChainInstance) CheckTxStatus(conn grpc1.ClientConn, index string) error {
 	bf := backoff.NewExponentialBackOff()
 	bf.InitialInterval = time.Second
 	bf.MaxInterval = time.Second * 10
 	bf.MaxElapsedTime = time.Minute
 
 	op := func() error {
-		if oc.CheckWhetherAlreadyExist(index) {
+		if oc.CheckWhetherAlreadyExist(conn, index) {
 			return nil
 		}
 		return errors.New("fail to find the tx")
@@ -134,7 +136,7 @@ func (oc *OppyChainInstance) CheckTxStatus(index string) error {
 }
 
 func (oc *OppyChainInstance) getValidators(height string) ([]*vaulttypes.Validator, error) {
-	vaultQuery := vaulttypes.NewQueryClient(oc.grpcClient)
+	vaultQuery := vaulttypes.NewQueryClient(oc.GrpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 

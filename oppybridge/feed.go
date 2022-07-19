@@ -3,16 +3,17 @@ package oppybridge
 import (
 	"errors"
 
+	grpc1 "github.com/gogo/protobuf/grpc"
 	zlog "github.com/rs/zerolog/log"
 	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 // FeedTx feed the tx with the given
-func (oc *OppyChainInstance) FeedTx(lastPoolInfo *vaulttypes.PoolInfo, pi *pubchain.Instance, currentBlockHeight int64) error {
+func (oc *OppyChainInstance) FeedTx(conn grpc1.ClientConn, lastPoolInfo *vaulttypes.PoolInfo, pi *pubchain.Instance, currentBlockHeight int64) error {
 	// we always increase the account seq regardless the tx successful or not
 	currentPool := lastPoolInfo.CreatePool.PoolAddr
-	acc, err := queryAccount(currentPool.String(), oc.grpcClient)
+	acc, err := queryAccount(conn, currentPool.String(), "")
 	if err != nil {
 		oc.logger.Error().Err(err).Msgf("fail to query the account")
 		return errors.New("invalid account query")

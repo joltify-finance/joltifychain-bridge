@@ -129,7 +129,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 	oc, err := NewOppyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl)
 	f.Require().NoError(err)
 	oc.Keyring = f.validatorky
-	oc.grpcClient = f.network.Validators[0].ClientCtx
+	oc.GrpcClient = f.network.Validators[0].ClientCtx
 	info, err := oc.Keyring.Key("operator")
 	f.Require().NoError(err)
 	poolInfo := vaulttypes.PoolInfo{
@@ -140,7 +140,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		},
 	}
 
-	acc, err := queryAccount(f.network.Validators[0].Address.String(), oc.grpcClient)
+	acc, err := queryAccount(f.network.Validators[0].Address.String(), oc.GrpcClient)
 	f.Require().NoError(err)
 	_ = acc
 	pi := pubchain.Instance{

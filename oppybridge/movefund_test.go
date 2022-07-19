@@ -119,7 +119,7 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 	m.Require().NoError(err)
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	oc.grpcClient = m.network.Validators[0].ClientCtx
+	oc.GrpcClient = m.network.Validators[0].ClientCtx
 	oc.Keyring = m.validatorky
 
 	info, _ := m.network.Validators[0].ClientCtx.Keyring.Key("node0")
@@ -137,7 +137,7 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 		Pk:          pkstr,
 		PoolInfo:    &vaulttypes.PoolInfo{CreatePool: &pro},
 	}
-	acc, err := queryAccount(info.GetAddress().String(), oc.grpcClient)
+	acc, err := queryAccount(info.GetAddress().String(), oc.GrpcClient)
 	m.Require().NoError(err)
 
 	coin := sdk.NewCoin("stake", sdk.NewInt(100))

@@ -13,36 +13,34 @@ import (
 // AddSubscribe add the subscirbe to the chain
 func (oc *OppyChainInstance) AddSubscribe(ctx context.Context) error {
 
+	var err error
 	query := "complete_churn.churn = 'oppy_churn'"
-	out, err := oc.wsClient.Subscribe(ctx, "oppyBridge", query, capacity)
+	oc.CurrentNewValidator, err = oc.WsClient.Subscribe(ctx, "oppyBridgeChurn", query, capacity)
 	if err != nil {
 		oc.logger.Error().Err(err).Msgf("Failed to subscribe to query with error %v", err)
 		return err
 	}
 
-	oc.CurrentNewValidator = out
-
 	query = "tm.event = 'NewBlock'"
-	newOppyBlock, err := oc.wsClient.Subscribe(ctx, "oppyBridge", query, capacity)
+	oc.CurrentNewBlockChan, err = oc.WsClient.Subscribe(ctx, "oppyBridgeNewBlock", query, capacity)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return err
 	}
-	oc.CurrentNewBlockChan = newOppyBlock
 	return nil
 }
 
 // UpdateSubscribe add the subscribe to the chain
 func (oc *OppyChainInstance) UpdateSubscribe(ctx context.Context) error {
 	query := "complete_churn.churn = 'oppy_churn'"
-	validator, err := oc.wsClient.Subscribe(ctx, "oppyBridge", query, capacity)
+	validator, err := oc.WsClient.Subscribe(ctx, "oppyBridgeChurn", query, capacity)
 	if err != nil {
 		oc.logger.Error().Err(err).Msgf("Failed to subscribe to query with error %v", err)
 		return err
 	}
 
 	query = "tm.event = 'NewBlock'"
-	newOppyBlock, err := oc.wsClient.Subscribe(ctx, "oppyBridge", query, capacity)
+	newOppyBlock, err := oc.WsClient.Subscribe(ctx, "oppyBridgeNewBlock", query, capacity)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return err
@@ -75,7 +73,7 @@ func (oc *OppyChainInstance) UpdateSubscribe(ctx context.Context) error {
 	return nil
 }
 
-func (oc *OppyChainInstance) RetryOppyChain() {
+func (oc *OppyChainInstance) RetryOppyChain() error {
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second*10), 3)
 	op := func() error {
 
@@ -83,7 +81,6 @@ func (oc *OppyChainInstance) RetryOppyChain() {
 		if err != nil {
 			return err
 		}
-
 		client, err := tmclienthttp.New(oc.httpAddr, "/websocket")
 		if err != nil {
 			return err
@@ -91,8 +88,8 @@ func (oc *OppyChainInstance) RetryOppyChain() {
 		oc.retryLock.Lock()
 		defer oc.retryLock.Unlock()
 		oc.logger.Warn().Msgf("we renewed the oppy client")
-		oc.grpcClient = grpcClient
-		oc.wsClient = client
+		oc.GrpcClient = grpcClient
+		oc.WsClient = client
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 		defer cancel()
 		oc.UpdateSubscribe(ctx)
@@ -103,4 +100,5 @@ func (oc *OppyChainInstance) RetryOppyChain() {
 	if err != nil {
 		oc.logger.Error().Err(err).Msgf("we fail to reconnect the pubchain interface with retries")
 	}
+	return err
 }

@@ -38,13 +38,12 @@ func (pi *Instance) UpdateSubscription(ctx context.Context) error {
 
 // StartSubscription start the subscription of the token
 func (pi *Instance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) error {
-	blockEvent := make(chan *types.Header, sbchannelsize)
-	handler, err := pi.EthClient.SubscribeNewHead(ctx, blockEvent)
+	pi.SubChannelNow = make(chan *types.Header, sbchannelsize)
+	handler, err := pi.EthClient.SubscribeNewHead(ctx, pi.SubChannelNow)
 	if err != nil {
 		fmt.Printf("fail to subscribe the block event with err %v\n", err)
 		return err
 	}
-	pi.ChannelQueue = blockEvent
 	pi.SubHandler = handler
 
 	go func() {
@@ -56,7 +55,7 @@ func (pi *Instance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) e
 	return nil
 }
 
-func (pi *Instance) RetryPubChain() {
+func (pi *Instance) RetryPubChain() error {
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second*10), 3)
 	op := func() error {
 		ethClient, err := ethclient.Dial(pi.configAddr)
@@ -71,6 +70,7 @@ func (pi *Instance) RetryPubChain() {
 	err := backoff.Retry(op, bf)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("we fail to reconnect the pubchain interface with retries")
+		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
@@ -78,5 +78,18 @@ func (pi *Instance) RetryPubChain() {
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("we fail to update the pubchain subscription")
 	}
+	return err
+}
 
+func (pi *Instance) HealthCheckAndReset() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	_, err := pi.EthClient.BlockNumber(ctx)
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("public chain connnection seems stopped we reset")
+		err2 := pi.RetryPubChain()
+		if err2 != nil {
+			pi.logger.Error().Err(err).Msgf("pubchain fail to restart")
+		}
+	}
 }

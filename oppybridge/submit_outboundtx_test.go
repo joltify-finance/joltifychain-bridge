@@ -109,7 +109,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	oc.Keyring = s.validatorky
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	oc.grpcClient = s.network.Validators[0].ClientCtx
+	oc.GrpcClient = s.network.Validators[0].ClientCtx
 	defer func() {
 		err := oc.TerminateBridge()
 		if err != nil {
@@ -129,7 +129,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
 	s.Require().NoError(err)
 
-	acc, err := queryAccount(valAddr.String(), oc.grpcClient)
+	acc, err := queryAccount(valAddr.String(), oc.GrpcClient)
 	s.Require().NoError(err)
 
 	operatorInfo, _ := oc.Keyring.Key("operator")
