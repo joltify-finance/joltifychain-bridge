@@ -50,7 +50,7 @@ func (oc *OppyChainInstance) UpdateSubscribe(ctx context.Context) error {
 		quite := false
 		for {
 			select {
-			case b := <-oc.CurrentNewValidator:
+			case b := <-oc.CurrentNewBlockChan:
 				oc.ChannelQueueNewBlock <- b
 			default:
 				quite = true
@@ -93,15 +93,26 @@ func (oc *OppyChainInstance) RetryOppyChain() error {
 		if err != nil {
 			return err
 		}
+
+		err = client.Start()
+		if err != nil {
+			return err
+		}
+
 		oc.retryLock.Lock()
 		defer oc.retryLock.Unlock()
 		oc.logger.Warn().Msgf("we renewed the oppy client")
+
+		// we stop the old connection though it may broken
+		err = oc.WsClient.Stop()
+		if err != nil {
+			oc.logger.Error().Err(err).Msgf("we fail to stop the previous WS client")
+		}
 		oc.GrpcClient = grpcClient
 		oc.WsClient = client
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 		defer cancel()
 		oc.UpdateSubscribe(ctx)
-
 		return nil
 	}
 	err := backoff.Retry(op, bf)

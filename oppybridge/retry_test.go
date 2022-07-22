@@ -1,33 +1,26 @@
 package oppybridge
 
 import (
-	"fmt"
-	"math/rand"
+	"context"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
-
-	"github.com/cosmos/cosmos-sdk/types/simulation"
-	"github.com/ethereum/go-ethereum/crypto"
-	grpc1 "github.com/gogo/protobuf/grpc"
-	"gitlab.com/oppy-finance/oppy-bridge/common"
-	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
-	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"github.com/stretchr/testify/suite"
+	"github.com/tendermint/tendermint/types"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 	"gitlab.com/oppy-finance/oppychain/testutil/network"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
-type FeedtransactionTestSuite struct {
+type subscribeTestSuite struct {
 	suite.Suite
 	cfg         network.Config
 	network     *network.Network
@@ -36,7 +29,7 @@ type FeedtransactionTestSuite struct {
 	grpc        grpc1.ClientConn
 }
 
-func (f *FeedtransactionTestSuite) SetupSuite() {
+func (f *subscribeTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
 	cfg.BondDenom = "stake"
@@ -97,73 +90,53 @@ func (f *FeedtransactionTestSuite) SetupSuite() {
 	f.queryClient = tmservice.NewServiceClient(f.network.Validators[0].ClientCtx)
 }
 
-func createdTestInBoundReqs(n int) []*common.InBoundReq {
-	r := rand.New(rand.NewSource(time.Now().Unix()))
-	accs := simulation.RandomAccounts(r, n)
-	retReq := make([]*common.InBoundReq, n)
-	for i := 0; i < n; i++ {
-		txid := fmt.Sprintf("testTXID %v", i)
-		testCoin := sdk.NewCoin("test", sdk.NewInt(32))
-		sk, err := crypto.GenerateKey()
-		if err != nil {
-			panic(err)
-		}
-		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewAccountInboundReq(accs[i].Address, addr, testCoin, []byte(txid), int64(i), int64(i))
-		retReq[i] = &item
-	}
-	return retReq
+func (s *subscribeTestSuite) TestSubscribe() {
+	oc, err := NewOppyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, nil, nil)
+	s.Require().NoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	err = oc.AddSubscribe(ctx)
+	s.Require().NoError(err)
+
+	block := <-oc.CurrentNewBlockChan
+	currentBlockHeight1 := block.Data.(types.EventDataNewBlock).Block.Height
+
+	block = <-oc.CurrentNewBlockChan
+	currentBlockHeight2 := block.Data.(types.EventDataNewBlock).Block.Height
+
+	s.Require().Equal(currentBlockHeight1+1, currentBlockHeight2)
+
+	// we cache 4 blocks
+	current := currentBlockHeight2 + 4
+	s.network.WaitForHeight(current)
+
+	err = oc.RetryOppyChain()
+	s.Require().NoError(err)
+
+	current += 2
+	s.network.WaitForHeight(current)
+
+	time.Sleep(time.Second)
+	s.Require().Equal(4, len(oc.ChannelQueueNewBlock))
+	s.Require().Equal(2, len(oc.CurrentNewBlockChan))
+
+	// do the test again
+	current += 5
+	s.network.WaitForHeight(current)
+	err = oc.RetryOppyChain()
+	s.Require().NoError(err)
+
+	current += 3
+	s.network.WaitForHeight(current)
+
+	time.Sleep(time.Second)
+	// 11=4+5+2
+	s.Require().Equal(11, len(oc.ChannelQueueNewBlock))
+	s.Require().Equal(3, len(oc.CurrentNewBlockChan))
+
 }
 
-func (f FeedtransactionTestSuite) TestFeedTransactions() {
-	accs, err := generateRandomPrivKey(2)
-	f.Require().NoError(err)
-	tss := TssMock{
-		accs[0].sk,
-		// nil,
-		f.network.Validators[0].ClientCtx.Keyring,
-		// m.network.Validators[0].ClientCtx.Keyring,
-		true,
-		true,
-	}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
-	f.Require().NoError(err)
-	oc, err := NewOppyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl)
-	f.Require().NoError(err)
-	oc.Keyring = f.validatorky
-	oc.GrpcClient = f.network.Validators[0].ClientCtx
-	info, err := oc.Keyring.Key("operator")
-	f.Require().NoError(err)
-	poolInfo := vaulttypes.PoolInfo{
-		BlockHeight: "100",
-		CreatePool: &vaulttypes.PoolProposal{
-			PoolAddr: f.network.Validators[0].Address,
-			Nodes:    []sdk.AccAddress{info.GetAddress()},
-		},
-	}
-
-	acc, err := queryAccount(f.grpc, f.network.Validators[0].Address.String(), "")
-	f.Require().NoError(err)
-	_ = acc
-	pi := pubchain.Instance{
-		RetryInboundReq: &sync.Map{},
-		InboundReqChan:  make(chan *common.InBoundReq, 10),
-	}
-
-	err = oc.FeedTx(f.grpc, &poolInfo, &pi, 100)
-	f.Require().NoError(err)
-	f.Require().Equal(len(pi.InboundReqChan), 0)
-	reqs := createdTestInBoundReqs(1)
-	for _, el := range reqs {
-		pi.AddItem(el)
-	}
-
-	err = oc.FeedTx(f.grpc, &poolInfo, &pi, 100)
-	f.Require().NoError(err)
-	value := <-pi.InboundReqChan
-	f.Require().Equal(value.TxID, reqs[0].TxID)
-}
-
-func TestFedTransaction(t *testing.T) {
-	suite.Run(t, new(FeedtransactionTestSuite))
+func TestSubscribeAndRetry(t *testing.T) {
+	suite.Run(t, new(subscribeTestSuite))
 }

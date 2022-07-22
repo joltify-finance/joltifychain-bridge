@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	grpc1 "github.com/gogo/protobuf/grpc"
 	common2 "gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
@@ -32,6 +33,7 @@ type OutBoundTestSuite struct {
 	network     *network.Network
 	validatorky keyring.Keyring
 	queryClient tmservice.ServiceClient
+	grpc        grpc1.ClientConn
 }
 
 const (
@@ -97,7 +99,7 @@ func (v *OutBoundTestSuite) SetupSuite() {
 
 	_, err = v.network.WaitForHeight(1)
 	v.Require().Nil(err)
-
+	v.grpc = v.network.Validators[0].ClientCtx
 	v.queryClient = tmservice.NewServiceClient(v.network.Validators[0].ClientCtx)
 }
 
@@ -271,7 +273,7 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, memo, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "empty address string is not allowed")
 
-	ret := oc.CheckWhetherAlreadyExist("testindex")
+	ret := oc.CheckWhetherAlreadyExist(o.grpc, "testindex")
 	o.Require().True(ret)
 
 	msg.ToAddress = accs[3].oppyAddr.String()

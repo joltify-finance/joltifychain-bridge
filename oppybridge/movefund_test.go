@@ -138,7 +138,7 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 		Pk:          pkstr,
 		PoolInfo:    &vaulttypes.PoolInfo{CreatePool: &pro},
 	}
-	acc, err := queryAccount(nil, info.GetAddress().String(), m.network.Validators[0].RPCAddress)
+	acc, err := queryAccount(m.grpc, info.GetAddress().String(), m.network.Validators[0].RPCAddress[:len(m.network.Validators[0].RPCAddress)-1])
 	m.Require().NoError(err)
 
 	coin := sdk.NewCoin("stake", sdk.NewInt(100))

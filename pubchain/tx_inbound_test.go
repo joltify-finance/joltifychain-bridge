@@ -158,7 +158,8 @@ func TestProcessInBound(t *testing.T) {
 	tssServer := TssMock{acc[0].sk}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
 	assert.Nil(t, err)
-	pi, err := NewChainInstance(websocketTest, &tssServer, tl)
+	wg := sync.WaitGroup{}
+	pi, err := NewChainInstance(websocketTest, &tssServer, tl, &wg)
 	assert.Nil(t, err)
 
 	toStr := "FFcf8FDEE72ac11b5c542428B35EEF5769C409f0"
@@ -608,7 +609,8 @@ func TestProcessERC20InBoundOnBSC(t *testing.T) {
 	tssServer := TssMock{acc[0].sk}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
 	assert.Nil(t, err)
-	pi, err := NewChainInstance(websocketTest, &tssServer, tl)
+	wg := sync.WaitGroup{}
+	pi, err := NewChainInstance(websocketTest, &tssServer, tl, &wg)
 	assert.Nil(t, err)
 
 	txid := common.HexToHash("0xec80b9209979cb24c7d41fa6165082c67c587d648fd2ad8165175d0ed86a3281")
@@ -631,7 +633,8 @@ func TestProcessNativeInBoundOnBSC(t *testing.T) {
 	tssServer := TssMock{acc[0].sk}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"native"}, []string{"abnb"})
 	assert.Nil(t, err)
-	pi, err := NewChainInstance(websocketTest, &tssServer, tl)
+	wg := sync.WaitGroup{}
+	pi, err := NewChainInstance(websocketTest, &tssServer, tl, &wg)
 
 	poolInfo := common2.PoolInfo{
 		EthAddress: common.HexToAddress("0x1f65cc33558b6825db119e9fe4c73b436211667e"),

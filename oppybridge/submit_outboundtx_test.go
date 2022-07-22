@@ -13,6 +13,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
@@ -29,6 +30,7 @@ type SubmitOutBoundTestSuite struct {
 	network     *network.Network
 	validatorky keyring.Keyring
 	queryClient tmservice.ServiceClient
+	grpc        grpc1.ClientConn
 }
 
 func (v *SubmitOutBoundTestSuite) SetupSuite() {
@@ -87,7 +89,7 @@ func (v *SubmitOutBoundTestSuite) SetupSuite() {
 	v.Require().NoError(err)
 	err = v.validatorky.ImportPrivKey("operator", sk, "12345678")
 	v.Require().NoError(err)
-
+	v.grpc = v.network.Validators[0].ClientCtx
 	v.queryClient = tmservice.NewServiceClient(v.network.Validators[0].ClientCtx)
 }
 
@@ -129,7 +131,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
 	s.Require().NoError(err)
 
-	acc, err := queryAccount(valAddr.String(), oc.GrpcClient)
+	acc, err := queryAccount(nil, valAddr.String(), oc.grpcAddr)
 	s.Require().NoError(err)
 
 	operatorInfo, _ := oc.Keyring.Key("operator")
@@ -140,7 +142,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	s.Require().NoError(err)
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	s.Require().NoError(err)
-	ret, _, err := oc.BroadcastTx(context.Background(), txBytes, false)
+	ret, _, err := oc.BroadcastTx(context.Background(), s.grpc, txBytes, false)
 	s.Require().NoError(err)
 	s.Require().True(ret)
 
@@ -150,7 +152,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 		OriginalHeight:     5,
 	}
 	s.Require().NoError(err)
-	err = oc.SubmitOutboundTx(info, req.Hash().Hex(), 10, hex.EncodeToString([]byte("testpubtx")))
+	err = oc.SubmitOutboundTx(s.grpc, info, req.Hash().Hex(), 10, hex.EncodeToString([]byte("testpubtx")))
 	s.Require().NoError(err)
 	_, err = oc.GetPubChainSubmittedTx(req)
 	s.Require().NoError(err)

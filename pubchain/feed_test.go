@@ -2,6 +2,7 @@ package pubchain
 
 import (
 	"math/big"
+	"sync"
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -41,7 +42,8 @@ func TestFeedTx(t *testing.T) {
 	tssServer := TssMock{acc[0].sk}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	assert.NilError(t, err)
-	pi, err := NewChainInstance(websocketTest, &tssServer, tl)
+	wg := sync.WaitGroup{}
+	pi, err := NewChainInstance(websocketTest, &tssServer, tl, &wg)
 	assert.NilError(t, err)
 	c := ethclient.NewClient(client)
 	pi.EthClient = c

@@ -12,6 +12,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 	"gitlab.com/oppy-finance/oppychain/testutil/network"
@@ -24,6 +25,7 @@ type ValidatorTestSuite struct {
 	network     *network.Network
 	validatorky keyring.Keyring
 	queryClient tmservice.ServiceClient
+	grpc        grpc1.ClientConn
 }
 
 func genNValidator(n int, validatorky keyring.Keyring) ([]stakingtypes.Validator, error) {
@@ -148,7 +150,7 @@ func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
 func (v ValidatorTestSuite) TestQueryPool() {
 	oc := new(OppyChainInstance)
 	oc.GrpcClient = v.network.Validators[0].ClientCtx
-	_, err := oc.QueryLastPoolAddress()
+	_, err := oc.QueryLastPoolAddress(v.grpc)
 	v.Require().NoError(err)
 }
 
@@ -160,7 +162,7 @@ func (v ValidatorTestSuite) TestCheckWhetherSigner() {
 	v.Require().NoError(err)
 	v.Require().GreaterOrEqual(blockHeight, int64(1))
 
-	poolInfo, err := oc.QueryLastPoolAddress()
+	poolInfo, err := oc.QueryLastPoolAddress(v.grpc)
 	v.Require().NoError(err)
 	v.Require().False(len(poolInfo) == 0)
 	lastPoolInfo := poolInfo[0]
@@ -185,9 +187,9 @@ func TestInitValidator(t *testing.T) {
 func (v ValidatorTestSuite) TestOppyChainBridge_CheckWhetherAlreadyExist() {
 	oc := new(OppyChainInstance)
 	oc.GrpcClient = v.network.Validators[0].ClientCtx
-	ret := oc.CheckWhetherAlreadyExist("testindex")
+	ret := oc.CheckWhetherAlreadyExist(v.grpc, "testindex")
 	v.Require().True(ret)
 
-	ret = oc.CheckWhetherAlreadyExist("testindexnoexist")
+	ret = oc.CheckWhetherAlreadyExist(v.grpc, "testindexnoexist")
 	v.Require().False(ret)
 }
