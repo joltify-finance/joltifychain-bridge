@@ -12,6 +12,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
@@ -25,6 +26,7 @@ type EventTestSuite struct {
 	network     *network.Network
 	validatorky keyring.Keyring
 	queryClient tmservice.ServiceClient
+	grpc        grpc1.ClientConn
 }
 
 func (v *EventTestSuite) SetupSuite() {
@@ -97,7 +99,7 @@ func (v *EventTestSuite) SetupSuite() {
 
 	_, err = v.network.WaitForHeight(1)
 	v.Require().Nil(err)
-
+	v.grpc = v.network.Validators[0].ClientCtx
 	v.queryClient = tmservice.NewServiceClient(v.network.Validators[0].ClientCtx)
 }
 
@@ -120,10 +122,9 @@ func (e EventTestSuite) TestSubscribe() {
 			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
 		}
 	}()
-	query := "tm.event = 'NewBlock'"
-	eventChain, err := oc.AddSubscribe(context.Background(), query)
+	err = oc.AddSubscribe(context.Background())
 	e.Require().NoError(err)
-	data := <-eventChain
+	data := <-oc.CurrentNewBlockChan
 	e.T().Logf("new block event test %v", data.Events)
 }
 

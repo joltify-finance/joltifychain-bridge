@@ -3,13 +3,14 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 )
 
 // PendingMoveFundMgr save the local state to file
@@ -67,14 +68,14 @@ func (fsm *PendingMoveFundMgr) LoadPendingItems() ([]*bcommon.PoolInfo, []*bcomm
 	if len(fsm.folder) < 1 {
 		return nil, nil, errors.New("base file path is invalid")
 	}
-	pubFilePathName := filepath.Join(fsm.folder, "movefundpending.dat")
+	pubFilePathName := filepath.Join(fsm.folder, "movefundpending_pub.dat")
 	_, err := os.Stat(pubFilePathName)
 	if err != nil {
 		fsm.logger.Error().Err(err).Msgf("fail to load the move fund on pub chain")
 		pubFilePathName = ""
 	}
 
-	oppyFilePathName := filepath.Join(fsm.folder, "movefundpending.dat")
+	oppyFilePathName := filepath.Join(fsm.folder, "movefundpending_oppy.dat")
 	_, err = os.Stat(oppyFilePathName)
 	if err != nil {
 		oppyFilePathName = ""

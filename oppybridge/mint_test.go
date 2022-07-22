@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/client"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
@@ -32,6 +33,7 @@ type MintTestSuite struct {
 	network     *network.Network
 	validatorky keyring.Keyring
 	queryClient tmservice.ServiceClient
+	grpc        grpc1.ClientConn
 }
 
 func (v *MintTestSuite) SetupSuite() {
@@ -93,7 +95,7 @@ func (v *MintTestSuite) SetupSuite() {
 
 	_, err = v.network.WaitForHeight(1)
 	v.Require().Nil(err)
-
+	v.grpc = v.network.Validators[0].ClientCtx
 	v.queryClient = tmservice.NewServiceClient(v.network.Validators[0].ClientCtx)
 }
 
@@ -209,7 +211,7 @@ func (m MintTestSuite) TestProcessInbound() {
 	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
 	m.Require().NoError(err)
 
-	acc, err := queryAccount(valAddr.String(), oc.GrpcClient)
+	acc, err := queryAccount(nil, valAddr.String(), m.network.Validators[0].RPCAddress)
 	m.Require().NoError(err)
 	tx := common.NewAccountInboundReq(valAddr, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100), int64(100))
 
@@ -222,7 +224,7 @@ func (m MintTestSuite) TestProcessInbound() {
 	m.Require().NoError(err)
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	m.Require().NoError(err)
-	ret, _, err := oc.BroadcastTx(context.Background(), txBytes, false)
+	ret, _, err := oc.BroadcastTx(context.Background(), m.grpc, txBytes, false)
 	m.Require().NoError(err)
 	m.Require().True(ret)
 
@@ -235,7 +237,7 @@ func (m MintTestSuite) TestProcessInbound() {
 	oc.lastTwoPools[0] = &pool
 	oc.lastTwoPools[1] = &pool
 
-	_, _, err = oc.ProcessInBound(&tx)
+	_, _, err = oc.ProcessInBound(m.grpc, &tx)
 	m.Require().Error(err)
 }
 

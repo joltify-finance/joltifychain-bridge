@@ -12,6 +12,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	"github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
@@ -27,6 +28,7 @@ type MoveFundTestSuite struct {
 	network     *network.Network
 	validatorky keyring.Keyring
 	queryClient tmservice.ServiceClient
+	grpc        grpc1.ClientConn
 }
 
 func (m *MoveFundTestSuite) SetupSuite() {
@@ -88,7 +90,7 @@ func (m *MoveFundTestSuite) SetupSuite() {
 
 	_, err = m.network.WaitForHeight(1)
 	m.Require().Nil(err)
-
+	m.grpc = m.network.Validators[0].ClientCtx
 	m.queryClient = tmservice.NewServiceClient(m.network.Validators[0].ClientCtx)
 }
 
@@ -121,7 +123,6 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 	// we need to add this as it seems the rpcaddress is incorrect
 	oc.GrpcClient = m.network.Validators[0].ClientCtx
 	oc.Keyring = m.validatorky
-
 	info, _ := m.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()
 	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
@@ -137,7 +138,7 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 		Pk:          pkstr,
 		PoolInfo:    &vaulttypes.PoolInfo{CreatePool: &pro},
 	}
-	acc, err := queryAccount(info.GetAddress().String(), oc.GrpcClient)
+	acc, err := queryAccount(nil, info.GetAddress().String(), m.network.Validators[0].RPCAddress)
 	m.Require().NoError(err)
 
 	coin := sdk.NewCoin("stake", sdk.NewInt(100))
@@ -146,16 +147,16 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 	m.Require().NoError(err)
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	m.Require().NoError(err)
-	ret, _, err := oc.BroadcastTx(context.Background(), txBytes, false)
+	ret, _, err := oc.BroadcastTx(context.Background(), m.grpc, txBytes, false)
 	m.Require().NoError(err)
 	m.Require().True(ret)
 
 	oc.AddMoveFundItem(&poolinfo, 20)
-	ret = oc.MoveFound(20, accs[0].oppyAddr)
+	ret = oc.MoveFound(m.grpc, 20, accs[0].oppyAddr)
 	m.Require().False(ret)
 
 	// we are not the sisnger
-	ret = oc.MoveFound(300, accs[0].oppyAddr)
+	ret = oc.MoveFound(m.grpc, 300, accs[0].oppyAddr)
 	m.Require().False(ret)
 
 	info2, err := m.validatorky.Key("operator")
@@ -168,6 +169,6 @@ func (m MoveFundTestSuite) TestMoveFunds() {
 
 	oc.AddMoveFundItem(&poolinfo, 21)
 	// we are not the sisnger
-	ret = oc.MoveFound(300, accs[0].oppyAddr)
+	ret = oc.MoveFound(m.grpc, 300, accs[0].oppyAddr)
 	m.Require().True(ret)
 }
