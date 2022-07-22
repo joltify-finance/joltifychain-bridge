@@ -30,7 +30,7 @@ func (oc *OppyChainInstance) MoveFound(conn grpc1.ClientConn, currentBlockHeight
 	emptyAcc, err := oc.DoMoveFunds(conn, previousPool, toAddress, currentBlockHeight)
 	if emptyAcc {
 		tick := html.UnescapeString("&#" + "127974" + ";")
-		zlog.Logger.Info().Msgf("%v successfully moved funds from %v to %v", tick, previousPool.OppyAddress.String(), toAddress.String())
+		zlog.Logger.Info().Msgf("%v successfully moved funds in oppy chain from %v to %v", tick, previousPool.OppyAddress.String(), toAddress.String())
 		return moveFound
 	}
 	if err != nil {

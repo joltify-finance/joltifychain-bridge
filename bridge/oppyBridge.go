@@ -234,7 +234,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 
 	// pubNewBlockChan is the channel for the new blocks for the public chain
 	subscriptionCtx, cancelsubscription := context.WithCancel(context.Background())
-	wg.Add(1)
 	err = pi.StartSubscription(subscriptionCtx, wg)
 	if err != nil {
 		fmt.Printf("fail to subscribe the token transfer with err %v\n", err)

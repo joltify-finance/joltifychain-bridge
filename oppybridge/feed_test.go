@@ -93,7 +93,7 @@ func (f *FeedtransactionTestSuite) SetupSuite() {
 
 	_, err = f.network.WaitForHeight(1)
 	f.Require().Nil(err)
-
+	f.grpc = f.network.Validators[0].ClientCtx
 	f.queryClient = tmservice.NewServiceClient(f.network.Validators[0].ClientCtx)
 }
 

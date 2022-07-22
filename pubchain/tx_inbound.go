@@ -13,7 +13,6 @@ import (
 	"sync"
 
 	"github.com/cenkalti/backoff"
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -331,83 +330,83 @@ func (pi *Instance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommo
 	return nil, 0
 }
 
-func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *big.Int, nonce uint64, blockHeight int64) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
-	defer cancel()
-	chainID, err := pi.EthClient.NetworkID(ctx)
-	if err != nil {
-		pi.logger.Error().Err(err).Msg("fail to get the chain ID")
-		return "", err
-	}
-
-	gasPrice, err := pi.EthClient.SuggestGasPrice(context.Background())
-	if err != nil {
-		return "", err
-	}
-
-	gasLimit, err := pi.EthClient.EstimateGas(context.Background(), ethereum.CallMsg{
-		To:   &receiver,
-		Data: nil,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	totalBnb := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(gasLimit))
-
-	totalBnbDec := types.NewDecFromBigIntWithPrec(totalBnb, types.Precision)
-	totalBnbDec = totalBnbDec.Mul(types.MustNewDecFromStr(config.GASFEERATIO))
-
-	moveFund := amount.Sub(amount, totalBnbDec.BigInt())
-	moveFundS := types.NewDecFromBigIntWithPrec(moveFund, types.Precision)
-	if moveFund.Cmp(big.NewInt(0)) != 1 {
-		pi.logger.Warn().Msgf("we do not have any bnb to move")
-		return "", nil
-	}
-
-	pi.logger.Info().Msgf("we need to move %v bnb", moveFundS.String())
-
-	dustBnb, err := types.NewDecFromStr(config.DUSTBNB)
-	if err != nil {
-		panic("invalid parameter")
-	}
-
-	if moveFund.Cmp(dustBnb.BigInt()) != 1 {
-		return "", nil
-	}
-	baseTx := ethTypes.LegacyTx{
-		Nonce:    nonce,
-		GasPrice: gasPrice,
-		Gas:      gasLimit,
-		To:       &receiver,
-		Data:     nil,
-		Value:    moveFund,
-	}
-
-	rawTx := ethTypes.NewTx(&baseTx)
-	signer := ethTypes.LatestSignerForChainID(chainID)
-	msg := signer.Hash(rawTx).Bytes()
-	signature, err := pi.tssSign(msg, senderPk, blockHeight)
-	if err != nil || len(signature) != 65 {
-		return "", errors.New("fail to get the valid signature")
-	}
-	bTx, err := rawTx.WithSignature(signer, signature)
-	if err != nil {
-		return "", err
-	}
-
-	err = pi.EthClient.SendTransaction(ctx, bTx)
-	if err != nil {
-		if err.Error() == "already known" {
-			pi.logger.Warn().Msgf("the tx has been submitted by others")
-			return rawTx.Hash().Hex(), nil
-		} else {
-			return "", err
-		}
-	}
-
-	return rawTx.Hash().Hex(), nil
-}
+//func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *big.Int, nonce uint64, blockHeight int64) (string, error) {
+//	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
+//	defer cancel()
+//	chainID, err := pi.EthClient.NetworkID(ctx)
+//	if err != nil {
+//		pi.logger.Error().Err(err).Msg("fail to get the chain ID")
+//		return "", err
+//	}
+//
+//	gasPrice, err := pi.EthClient.SuggestGasPrice(context.Background())
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	gasLimit, err := pi.EthClient.EstimateGas(context.Background(), ethereum.CallMsg{
+//		To:   &receiver,
+//		Data: nil,
+//	})
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	totalBnb := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(gasLimit))
+//
+//	totalBnbDec := types.NewDecFromBigIntWithPrec(totalBnb, types.Precision)
+//	totalBnbDec = totalBnbDec.Mul(types.MustNewDecFromStr(config.GASFEERATIO))
+//
+//	moveFund := amount.Sub(amount, totalBnbDec.BigInt())
+//	moveFundS := types.NewDecFromBigIntWithPrec(moveFund, types.Precision)
+//	if moveFund.Cmp(big.NewInt(0)) != 1 {
+//		pi.logger.Warn().Msgf("we do not have any bnb to move")
+//		return "", nil
+//	}
+//
+//	pi.logger.Info().Msgf("we need to move %v bnb", moveFundS.String())
+//
+//	dustBnb, err := types.NewDecFromStr(config.DUSTBNB)
+//	if err != nil {
+//		panic("invalid parameter")
+//	}
+//
+//	if moveFund.Cmp(dustBnb.BigInt()) != 1 {
+//		return "", nil
+//	}
+//	baseTx := ethTypes.LegacyTx{
+//		Nonce:    nonce,
+//		GasPrice: gasPrice,
+//		Gas:      gasLimit,
+//		To:       &receiver,
+//		Data:     nil,
+//		Value:    moveFund,
+//	}
+//
+//	rawTx := ethTypes.NewTx(&baseTx)
+//	signer := ethTypes.LatestSignerForChainID(chainID)
+//	msg := signer.Hash(rawTx).Bytes()
+//	signature, err := pi.tssSign(msg, senderPk, blockHeight)
+//	if err != nil || len(signature) != 65 {
+//		return "", errors.New("fail to get the valid signature")
+//	}
+//	bTx, err := rawTx.WithSignature(signer, signature)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	err = pi.EthClient.SendTransaction(ctx, bTx)
+//	if err != nil {
+//		if err.Error() == "already known" {
+//			pi.logger.Warn().Msgf("the tx has been submitted by others")
+//			return rawTx.Hash().Hex(), nil
+//		} else {
+//			return "", err
+//		}
+//	}
+//
+//	return rawTx.Hash().Hex(), nil
+//}
 
 func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64, tokenAddr string) (string, error) {
 	txHash, err := pi.SendToken(senderPk, sender, receiver, balance, blockheight, nil, tokenAddr)

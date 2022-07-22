@@ -36,6 +36,11 @@ func (pi *Instance) UpdateSubscription(ctx context.Context) error {
 		}
 	}
 	pi.SubChannelNow = blockEvent
+	// release the old one
+	if pi.SubHandler != nil {
+		pi.SubHandler.Unsubscribe()
+	}
+
 	pi.SubHandler = handler
 	return nil
 }
@@ -49,7 +54,7 @@ func (pi *Instance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) e
 		return err
 	}
 	pi.SubHandler = handler
-
+	wg.Add(1)
 	go func() {
 		<-ctx.Done()
 		pi.SubHandler.Unsubscribe()

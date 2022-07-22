@@ -206,6 +206,7 @@ func TestProcessInBound(t *testing.T) {
 		assert.True(t, data.Coin.Equal(expected))
 		return true
 	})
+	wg.Wait()
 }
 
 type testHasher struct {
@@ -623,6 +624,7 @@ func TestProcessERC20InBoundOnBSC(t *testing.T) {
 	txInfo, err := pi.checkErc20(tx.Data(), tx.To().Hex())
 	assert.Nil(t, err)
 	assert.Equal(t, txInfo.fromAddr.String(), "oppy12gflne2dadajtzn5h7x8z4udfpd7f22dvly0zg")
+	wg.Wait()
 }
 
 func TestProcessNativeInBoundOnBSC(t *testing.T) {
@@ -659,4 +661,5 @@ func TestProcessNativeInBoundOnBSC(t *testing.T) {
 		assert.Equal(t, item.Address.String(), "oppy12gflne2dadajtzn5h7x8z4udfpd7f22dvly0zg")
 		return true
 	})
+	wg.Wait()
 }

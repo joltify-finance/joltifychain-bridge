@@ -132,11 +132,14 @@ func (pi *Instance) getBlockByNumberWithLock(ctx context.Context, number *big.In
 
 	if err != nil {
 		// we reset the ethcliet
-		fmt.Printf("error of the ethclient is %v\n", err)
+		pi.logger.Error().Err(err).Msgf("error of the ethclient")
 		pi.wg.Add(1)
 		go func() {
 			defer pi.wg.Done()
-			pi.RetryPubChain()
+			err = pi.RetryPubChain()
+			if err != nil {
+				pi.logger.Error().Err(err).Msgf("we fail to restart the eth client")
+			}
 		}()
 	}
 	return block, err
@@ -149,11 +152,14 @@ func (pi *Instance) getTransactionReceiptWithLock(ctx context.Context, txHash co
 
 	if err != nil {
 		// we reset the ethcliet
-		fmt.Printf("error of the ethclient is %v\n", err)
+		pi.logger.Error().Err(err).Msgf("error of the ethclient")
 		pi.wg.Add(1)
 		go func() {
 			defer pi.wg.Done()
-			pi.RetryPubChain()
+			err = pi.RetryPubChain()
+			if err != nil {
+				pi.logger.Error().Err(err).Msgf("we fail to restart the eth client")
+			}
 		}()
 	}
 	return receipt, err
@@ -168,11 +174,14 @@ func (pi *Instance) GetGasPriceWithLock() (*big.Int, error) {
 
 	if err != nil {
 		// we reset the ethcliet
-		fmt.Printf("error of the ethclient is %v\n", err)
+		pi.logger.Error().Err(err).Msgf("error of the ethclient")
 		pi.wg.Add(1)
 		go func() {
 			defer pi.wg.Done()
-			pi.RetryPubChain()
+			err = pi.RetryPubChain()
+			if err != nil {
+				pi.logger.Error().Err(err).Msgf("we fail to restart the eth client")
+			}
 		}()
 	}
 	return gasPrice, err
@@ -185,11 +194,14 @@ func (pi *Instance) getBalanceWithLock(ctx context.Context, ethAddr common.Addre
 
 	if err != nil {
 		// we reset the ethcliet
-		fmt.Printf("error of the ethclient is %v\n", err)
+		pi.logger.Error().Err(err).Msgf("error of the ethclient")
 		pi.wg.Add(1)
 		go func() {
 			defer pi.wg.Done()
-			pi.RetryPubChain()
+			err = pi.RetryPubChain()
+			if err != nil {
+				pi.logger.Error().Err(err).Msgf("we fail to restart the eth client")
+			}
 		}()
 	}
 	return balanceBnB, err
@@ -202,11 +214,15 @@ func (pi *Instance) getPendingNonceWithLock(ctx context.Context, poolAddress com
 
 	if err != nil {
 		// we reset the ethcliet
-		fmt.Printf("error of the ethclient is %v\n", err)
+		pi.logger.Error().Err(err).Msgf("fail to get the pending nonce ")
 		pi.wg.Add(1)
 		go func() {
 			defer pi.wg.Done()
-			pi.RetryPubChain()
+			err := pi.RetryPubChain()
+			if err != nil {
+				pi.logger.Error().Err(err).Msgf("fail to reset the public chain")
+
+			}
 		}()
 	}
 
@@ -224,11 +240,15 @@ func (pi *Instance) sendTransactionWithLock(ctx context.Context, tx *types.Trans
 			return nil
 		}
 		// we reset the ethcliet
-		fmt.Printf("error of the ethclient is %v\n", err)
+		pi.logger.Error().Err(err).Msgf("fail to send transactions")
 		pi.wg.Add(1)
 		go func() {
 			defer pi.wg.Done()
-			pi.RetryPubChain()
+			err := pi.RetryPubChain()
+			if err != nil {
+				pi.logger.Error().Err(err).Msgf("fail to reset the public chain")
+
+			}
 		}()
 	}
 	return err
@@ -236,6 +256,7 @@ func (pi *Instance) sendTransactionWithLock(ctx context.Context, tx *types.Trans
 
 func (pi *Instance) renewEthClientWithLock(ethclient *ethclient.Client) {
 	pi.ethClientLocker.Lock()
+	pi.EthClient.Close()
 	pi.EthClient = ethclient
 	pi.ethClientLocker.Unlock()
 }

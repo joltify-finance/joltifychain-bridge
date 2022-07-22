@@ -10,9 +10,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32"
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	grpc1 "github.com/gogo/protobuf/grpc"
 	"github.com/stretchr/testify/suite"
 	"github.com/tendermint/tendermint/types"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
@@ -26,7 +25,6 @@ type subscribeTestSuite struct {
 	network     *network.Network
 	validatorky keyring.Keyring
 	queryClient tmservice.ServiceClient
-	grpc        grpc1.ClientConn
 }
 
 func (f *subscribeTestSuite) SetupSuite() {
@@ -109,26 +107,28 @@ func (s *subscribeTestSuite) TestSubscribe() {
 
 	// we cache 4 blocks
 	current := currentBlockHeight2 + 4
-	s.network.WaitForHeight(current)
-
+	_, err = s.network.WaitForHeight(current)
+	s.Require().NoError(err)
 	err = oc.RetryOppyChain()
 	s.Require().NoError(err)
 
 	current += 2
-	s.network.WaitForHeight(current)
-
+	_, err = s.network.WaitForHeight(current)
+	s.Require().NoError(err)
 	time.Sleep(time.Second)
 	s.Require().Equal(4, len(oc.ChannelQueueNewBlock))
 	s.Require().Equal(2, len(oc.CurrentNewBlockChan))
 
 	// do the test again
 	current += 5
-	s.network.WaitForHeight(current)
+	_, err = s.network.WaitForHeight(current)
+	s.Require().NoError(err)
 	err = oc.RetryOppyChain()
 	s.Require().NoError(err)
 
 	current += 3
-	s.network.WaitForHeight(current)
+	_, err = s.network.WaitForHeight(current)
+	s.Require().NoError(err)
 
 	time.Sleep(time.Second)
 	// 11=4+5+2

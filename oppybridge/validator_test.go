@@ -117,7 +117,7 @@ func (v *ValidatorTestSuite) SetupSuite() {
 	v.Require().NotNil(v.network)
 	_, err = v.network.WaitForHeightWithTimeout(14, 5*time.Minute)
 	v.Require().Nil(err)
-
+	v.grpc = v.network.Validators[0].ClientCtx
 	v.queryClient = tmservice.NewServiceClient(v.network.Validators[0].ClientCtx)
 }
 

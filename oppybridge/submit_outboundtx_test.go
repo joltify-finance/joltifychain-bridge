@@ -131,7 +131,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
 	s.Require().NoError(err)
 
-	acc, err := queryAccount(nil, valAddr.String(), oc.grpcAddr)
+	acc, err := queryAccount(s.grpc, valAddr.String(), "")
 	s.Require().NoError(err)
 
 	operatorInfo, _ := oc.Keyring.Key("operator")

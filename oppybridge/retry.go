@@ -112,8 +112,8 @@ func (oc *OppyChainInstance) RetryOppyChain() error {
 		oc.WsClient = client
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 		defer cancel()
-		oc.UpdateSubscribe(ctx)
-		return nil
+		err = oc.UpdateSubscribe(ctx)
+		return err
 	}
 	err := backoff.Retry(op, bf)
 	if err != nil {

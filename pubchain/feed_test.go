@@ -68,4 +68,5 @@ func TestFeedTx(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, testOutBoundReqs[0].BlockHeight, int64(225))
 	assert.Equal(t, testOutBoundReqs[0].RoundBlockHeight, int64(225/ROUNDBLOCK))
+	wg.Wait()
 }

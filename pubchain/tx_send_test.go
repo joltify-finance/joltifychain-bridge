@@ -141,7 +141,6 @@ func TestSendToken(t *testing.T) {
 
 	// we firstly test the subscription of the pubchain new block
 	ctx, cancel := context.WithCancel(context.Background())
-	wg.Add(1)
 	err = pubChain.StartSubscription(ctx, &wg)
 	assert.Nil(t, err)
 
