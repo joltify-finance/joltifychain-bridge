@@ -458,8 +458,9 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					}
 					if ethClient != nil {
 						isMoveFund = pi.MoveFound(wg, head.Number.Int64(), previousPool, height, ethClient)
+						ethClient.Close()
 					}
-					ethClient.Close()
+
 				}
 				if isMoveFund {
 					// once we move fund, we do not send tx to be processed
