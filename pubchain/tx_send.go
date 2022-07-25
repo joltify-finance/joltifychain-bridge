@@ -134,7 +134,7 @@ func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, 
 	if nonce != nil {
 		txo.Nonce = nonce
 	}
-
+	pi.logger.Info().Msgf("we have get the signature from tss module")
 	txo.NoSend = true
 	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), pi.EthClient)
 	if err != nil {
