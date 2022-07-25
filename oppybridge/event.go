@@ -2,6 +2,7 @@ package oppybridge
 
 import (
 	"encoding/base64"
+	"errors"
 	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
@@ -66,7 +67,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64) error {
 		if resp.Status != common.Success {
 			// todo we need to put our blame on pub_chain as well
 			oc.logger.Error().Msgf("we fail to ge the valid key")
-			return nil
+			return errors.New("fail to get the valid key")
 		}
 		// now we put the tss key on pub_chain
 		// fixme we need to allow user to choose the name of the key

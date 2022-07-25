@@ -91,7 +91,7 @@ func (pi *Instance) SendNativeToken(signerPk string, sender, receiver common.Add
 	if nonce != nil {
 		txo.Nonce = nonce
 	}
-
+	pi.logger.Info().Msgf("we have get the signature for native token")
 	sendAmount := new(big.Int).Sub(amount, totalFee)
 	txo.Value = sendAmount
 

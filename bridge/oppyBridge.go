@@ -282,7 +282,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 
 				err = oppyChain.HandleUpdateValidators(height)
 				if err != nil {
-					fmt.Printf("error in handle update validator")
+					zlog.Logger.Info().Msgf("error in handle update validator")
 					continue
 				}
 
@@ -625,6 +625,16 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						oppyChain.AddItem(itemCheck)
 					}(litem, txHashCheck)
 				}(itemRecv)
+			case <-time.After(time.Second * 15):
+				zlog.Logger.Info().Msgf("we should not reach here")
+				err := pi.RetryPubChain()
+				if err != nil {
+					zlog.Logger.Error().Err(err).Msgf("fail to restart the pub chain")
+				}
+				err = oppyChain.RetryOppyChain()
+				if err != nil {
+					zlog.Logger.Error().Err(err).Msgf("fail to restart the oppy chain")
+				}
 			}
 		}
 	}(wg)
