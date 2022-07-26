@@ -596,8 +596,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						}
 					}
 
-					toAddr, fromAddr, tokenAddr, amount, roundBlockHeight, nonce := litem.GetOutBoundInfo()
-					txHashCheck, err := pi.ProcessOutBound(toAddr, fromAddr, tokenAddr, amount, roundBlockHeight, nonce)
+					toAddr, fromAddr, tokenAddr, amount, _, nonce := litem.GetOutBoundInfo()
+					txHashCheck, err := pi.ProcessOutBound(toAddr, fromAddr, tokenAddr, amount, nonce)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
 					}

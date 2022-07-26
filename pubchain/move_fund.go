@@ -30,12 +30,8 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, height int64, previousPool *bc
 			zlog.Warn().Msgf("the current pool has not been set, move fund can not start")
 			return false
 		}
-		latestBlock, err := pi.GetBlockByNumberWithLock(nil)
-		if err != nil {
-			pi.logger.Error().Err(err).Msgf("fail to get the latest block height in ercc20 token transfer")
-			continue
-		}
-		tokenIsEmpty, err := pi.doMoveTokenFunds(wg, previousPool, currentPool[1].EthAddress, int64(latestBlock.NumberU64()), tokenAddr, ethClient)
+
+		tokenIsEmpty, err := pi.doMoveTokenFunds(wg, previousPool, currentPool[1].EthAddress, tokenAddr, ethClient)
 		// once there exists one token in the current pool, then we need to addMoveFundItem
 		if err != nil {
 			zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v for token %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String(), tokenAddr)
@@ -54,12 +50,8 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, height int64, previousPool *bc
 		pi.AddMoveFundItem(previousPool, height+movefundretrygap)
 		return false
 	} else {
-		latestBlock, err := pi.GetBlockByNumberWithLock(nil)
-		if err != nil {
-			pi.logger.Error().Err(err).Msgf("fail to get the latest block height in bnb token transfer")
-			return false
-		}
-		bnbIsMoved, isEmpty, err := pi.doMoveBNBFunds(wg, previousPool, currentPool[1].EthAddress, int64(latestBlock.NumberU64()))
+
+		bnbIsMoved, isEmpty, err := pi.doMoveBNBFunds(wg, previousPool, currentPool[1].EthAddress)
 		if isEmpty {
 			return true
 		}

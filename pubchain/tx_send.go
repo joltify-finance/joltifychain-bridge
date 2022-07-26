@@ -60,7 +60,7 @@ func (pi *Instance) waitToSend(poolAddress common.Address, targetNonce uint64) e
 }
 
 // SendNativeToken sends the native token to the public chain
-func (pi *Instance) SendNativeToken(signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int) (common.Hash, bool, error) {
+func (pi *Instance) SendNativeToken(signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int) (common.Hash, bool, error) {
 
 	// fixme, we set the fixed gaslimit
 	gasLimit, err := strconv.ParseUint(config.DefaultPUBChainGasWanted, 10, 64)
@@ -84,6 +84,15 @@ func (pi *Instance) SendNativeToken(signerPk string, sender, receiver common.Add
 		lastPool := pi.GetPool()[1]
 		signerPk = lastPool.Pk
 	}
+
+	latest, err := pi.GetBlockByNumberWithLock(nil)
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("fail to get the latest height")
+		return common.Hash{}, false, err
+	}
+	blockHeight := int64(latest.NumberU64()) / 10
+	tick := html.UnescapeString("&#" + "128296" + ";")
+	pi.logger.Info().Msgf(">>>>>>%v we build tss at height %v>>>>>>>\n", tick, blockHeight)
 	txo, err := pi.composeTx(signerPk, sender, pi.chainID, blockHeight)
 	if err != nil {
 		return common.Hash{}, false, err
@@ -122,11 +131,22 @@ func (pi *Instance) SendNativeToken(signerPk string, sender, receiver common.Add
 }
 
 // SendToken sends the token to the public chain
-func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, amount *big.Int, blockHeight int64, nonce *big.Int, tokenAddr string) (common.Hash, error) {
+func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string) (common.Hash, error) {
 	if signerPk == "" {
 		lastPool := pi.GetPool()[1]
 		signerPk = lastPool.Pk
 	}
+
+	latest, err := pi.GetBlockByNumberWithLock(nil)
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("fail to get the latest height")
+		return common.Hash{}, err
+	}
+
+	blockHeight := int64(latest.NumberU64()) / 10
+
+	tick := html.UnescapeString("&#" + "128296" + ";")
+	pi.logger.Info().Msgf(">>>>>>%v we build tss at height %v>>>>>>>\n", tick, blockHeight)
 	txo, err := pi.composeTx(signerPk, sender, pi.chainID, blockHeight)
 	if err != nil {
 		return common.Hash{}, err
@@ -139,6 +159,7 @@ func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, 
 	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), pi.EthClient)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to generate token instance for %v while processing outbound tx", tokenAddr)
+		return common.Hash{}, err
 	}
 	readyTx, err := tokenInstance.Transfer(txo, receiver, amount)
 	if err != nil {
@@ -164,14 +185,14 @@ func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, 
 }
 
 // ProcessOutBound send the money to public chain
-func (pi *Instance) ProcessOutBound(toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, blockHeight int64, nonce uint64) (string, error) {
+func (pi *Instance) ProcessOutBound(toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, nonce uint64) (string, error) {
 	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v of %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18), tokenAddr)
 	var txHash common.Hash
 	var err error
 	if tokenAddr == config.NativeSign {
-		txHash, _, err = pi.SendNativeToken("", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce))
+		txHash, _, err = pi.SendNativeToken("", fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce))
 	} else {
-		txHash, err = pi.SendToken("", fromAddr, toAddr, amount, blockHeight, new(big.Int).SetUint64(nonce), tokenAddr)
+		txHash, err = pi.SendToken("", fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce), tokenAddr)
 	}
 	if err != nil {
 		if err.Error() == "already known" {

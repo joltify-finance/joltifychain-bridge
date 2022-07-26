@@ -406,8 +406,8 @@ func (pi *Instance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommo
 //	return rawTx.Hash().Hex(), nil
 //}
 
-func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, receiver common.Address, balance *big.Int, blockheight int64, tokenAddr string) (string, error) {
-	txHash, err := pi.SendToken(senderPk, sender, receiver, balance, blockheight, nil, tokenAddr)
+func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, receiver common.Address, balance *big.Int, tokenAddr string) (string, error) {
+	txHash, err := pi.SendToken(senderPk, sender, receiver, balance, nil, tokenAddr)
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")
@@ -419,7 +419,7 @@ func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, 
 	return txHash.Hex(), nil
 }
 
-func (pi *Instance) doMoveTokenFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64, tokenAddr string, ethClient *ethclient.Client) (bool, error) {
+func (pi *Instance) doMoveTokenFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, tokenAddr string, ethClient *ethclient.Client) (bool, error) {
 	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), ethClient)
 	if err != nil {
 		return false, err
@@ -437,7 +437,7 @@ func (pi *Instance) doMoveTokenFunds(wg *sync.WaitGroup, previousPool *bcommon.P
 	}
 
 	if balance.Cmp(big.NewInt(0)) == 1 {
-		erc20TxHash, err := pi.moveERC20Token(wg, previousPool.Pk, previousPool.EthAddress, receiver, balance, blockHeight, tokenAddr)
+		erc20TxHash, err := pi.moveERC20Token(wg, previousPool.Pk, previousPool.EthAddress, receiver, balance, tokenAddr)
 		// if we fail erc20 token transfer, we should not transfer the bnb otherwise,we do not have enough fee to pay retry
 		if err != nil {
 			return false, errors.New("fail to transfer erc20 token")
@@ -452,7 +452,7 @@ func (pi *Instance) doMoveTokenFunds(wg *sync.WaitGroup, previousPool *bcommon.P
 	return false, nil
 }
 
-func (pi *Instance) doMoveBNBFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, blockHeight int64) (bool, bool, error) {
+func (pi *Instance) doMoveBNBFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address) (bool, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel()
 	balanceBnB, err := pi.getBalanceWithLock(ctx, previousPool.EthAddress)
@@ -469,7 +469,7 @@ func (pi *Instance) doMoveBNBFunds(wg *sync.WaitGroup, previousPool *bcommon.Poo
 		return false, false, err
 	}
 
-	bnbTxHash, emptyAccount, err := pi.SendNativeToken(previousPool.Pk, previousPool.EthAddress, receiver, balanceBnB, blockHeight, new(big.Int).SetUint64(nonce))
+	bnbTxHash, emptyAccount, err := pi.SendNativeToken(previousPool.Pk, previousPool.EthAddress, receiver, balanceBnB, new(big.Int).SetUint64(nonce))
 	//bnbTxHash, err = pi.moveBnb(previousPool.Pk, receiver, balanceBnB, nonce, blockHeight)
 	if err != nil {
 		return false, false, err
