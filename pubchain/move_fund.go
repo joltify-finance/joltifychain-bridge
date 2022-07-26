@@ -25,6 +25,11 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPoo
 		if tokenAddr == "native" {
 			continue
 		}
+		// if we restart the bridge, pubchain go routine may run before oppy go routine which acquire the pool info
+		if currentPool[1] == nil {
+			zlog.Warn().Msgf("the current pool has not been set, move fund can not start")
+			return false
+		}
 		tokenIsEmpty, err := pi.doMoveTokenFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight, tokenAddr, ethClient)
 		// once there exists one token in the current pool, then we need to addMoveFundItem
 		if err != nil {

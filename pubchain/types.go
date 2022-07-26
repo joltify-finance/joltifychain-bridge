@@ -125,8 +125,10 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.T
 	}, nil
 }
 
-func (pi *Instance) getBlockByNumberWithLock(ctx context.Context, number *big.Int) (*types.Block, error) {
+func (pi *Instance) GetBlockByNumberWithLock(number *big.Int) (*types.Block, error) {
 	pi.ethClientLocker.RLock()
+	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
+	defer cancel()
 	block, err := pi.EthClient.BlockByNumber(ctx, number)
 	pi.ethClientLocker.RUnlock()
 

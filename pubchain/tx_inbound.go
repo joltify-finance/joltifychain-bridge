@@ -70,9 +70,7 @@ func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, txInfo *Erc20T
 
 // ProcessNewBlock process the blocks received from the public pub_chain
 func (pi *Instance) ProcessNewBlock(number *big.Int, oppyBlockHeight int64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
-	defer cancel()
-	block, err := pi.getBlockByNumberWithLock(ctx, number)
+	block, err := pi.GetBlockByNumberWithLock(number)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to retrieve the block")
 		return err

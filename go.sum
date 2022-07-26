@@ -1632,6 +1632,8 @@ github.com/openzipkin/zipkin-go v0.2.2/go.mod h1:NaW6tEwdmWMaCDZzg8sh+IBNOxHMPnh
 github.com/openzipkin/zipkin-go v0.2.5/go.mod h1:KpXfKdgRDnnhsxw4pNIH9Md5lyFqKUa4YDFlwRYAMyE=
 github.com/oppyfinance/tss v1.7.3 h1:0m1R4MjGkMvTGnbo1/GDPZzWz9HMpZJ1X4LLmsHDgZc=
 github.com/oppyfinance/tss v1.7.3/go.mod h1:oGMIRv9HIBjOZgGUFMKwC49MrBo9pJgQsJZ8Cjl6zds=
+github.com/oppyfinance/tss v1.7.4-0.20220726004820-d8e35cb28335 h1:mqeBn0T77ECiGZnzBIWrP+7gFfIvrhHZRgXv5aWzGdY=
+github.com/oppyfinance/tss v1.7.4-0.20220726004820-d8e35cb28335/go.mod h1:oGMIRv9HIBjOZgGUFMKwC49MrBo9pJgQsJZ8Cjl6zds=
 github.com/ory/dockertest v3.3.5+incompatible h1:iLLK6SQwIhcbrG783Dghaaa3WPzGc+4Emza6EbVUUGA=
 github.com/ory/dockertest v3.3.5+incompatible/go.mod h1:1vX4m9wsvi00u5bseYwXaSnhNrne+V0E6LAcBILJdPs=
 github.com/otiai10/copy v1.6.0 h1:IinKAryFFuPONZ7cm6T6E2QX/vcJwSnlaA5lfoaXIiQ=
