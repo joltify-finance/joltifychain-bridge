@@ -312,11 +312,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 
 				currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
 
-				if latestHeight-currentBlockHeight > 5 {
-					zlog.Logger.Warn().Msgf("oppy chain: current block is %v, and latest is %v,we need to be synced", currentBlockHeight, latestHeight)
-					continue
-				}
-
 				ok, _ := oppyChain.CheckAndUpdatePool(grpcClient, currentBlockHeight)
 				if !ok {
 					// it is okay to fail to submit a pool address as other nodes can submit, as long as 2/3 nodes submit, it is fine.
@@ -432,15 +427,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				pi.ChannelQueue <- head
 				// process the public chain new block event
 			case head := <-pi.ChannelQueue:
-
-				latestBlock, err := pi.GetBlockByNumberWithLock(nil)
-				if err != nil {
-					zlog.Logger.Error().Err(err).Msgf("fail to get the latest block")
-					continue
-				}
-				if new(big.Int).Sub(latestBlock.Header().Number, head.Number).Cmp(big.NewInt(5)) == 1 {
-					zlog.Logger.Warn().Msgf("pub chain: current block %v, and the latest is %v", head.Number.String(), latestBlock.Header().Number.String())
-				}
 
 				oppyBlockHeight, errInner := oppyChain.GetLastBlockHeight(oppyChain.GrpcClient)
 				if errInner != nil {

@@ -14,8 +14,6 @@ import (
 // UpdateSubscription start the subscription of the token
 func (pi *Instance) UpdateSubscription(ctx context.Context) error {
 	blockEvent := make(chan *types.Header, sbchannelsize)
-	pi.ethClientLocker.Lock()
-	defer pi.ethClientLocker.Unlock()
 	handler, err := pi.EthClient.SubscribeNewHead(ctx, blockEvent)
 	if err != nil {
 		fmt.Printf("fail to subscribe the block event with err %v\n", err)
@@ -36,11 +34,6 @@ func (pi *Instance) UpdateSubscription(ctx context.Context) error {
 		}
 	}
 	pi.SubChannelNow = blockEvent
-	// release the old one
-	if pi.SubHandler != nil {
-		pi.SubHandler.Unsubscribe()
-	}
-
 	pi.SubHandler = handler
 	return nil
 }
@@ -65,6 +58,13 @@ func (pi *Instance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) e
 }
 
 func (pi *Instance) RetryPubChain() error {
+
+	_, err := pi.GetBlockByNumberWithLock(nil)
+	if err != nil {
+		pi.logger.Info().Msgf("all good we do not need to reset")
+		return nil
+	}
+
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second*10), 3)
 	op := func() error {
 		ethClient, err := ethclient.Dial(pi.configAddr)
@@ -72,21 +72,15 @@ func (pi *Instance) RetryPubChain() error {
 			pi.logger.Error().Err(err).Msg("fail to dial the websocket")
 			return err
 		}
-		pi.renewEthClientWithLock(ethClient)
-		return nil
+		err = pi.renewEthClientWithLock(ethClient)
+		return err
 	}
-	err := backoff.Retry(op, bf)
+	err = backoff.Retry(op, bf)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("we fail to reconnect the pubchain interface with retries")
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	err = pi.UpdateSubscription(ctx)
-	if err != nil {
-		pi.logger.Error().Err(err).Msgf("we fail to update the pubchain subscription")
-		return err
-	}
+
 	pi.logger.Warn().Msgf("we renewed the ethclient")
 	return nil
 }

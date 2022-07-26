@@ -160,7 +160,7 @@ func TestSendToken(t *testing.T) {
 	wg2 := sync.WaitGroup{}
 	nonce, err := pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
 	assert.Nil(t, err)
-	_, err = pubChain.ProcessOutBound(accs[0].commAddr, fromAddrEth, tokenAddrTest, big.NewInt(100), int64(10), nonce)
+	_, err = pubChain.ProcessOutBound(accs[0].commAddr, fromAddrEth, tokenAddrTest, big.NewInt(100), nonce)
 	assert.Nil(t, err)
 	wg2.Wait()
 
@@ -168,7 +168,7 @@ func TestSendToken(t *testing.T) {
 	nonce, err = pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
 	assert.Nil(t, err)
 
-	_, err = pubChain.ProcessOutBound(accs[0].commAddr, fromAddrEth, tokenAddrTest, big.NewInt(100), int64(10), nonce)
+	_, err = pubChain.ProcessOutBound(accs[0].commAddr, fromAddrEth, tokenAddrTest, big.NewInt(100), nonce)
 	assert.Nil(t, err)
 
 	pubChain.tssServer.Stop()

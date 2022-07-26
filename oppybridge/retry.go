@@ -82,6 +82,17 @@ func (oc *OppyChainInstance) UpdateSubscribe(ctx context.Context) error {
 }
 
 func (oc *OppyChainInstance) RetryOppyChain() error {
+
+	_, err1 := GetLastBlockHeight(oc.GrpcClient)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+
+	_, err2 := oc.WsClient.Status(ctx)
+	if err1 == nil && err2 == nil {
+		oc.logger.Info().Msgf("all good,we do not need to reset")
+		return nil
+	}
+
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second*10), 3)
 	op := func() error {
 
@@ -104,15 +115,35 @@ func (oc *OppyChainInstance) RetryOppyChain() error {
 		oc.logger.Warn().Msgf("we renewed the oppy client")
 
 		// we stop the old connection though it may broken
+		// if we stop the channle directly, we do not need to unsubscribe it here
+		//ctx,cancel:=context.WithTimeout(context.Background(),time.Second*3)
+		//err=oc.WsClient.UnsubscribeAll(ctx,"oppyBridgeChurn")
+		//if err!=nil{
+		//	oc.logger.Error().Err(err).Msgf("we fail to unsubscribe")
+		//}
+		//
+		//err=oc.WsClient.UnsubscribeAll(ctx,"oppyBridgeChurn")
+		//if err!=nil{
+		//	oc.logger.Error().Err(err).Msgf("we fail to unsubscribe")
+		//}
+		//
+
 		err = oc.WsClient.Stop()
 		if err != nil {
 			oc.logger.Error().Err(err).Msgf("we fail to stop the previous WS client")
 		}
+
+		conn := oc.GrpcClient.(*grpc.ClientConn)
+		err = conn.Close()
+		if err != nil {
+			oc.logger.Error().Err(err).Msgf("we fail to stop the grpc connection")
+		}
+
 		oc.GrpcClient = grpcClient
 		oc.WsClient = client
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-		defer cancel()
-		err = oc.UpdateSubscribe(ctx)
+		ctx2, cancel2 := context.WithTimeout(context.Background(), time.Second*2)
+		defer cancel2()
+		err = oc.UpdateSubscribe(ctx2)
 		return err
 	}
 	err := backoff.Retry(op, bf)

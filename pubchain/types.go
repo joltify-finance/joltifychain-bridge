@@ -256,9 +256,22 @@ func (pi *Instance) sendTransactionWithLock(ctx context.Context, tx *types.Trans
 	return err
 }
 
-func (pi *Instance) renewEthClientWithLock(ethclient *ethclient.Client) {
+func (pi *Instance) renewEthClientWithLock(ethclient *ethclient.Client) error {
 	pi.ethClientLocker.Lock()
+	// release the old one
+	if pi.SubHandler != nil {
+		pi.SubHandler.Unsubscribe()
+	}
 	pi.EthClient.Close()
 	pi.EthClient = ethclient
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	err := pi.UpdateSubscription(ctx)
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("we fail to update the pubchain subscription")
+		return err
+	}
 	pi.ethClientLocker.Unlock()
+	return nil
 }

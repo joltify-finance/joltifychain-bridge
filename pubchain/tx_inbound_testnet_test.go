@@ -133,14 +133,14 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	// if the  test fail, you need to disable the check for pool1->pool2 and
 	// run the test once to allow the fund move from pool2 back to pool1
 	// currently, we return false to enable double check of ERC20 token transfer
-	ret := tn.pubChain.MoveFound(&wg, 100, &pool, 101, tn.pubChain.EthClient)
+	ret := tn.pubChain.MoveFound(&wg, 100, &pool, tn.pubChain.EthClient)
 	time.Sleep(time.Second * 10)
 	// as we always retry, so we get false fir the first time we run the check
 	tn.Require().False(ret)
-	ret = tn.pubChain.MoveFound(&wg, 100, &pool, 101, tn.pubChain.EthClient)
+	ret = tn.pubChain.MoveFound(&wg, 100, &pool, tn.pubChain.EthClient)
 	tn.Require().True(ret)
 
-	tn.pubChain.MoveFound(&wg, 100, &pool, 103, tn.pubChain.EthClient)
+	tn.pubChain.MoveFound(&wg, 100, &pool, tn.pubChain.EthClient)
 	time.Sleep(time.Second * 10)
 	tn.Require().True(ret)
 
@@ -151,14 +151,14 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	err = tn.pubChain.UpdatePool(&poolInfo1)
 	tn.Require().NoError(err)
 
-	ret = tn.pubChain.MoveFound(&wg, 100, &pool2, 104, tn.pubChain.EthClient)
+	ret = tn.pubChain.MoveFound(&wg, 100, &pool2, tn.pubChain.EthClient)
 	time.Sleep(time.Second * 10)
 	tn.Require().False(ret)
 
-	ret = tn.pubChain.MoveFound(&wg, 100, &pool2, 104, tn.pubChain.EthClient)
+	ret = tn.pubChain.MoveFound(&wg, 100, &pool2, tn.pubChain.EthClient)
 	tn.Require().True(ret)
 
-	ret = tn.pubChain.MoveFound(&wg, 100, &pool2, 104, tn.pubChain.EthClient)
+	ret = tn.pubChain.MoveFound(&wg, 100, &pool2, tn.pubChain.EthClient)
 	tn.Require().True(ret)
 
 	wg.Wait()
