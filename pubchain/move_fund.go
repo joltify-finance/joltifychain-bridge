@@ -13,7 +13,7 @@ import (
 // MoveFound moves the fund for the public chain
 // our strategy is we need to run move fund at least twice to ensure the account is empty, even if
 // we move the fund success this round, we still need to run it again to 100% ensure the old pool is empty
-func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPool *bcommon.PoolInfo, height int64, ethClient *ethclient.Client) bool {
+func (pi *Instance) MoveFound(wg *sync.WaitGroup, height int64, previousPool *bcommon.PoolInfo, ethClient *ethclient.Client) bool {
 	// we get the latest pool address and move funds to the latest pool
 	currentPool := pi.GetPool()
 	emptyERC20Tokens := true
@@ -30,7 +30,12 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPoo
 			zlog.Warn().Msgf("the current pool has not been set, move fund can not start")
 			return false
 		}
-		tokenIsEmpty, err := pi.doMoveTokenFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight, tokenAddr, ethClient)
+		latestBlock, err := pi.GetBlockByNumberWithLock(nil)
+		if err != nil {
+			pi.logger.Error().Err(err).Msgf("fail to get the latest block height in ercc20 token transfer")
+			continue
+		}
+		tokenIsEmpty, err := pi.doMoveTokenFunds(wg, previousPool, currentPool[1].EthAddress, int64(latestBlock.NumberU64()), tokenAddr, ethClient)
 		// once there exists one token in the current pool, then we need to addMoveFundItem
 		if err != nil {
 			zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v for token %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String(), tokenAddr)
@@ -49,11 +54,16 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, blockHeight int64, previousPoo
 		pi.AddMoveFundItem(previousPool, height+movefundretrygap)
 		return false
 	} else {
-		bnbIsMoved, isEmpty, err := pi.doMoveBNBFunds(wg, previousPool, currentPool[1].EthAddress, blockHeight)
+		latestBlock, err := pi.GetBlockByNumberWithLock(nil)
+		if err != nil {
+			pi.logger.Error().Err(err).Msgf("fail to get the latest block height in bnb token transfer")
+			return false
+		}
+		bnbIsMoved, isEmpty, err := pi.doMoveBNBFunds(wg, previousPool, currentPool[1].EthAddress, int64(latestBlock.NumberU64()))
 		if isEmpty {
 			return true
 		}
-		pi.AddMoveFundItem(previousPool, pi.CurrentHeight+movefundretrygap)
+		pi.AddMoveFundItem(previousPool, height+movefundretrygap)
 		if err != nil || !bnbIsMoved {
 			zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v for bnb", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
 			return false

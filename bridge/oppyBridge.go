@@ -393,8 +393,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					previousPool := oppyChain.UpdatePool(poolInfo[0])
 					if previousPool.Pk != poolInfo[0].CreatePool.PoolPubKey {
 						// we force the first try of the tx to be run without blocking by the block wait
-						oppyChain.AddMoveFundItem(previousPool, currentBlockHeight-config.MINCHECKBLOCKGAP+5)
-						pi.AddMoveFundItem(previousPool, pi.CurrentHeight-config.MINCHECKBLOCKGAP+5)
+						oppyChain.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5)
+						pi.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5)
 					}
 				}
 
@@ -478,7 +478,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						zlog.Logger.Error().Err(err).Msg("fail to dial the websocket")
 					}
 					if ethClient != nil {
-						isMoveFund = pi.MoveFound(wg, head.Number.Int64(), previousPool, height, ethClient)
+						isMoveFund = pi.MoveFound(wg, height, previousPool, ethClient)
 						ethClient.Close()
 					}
 
