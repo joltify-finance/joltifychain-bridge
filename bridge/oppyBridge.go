@@ -19,6 +19,7 @@ import (
 	"github.com/tendermint/tendermint/types"
 	"gitlab.com/oppy-finance/oppy-bridge/storage"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
+	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -34,6 +35,9 @@ import (
 
 	zlog "github.com/rs/zerolog/log"
 )
+
+// we may need to increase it as we increase the time for keygen/keysign and join party
+var ROUNDBLOCK = 50
 
 // NewBridgeService starts the new bridge service
 func NewBridgeService(config config.Config) {
@@ -254,6 +258,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 	firstTimeOutbound := true
 	localSubmitLocker := sync.Mutex{}
 
+	failedInbound := atomic.NewInt64(0)
+	inboundPauseHeight := int64(0)
+	outboundPauseHeight := uint64(0)
+	failedOutbound := atomic.NewInt64(0)
+
 	wg.Add(1)
 	go func(wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -307,6 +316,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				latestHeight, err := oppybridge.GetLastBlockHeight(grpcClient)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msgf("fail to get the latest block height")
+					grpcClient.Close()
 					continue
 				}
 
@@ -336,8 +346,9 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				}
 
 				// we update the tx new, if there exits a processable block
+				processableBlockHeight := int64(0)
 				if currentBlockHeight > oppyRollbackGap {
-					processableBlockHeight := currentBlockHeight - oppyRollbackGap
+					processableBlockHeight = currentBlockHeight - oppyRollbackGap
 					processableBlock, err := oppyChain.GetBlockByHeight(grpcClient, processableBlockHeight)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("error in get block to process %v", err)
@@ -401,8 +412,20 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					continue
 				}
 
+				if failedInbound.Load() > 5 {
+					failedInbound.Store(0)
+					mid := (latestHeight / int64(ROUNDBLOCK)) + 1
+					inboundPauseHeight = mid * int64(ROUNDBLOCK)
+				}
+
+				if latestHeight < inboundPauseHeight {
+					zlog.Logger.Warn().Msgf("too many error for inbound, we wait for %v blocks to continue", inboundPauseHeight-latestHeight)
+					grpcClient.Close()
+					continue
+				}
+
 				// todo we need also to add the check to avoid send tx near the churn blocks
-				if currentBlockHeight-previousTssBlockInbound >= pubchain.GroupBlockGap && pi.Size() != 0 {
+				if processableBlockHeight-previousTssBlockInbound >= pubchain.GroupBlockGap && pi.Size() != 0 {
 					// if we do not have enough tx to process, we wait for another round
 					if pi.Size() < pubchain.GroupSign && firstTimeInbound {
 						firstTimeInbound = false
@@ -412,6 +435,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					}
 
 					pools := oppyChain.GetPool()
+
 					zlog.Logger.Warn().Msgf("we feed the inbound tx now %v", pools[1].PoolInfo.CreatePool.String())
 					err := oppyChain.FeedTx(grpcClient, pools[1].PoolInfo, pi)
 					if err != nil {
@@ -428,13 +452,9 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				// process the public chain new block event
 			case head := <-pi.ChannelQueue:
 
-				oppyBlockHeight, errInner := oppyChain.GetLastBlockHeightWithLock()
-				if errInner != nil {
-					zlog.Logger.Error().Err(err).Msg("fail to get the oppy chain block height for this round")
-					errOppyConnect := oppyChain.RetryOppyChain()
-					if errOppyConnect != nil {
-						zlog.Logger.Error().Err(err).Msg("fail to reconnect to the oppy chain")
-					}
+				latestHeight, err := pi.GetBlockByNumberWithLock(nil)
+				if err != nil {
+					zlog.Error().Err(err).Msgf("fail to get the latest public block")
 					continue
 				}
 
@@ -474,8 +494,19 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					continue
 				}
 
+				if failedOutbound.Load() > 5 {
+					mid := (latestHeight.NumberU64() / uint64(ROUNDBLOCK)) + 1
+					outboundPauseHeight = mid * uint64(ROUNDBLOCK)
+					failedOutbound.Store(0)
+				}
+
+				if latestHeight.NumberU64() < outboundPauseHeight {
+					zlog.Logger.Warn().Msgf("too many error for outbound we wait for %v blocks to continue", outboundPauseHeight-latestHeight.NumberU64())
+					continue
+				}
+
 				// todo we need also to add the check to avoid send tx near the churn blocks
-				if oppyBlockHeight-previousTssBlockOutBound >= oppybridge.GroupBlockGap && oppyChain.Size() != 0 {
+				if processableBlockHeight.Int64()-previousTssBlockOutBound >= oppybridge.GroupBlockGap && oppyChain.Size() != 0 {
 					// if we do not have enough tx to process, we wait for another round
 					if oppyChain.Size() < pubchain.GroupSign && firstTimeOutbound {
 						firstTimeOutbound = false
@@ -489,6 +520,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						zlog.Logger.Warn().Msgf("we do not have 2 pools to start the tx")
 						continue
 					}
+
 					zlog.Logger.Warn().Msgf("we feed the outbound tx now %v", pools[1].PoolInfo.CreatePool.String())
 
 					outboundItems := oppyChain.PopItem(pubchain.GroupSign)
@@ -513,7 +545,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
 						continue
 					}
-					previousTssBlockOutBound = oppyBlockHeight
+					previousTssBlockOutBound = processableBlockHeight.Int64()
 					firstTimeOutbound = true
 					metric.UpdateOutboundTxNum(float64(oppyChain.Size()))
 
@@ -551,6 +583,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						err = oppyChain.CheckTxStatus(grpcClientLocal, index)
 						if err != nil {
 							zlog.Logger.Error().Err(err).Msgf("the tx index(%v) has not been successfully submitted retry", index)
+							failedInbound.Inc()
 							pi.AddItem(item)
 							return
 						}
@@ -558,6 +591,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						if txHash == "" {
 							zlog.Logger.Info().Msgf("%v index(%v) have successfully top up by others", tick, index)
 						} else {
+							failedInbound.Store(0)
 							zlog.Logger.Info().Msgf("%v txid(%v) have successfully top up", tick, txHash)
 						}
 					}(indexRet)
@@ -595,6 +629,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						if txHash != emptyHash {
 							err := pi.CheckTxStatus(txHash)
 							if err == nil {
+								failedOutbound.Store(0)
 								tick := html.UnescapeString("&#" + "128228" + ";")
 								zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, fromAddr, toAddr, amount.String())
 								// now we submit our public chain tx to oppychain
@@ -629,6 +664,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 							}
 						}
 						zlog.Logger.Warn().Msgf("the tx is fail in submission, we need to resend")
+						failedOutbound.Inc()
 						oppyChain.AddItem(itemCheck)
 					}(litem, txHashCheck)
 				}(itemRecv)
