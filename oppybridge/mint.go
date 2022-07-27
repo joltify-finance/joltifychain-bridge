@@ -2,6 +2,7 @@ package oppybridge
 
 import (
 	"errors"
+	"html"
 
 	grpc1 "github.com/gogo/protobuf/grpc"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
@@ -11,7 +12,7 @@ import (
 )
 
 func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string) (*vaulttypes.MsgCreateIssueToken, error) {
-	userAddr, _, coin, _, _ := item.GetInboundReqInfo()
+	userAddr, _, coin, _ := item.GetInboundReqInfo()
 
 	a, err := vaulttypes.NewMsgCreateIssueToken(creatorAddr, index, coin.String(), userAddr.String())
 	if err != nil {
@@ -37,8 +38,14 @@ func (oc *OppyChainInstance) ProcessInBound(conn grpc1.ClientConn, item *common.
 		return "", "", err
 	}
 
-	_, _, _, _, roundBlockHeight := item.GetInboundReqInfo()
-	oc.logger.Info().Msgf("we do the top up for %v at height %v", issueReq.Receiver.String(), roundBlockHeight)
+	blockHeight, err := oc.GetLastBlockHeightWithLock()
+	if err != nil {
+		return "", "", err
+	}
+
+	roundBlockHeight := blockHeight / ROUNDBLOCK
+	tick := html.UnescapeString("&#" + "128296" + ";")
+	oc.logger.Info().Msgf("%v we do the top up for %v at height %v", tick, issueReq.Receiver.String(), roundBlockHeight)
 	signMsg := tssclient.TssSignigMsg{
 		Pk:          poolPk,
 		Signers:     nil,

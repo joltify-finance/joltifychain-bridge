@@ -8,7 +8,7 @@ import (
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
-func (pi *Instance) FeedTx(currentBlockHeight int64, lastPoolInfo *vaulttypes.PoolInfo, outboundReqs []*common.OutBoundReq) error {
+func (pi *Instance) FeedTx(lastPoolInfo *vaulttypes.PoolInfo, outboundReqs []*common.OutBoundReq) error {
 	// we always increase the account seq regardless the tx successful or not
 	poolEthAddress, err := misc.PoolPubKeyToEthAddress(lastPoolInfo.CreatePool.GetPoolPubKey())
 	if err != nil {
@@ -23,10 +23,9 @@ func (pi *Instance) FeedTx(currentBlockHeight int64, lastPoolInfo *vaulttypes.Po
 		return err
 	}
 
-	roundBlockHeight := currentBlockHeight / ROUNDBLOCK
 	// for BSC we need to use the next nonce while for oppy, we used the returned nonce
 	for _, el := range outboundReqs {
-		el.SetItemHeightAndNonce(roundBlockHeight, currentBlockHeight, poolEthAddress, nonce)
+		el.SetItemNonce(poolEthAddress, nonce)
 		nonce++
 	}
 	return nil

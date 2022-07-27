@@ -32,7 +32,7 @@ func (oc *OppyChainInstance) calculateGas() sdk.Coin {
 	return expectedFee
 }
 
-func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
+func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, txBlockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
 	tokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenom(msg.Amount[0].GetDenom())
 	if !tokenExist || msg.Amount[0].GetDenom() != config.OutBoundDenomFee {
 		return errors.New("token is not on our token list or not fee demon")
@@ -63,8 +63,6 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHe
 			return nil
 		}
 	}
-	roundBlockHeight := blockHeight / ROUNDBLOCK
-
 	// we need to adjust the decimal as some token may not have 18 decimals
 	// in oppy, we apply 18 decimal
 	delta := tokenItem.Decimals - sdk.Precision
@@ -73,13 +71,13 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, blockHe
 		savedTx.Token.Amount = adjustedTokenAmount
 	}
 
-	itemReq := bcommon.NewOutboundReq(memo.TopupID, savedTx.OutReceiverAddress, currEthAddr, savedTx.Token, tokenAddr, blockHeight, roundBlockHeight)
+	itemReq := bcommon.NewOutboundReq(memo.TopupID, savedTx.OutReceiverAddress, currEthAddr, savedTx.Token, tokenAddr, txBlockHeight)
 	oc.AddItem(&itemReq)
-	oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, oc.CurrentHeight)
+	oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", txBlockHeight, oc.CurrentHeight)
 	return nil
 }
 
-func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID string, blockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
+func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID string, txBlockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
 	tokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenom(msg.Amount[0].GetDenom())
 	if !tokenExist {
 		return errors.New("token is not on our token list")
@@ -91,7 +89,7 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 		return errors.New("not a native token")
 	}
 
-	item := oc.processNativeFee(txID, tokenAddr, blockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[0].Amount)
+	item := oc.processNativeFee(txID, tokenAddr, txBlockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[0].Amount)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
 		delta := tokenItem.Decimals - sdk.Precision
@@ -99,17 +97,16 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 			adjustedTokenAmount := bcommon.AdjustInt(item.Token.Amount, int64(delta))
 			item.Token.Amount = adjustedTokenAmount
 		}
-		roundBlockHeight := blockHeight / ROUNDBLOCK
-		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, blockHeight, roundBlockHeight)
+		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight)
 		oc.AddItem(&itemReq)
-		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, oc.CurrentHeight)
+		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", txBlockHeight, oc.CurrentHeight)
 		return nil
 	}
 	return nil
 
 }
 
-func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID string, blockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
+func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID string, txBlockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
 	// now we search for the index of the outboundemo and the outbounddemofee
 	found := false
 	indexDemo := 0
@@ -137,7 +134,7 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 		return errors.New("invalid fee pair")
 	}
 
-	item := oc.processErc20DemonAndFee(txID, tokenAddr, blockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
+	item := oc.processErc20DemonAndFee(txID, tokenAddr, txBlockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
 		delta := tokenItem.Decimals - sdk.Precision
@@ -145,17 +142,16 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 			adjustedTokenAmount := bcommon.AdjustInt(item.Token.Amount, int64(delta))
 			item.Token.Amount = adjustedTokenAmount
 		}
-		roundBlockHeight := blockHeight / ROUNDBLOCK
-		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, blockHeight, roundBlockHeight)
+		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight)
 		oc.AddItem(&itemReq)
-		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", blockHeight, oc.CurrentHeight)
+		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", txBlockHeight, oc.CurrentHeight)
 		return nil
 	}
 	return nil
 }
 
 // processMsg handle the oppychain transactions
-func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, memo bcommon.BridgeMemo, msg *banktypes.MsgSend, txHash []byte) error {
+func (oc *OppyChainInstance) processMsg(txBlockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, memo bcommon.BridgeMemo, msg *banktypes.MsgSend, txHash []byte) error {
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 
 	toAddress, err := types.AccAddressFromBech32(msg.ToAddress)
@@ -174,21 +170,21 @@ func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAd
 	switch len(msg.Amount) {
 	case 1:
 		if len(memo.TopupID) != 0 {
-			err := oc.processTopUpRequest(msg, blockHeight, curEthAddr, memo)
+			err := oc.processTopUpRequest(msg, txBlockHeight, curEthAddr, memo)
 			if err != nil {
 				oc.logger.Error().Err(err).Msg("")
 				return errors.New("fail to process the native token top up request")
 			}
 			return nil
 		}
-		err := oc.processNativeRequest(msg, txID, blockHeight, curEthAddr, memo)
+		err := oc.processNativeRequest(msg, txID, txBlockHeight, curEthAddr, memo)
 		if err != nil {
 			oc.logger.Error().Err(err).Msg("")
 			return errors.New("fail to process the native token outbound request")
 		}
 		return nil
 	case 2:
-		err := oc.processErc20Request(msg, txID, blockHeight, curEthAddr, memo)
+		err := oc.processErc20Request(msg, txID, txBlockHeight, curEthAddr, memo)
 		if err != nil {
 			return errors.New("fail to process the outbound erc20 request")
 		}
@@ -198,7 +194,7 @@ func (oc *OppyChainInstance) processMsg(blockHeight int64, address []types.AccAd
 	}
 }
 
-func (oc *OppyChainInstance) processNativeFee(txID string, tokenAddr string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount types.Int) *OutboundTx {
+func (oc *OppyChainInstance) processNativeFee(txID string, tokenAddr string, txBlockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount types.Int) *OutboundTx {
 	expectedFee := oc.calculateGas()
 
 	token := types.Coin{
@@ -208,7 +204,7 @@ func (oc *OppyChainInstance) processNativeFee(txID string, tokenAddr string, blo
 
 	tx := OutboundTx{
 		receiverAddr,
-		uint64(blockHeight),
+		uint64(txBlockHeight),
 		token,
 		tokenAddr,
 		expectedFee,

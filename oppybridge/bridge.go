@@ -350,8 +350,16 @@ func (oc *OppyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, heig
 }
 
 // GetLastBlockHeight gets the current block height
-func (oc *OppyChainInstance) GetLastBlockHeight(conn grpc1.ClientConn) (int64, error) {
-	b, err := GetLastBlockHeight(conn)
+func (oc *OppyChainInstance) GetLastBlockHeightWithLock() (int64, error) {
+	oc.grpcLock.Lock()
+	b, err := GetLastBlockHeight(oc.GrpcClient)
+	oc.grpcLock.Unlock()
+	if err != nil {
+		err2 := oc.RetryOppyChain()
+		if err2 != nil {
+			oc.logger.Error().Err(err).Msgf("we fail to reset the oppychain")
+		}
+	}
 	return b, err
 }
 
@@ -418,7 +426,7 @@ func (oc *OppyChainInstance) CheckAndUpdatePool(conn grpc1.ClientConn, blockHeig
 }
 
 // CheckOutBoundTx checks
-func (oc *OppyChainInstance) CheckOutBoundTx(conn grpc1.ClientConn, blockHeight int64, rawTx tendertypes.Tx) {
+func (oc *OppyChainInstance) CheckOutBoundTx(conn grpc1.ClientConn, txBlockHeight int64, rawTx tendertypes.Tx) {
 	pools := oc.GetPool()
 	if pools[0] == nil || pools[1] == nil {
 		return
@@ -467,7 +475,7 @@ func (oc *OppyChainInstance) CheckOutBoundTx(conn grpc1.ClientConn, blockHeight 
 				continue
 			}
 
-			err = oc.processMsg(blockHeight, poolAddress, pools[1].EthAddress, txMemo, eachMsg, rawTx.Hash())
+			err = oc.processMsg(txBlockHeight, poolAddress, pools[1].EthAddress, txMemo, eachMsg, rawTx.Hash())
 			if err != nil {
 				if err.Error() != "not a top up message to the pool" {
 					oc.logger.Error().Err(err).Msgf("fail to process the message, it is not a top up message")

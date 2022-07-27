@@ -215,7 +215,7 @@ func (m MintTestSuite) TestProcessInbound() {
 	m.Require().NoError(err)
 	tx := common.NewAccountInboundReq(valAddr, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100), int64(100))
 
-	tx.SetAccountInfoAndHeight(0, 0, accs[0].oppyAddr, accs[0].pk, 0)
+	tx.SetAccountInfo(0, 0, accs[0].oppyAddr, accs[0].pk, 0)
 
 	send := banktypes.NewMsgSend(valAddr, accs[0].oppyAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 

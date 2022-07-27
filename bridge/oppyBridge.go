@@ -241,7 +241,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 		return
 	}
 
-	blockHeight, err := oppyChain.GetLastBlockHeight(oppyChain.GrpcClient)
+	blockHeight, err := oppyChain.GetLastBlockHeightWithLock()
 	if err != nil {
 		fmt.Printf("we fail to get the latest block height")
 		cancelsubscription()
@@ -270,7 +270,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 
 			case vals := <-oppyChain.ChannelQueueValidator:
 
-				height, err := oppyChain.GetLastBlockHeight(oppyChain.GrpcClient)
+				height, err := oppyChain.GetLastBlockHeightWithLock()
 				if err != nil {
 					continue
 				}
@@ -413,7 +413,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 
 					pools := oppyChain.GetPool()
 					zlog.Logger.Warn().Msgf("we feed the inbound tx now %v", pools[1].PoolInfo.CreatePool.String())
-					err := oppyChain.FeedTx(grpcClient, pools[1].PoolInfo, pi, currentBlockHeight)
+					err := oppyChain.FeedTx(grpcClient, pools[1].PoolInfo, pi)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
 					}
@@ -428,7 +428,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				// process the public chain new block event
 			case head := <-pi.ChannelQueue:
 
-				oppyBlockHeight, errInner := oppyChain.GetLastBlockHeight(oppyChain.GrpcClient)
+				oppyBlockHeight, errInner := oppyChain.GetLastBlockHeightWithLock()
 				if errInner != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to get the oppy chain block height for this round")
 					errOppyConnect := oppyChain.RetryOppyChain()
@@ -440,7 +440,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 
 				// process block with rollback gap
 				processableBlockHeight := big.NewInt(0).Sub(head.Number, big.NewInt(pubRollbackGap))
-				err = pi.ProcessNewBlock(processableBlockHeight, oppyBlockHeight)
+				err = pi.ProcessNewBlock(processableBlockHeight)
 				pi.CurrentHeight = head.Number.Int64()
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
@@ -508,7 +508,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						continue
 					}
 
-					err = pi.FeedTx(oppyBlockHeight, pools[1].PoolInfo, outboundItems)
+					err = pi.FeedTx(pools[1].PoolInfo, outboundItems)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
 						continue
@@ -582,7 +582,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						}
 					}
 
-					toAddr, fromAddr, tokenAddr, amount, _, nonce := litem.GetOutBoundInfo()
+					toAddr, fromAddr, tokenAddr, amount, nonce := litem.GetOutBoundInfo()
 					txHashCheck, err := pi.ProcessOutBound(toAddr, fromAddr, tokenAddr, amount, nonce)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")

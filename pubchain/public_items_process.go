@@ -42,6 +42,7 @@ func (pi *Instance) PopItem(n int) []*common.InBoundReq {
 
 	inboundReqs := make([]*common.InBoundReq, returnNum)
 
+	pi.logger.Warn().Msgf("the pop out items seq array is %v", allkeys[:returnNum])
 	for i := 0; i < returnNum; i++ {
 		el, loaded := pi.RetryInboundReq.LoadAndDelete(allkeys[i])
 		if !loaded {

@@ -90,7 +90,7 @@ func (pi *Instance) SendNativeToken(signerPk string, sender, receiver common.Add
 		pi.logger.Error().Err(err).Msgf("fail to get the latest height")
 		return common.Hash{}, false, err
 	}
-	blockHeight := int64(latest.NumberU64()) / 10
+	blockHeight := int64(latest.NumberU64()) / ROUNDBLOCK
 	tick := html.UnescapeString("&#" + "128296" + ";")
 	pi.logger.Info().Msgf(">>>>>>%v we build tss at height %v>>>>>>>\n", tick, blockHeight)
 	txo, err := pi.composeTx(signerPk, sender, pi.chainID, blockHeight)
@@ -143,7 +143,7 @@ func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, 
 		return common.Hash{}, err
 	}
 
-	blockHeight := int64(latest.NumberU64()) / 10
+	blockHeight := int64(latest.NumberU64()) / ROUNDBLOCK
 
 	tick := html.UnescapeString("&#" + "128296" + ";")
 	pi.logger.Info().Msgf(">>>>>>%v we build tss at height %v>>>>>>>\n", tick, blockHeight)

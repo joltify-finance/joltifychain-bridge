@@ -10,7 +10,7 @@ import (
 )
 
 // FeedTx feed the tx with the given
-func (oc *OppyChainInstance) FeedTx(conn grpc1.ClientConn, lastPoolInfo *vaulttypes.PoolInfo, pi *pubchain.Instance, currentBlockHeight int64) error {
+func (oc *OppyChainInstance) FeedTx(conn grpc1.ClientConn, lastPoolInfo *vaulttypes.PoolInfo, pi *pubchain.Instance) error {
 	// we always increase the account seq regardless the tx successful or not
 	currentPool := lastPoolInfo.CreatePool.PoolAddr
 	acc, err := queryAccount(conn, currentPool.String(), "")
@@ -24,7 +24,6 @@ func (oc *OppyChainInstance) FeedTx(conn grpc1.ClientConn, lastPoolInfo *vaultty
 		oc.logger.Info().Msgf("empty queue")
 		return nil
 	}
-	roundBlockHeight := currentBlockHeight / ROUNDBLOCK
 
 	accNum := acc.GetAccountNumber()
 	accSeq := acc.GetSequence()
@@ -41,7 +40,7 @@ func (oc *OppyChainInstance) FeedTx(conn grpc1.ClientConn, lastPoolInfo *vaultty
 			continue
 		}
 
-		el.SetAccountInfoAndHeight(accNum, accSeq, address, poolPubkey, roundBlockHeight)
+		el.SetAccountInfo(accNum, accSeq, address, poolPubkey)
 		accSeq++
 		pi.InboundReqChan <- el
 	}

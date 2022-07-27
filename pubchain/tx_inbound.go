@@ -59,8 +59,8 @@ func (pi *Instance) getBalance(value *big.Int) (types.Coin, error) {
 }
 
 // ProcessInBoundERC20 process the inbound contract token top-up
-func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, txInfo *Erc20TxInfo, blockHeight uint64) error {
-	err := pi.processInboundTx(tx.Hash().Hex()[2:], blockHeight, txInfo.fromAddr, txInfo.tokenAddress, txInfo.Amount, txInfo.tokenAddress)
+func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, txInfo *Erc20TxInfo, txBlockHeight uint64) error {
+	err := pi.processInboundERC20Tx(tx.Hash().Hex()[2:], txBlockHeight, txInfo.fromAddr, txInfo.tokenAddress, txInfo.Amount, txInfo.tokenAddress)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
 		return err
@@ -69,17 +69,18 @@ func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, txInfo *Erc20T
 }
 
 // ProcessNewBlock process the blocks received from the public pub_chain
-func (pi *Instance) ProcessNewBlock(number *big.Int, oppyBlockHeight int64) error {
+func (pi *Instance) ProcessNewBlock(number *big.Int) error {
 	block, err := pi.GetBlockByNumberWithLock(number)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to retrieve the block")
 		return err
 	}
-	pi.processEachBlock(block, oppyBlockHeight)
+	//we need to put the block height in which we find the tx
+	pi.processEachBlock(block, number.Int64())
 	return nil
 }
 
-func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
+func (pi *Instance) processInboundERC20Tx(txID string, txBlockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
 	// this is repeated check for tokenAddr which is cheked at function 'processEachBlock'
 	tokenItem, exit := pi.TokenList.GetTokenInfoByAddress(strings.ToLower(addr.Hex()))
 	if !exit {
@@ -95,7 +96,7 @@ func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types
 	tx := InboundTx{
 		txID,
 		from,
-		blockHeight,
+		txBlockHeight,
 		token,
 	}
 
@@ -111,8 +112,7 @@ func (pi *Instance) processInboundTx(txID string, blockHeight uint64, from types
 		tx.Token.Amount = adjustedTokenAmount
 	}
 
-	roundBlockHeight := blockHeight / ROUNDBLOCK
-	item := bcommon.NewAccountInboundReq(tx.Address, to, tx.Token, txIDBytes, int64(blockHeight), int64(roundBlockHeight))
+	item := bcommon.NewAccountInboundReq(tx.Address, to, tx.Token, txIDBytes, int64(txBlockHeight))
 	pi.AddItem(&item)
 	return nil
 }
@@ -174,7 +174,7 @@ func (pi *Instance) checkErc20(data []byte, to string) (*Erc20TxInfo, error) {
 	return nil, errors.New("invalid method for decode")
 }
 
-func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int64) {
+func (pi *Instance) processEachBlock(block *ethTypes.Block, txBlockHeight int64) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
 			continue
@@ -233,8 +233,7 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, oppyBlockHeight int6
 				balance.Amount = adjustedTokenAmount
 			}
 
-			roundBlockHeight := oppyBlockHeight / ROUNDBLOCK
-			item := bcommon.NewAccountInboundReq(fromAddr, *tx.To(), balance, tx.Hash().Bytes(), oppyBlockHeight, roundBlockHeight)
+			item := bcommon.NewAccountInboundReq(fromAddr, *tx.To(), balance, tx.Hash().Bytes(), txBlockHeight)
 			// we add to the retry pool to  sort the tx
 			pi.AddItem(&item)
 		}
