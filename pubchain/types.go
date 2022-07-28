@@ -63,24 +63,26 @@ type InboundTxBnb struct {
 
 // Instance hold the oppy_bridge entity
 type Instance struct {
-	EthClient       *ethclient.Client
-	ethClientLocker *sync.RWMutex
-	configAddr      string
-	chainID         *big.Int
-	tokenAbi        *abi.ABI
-	logger          zerolog.Logger
-	lastTwoPools    []*bcommon.PoolInfo
-	poolLocker      *sync.RWMutex
-	tssServer       tssclient.TssInstance
-	InboundReqChan  chan *bcommon.InBoundReq
-	RetryInboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
-	moveFundReq     *sync.Map
-	CurrentHeight   int64
-	TokenList       tokenlist.TokenListI
-	wg              *sync.WaitGroup
-	SubChannelNow   chan *types.Header
-	ChannelQueue    chan *types.Header
-	SubHandler      ethereum.Subscription
+	EthClient            *ethclient.Client
+	ethClientLocker      *sync.RWMutex
+	configAddr           string
+	chainID              *big.Int
+	tokenAbi             *abi.ABI
+	logger               zerolog.Logger
+	lastTwoPools         []*bcommon.PoolInfo
+	poolLocker           *sync.RWMutex
+	tssServer            tssclient.TssInstance
+	InboundReqChan       chan *bcommon.InBoundReq
+	RetryInboundReq      *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
+	moveFundReq          *sync.Map
+	CurrentHeight        int64
+	TokenList            tokenlist.TokenListI
+	wg                   *sync.WaitGroup
+	SubChannelNow        chan *types.Header
+	ChannelQueue         chan *types.Header
+	SubHandler           ethereum.Subscription
+	onHoldRetryQueue     []*bcommon.InBoundReq
+	onHoldRetryQueueLock *sync.Mutex
 }
 
 // NewChainInstance initialize the oppy_bridge entity
@@ -107,21 +109,23 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.T
 	}
 
 	return &Instance{
-		logger:          logger,
-		EthClient:       ethClient,
-		ethClientLocker: &sync.RWMutex{},
-		configAddr:      ws,
-		chainID:         chainID,
-		tokenAbi:        &tAbi,
-		poolLocker:      &sync.RWMutex{},
-		tssServer:       tssServer,
-		lastTwoPools:    make([]*bcommon.PoolInfo, 2),
-		InboundReqChan:  make(chan *bcommon.InBoundReq, inboundprosSize),
-		RetryInboundReq: &sync.Map{},
-		moveFundReq:     &sync.Map{},
-		TokenList:       tl,
-		wg:              wg,
-		ChannelQueue:    make(chan *types.Header, sbchannelsize),
+		logger:               logger,
+		EthClient:            ethClient,
+		ethClientLocker:      &sync.RWMutex{},
+		configAddr:           ws,
+		chainID:              chainID,
+		tokenAbi:             &tAbi,
+		poolLocker:           &sync.RWMutex{},
+		tssServer:            tssServer,
+		lastTwoPools:         make([]*bcommon.PoolInfo, 2),
+		InboundReqChan:       make(chan *bcommon.InBoundReq, inboundprosSize),
+		RetryInboundReq:      &sync.Map{},
+		moveFundReq:          &sync.Map{},
+		TokenList:            tl,
+		wg:                   wg,
+		ChannelQueue:         make(chan *types.Header, sbchannelsize),
+		onHoldRetryQueue:     []*bcommon.InBoundReq{},
+		onHoldRetryQueueLock: &sync.Mutex{},
 	}, nil
 }
 

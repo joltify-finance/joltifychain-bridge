@@ -37,7 +37,10 @@ import (
 )
 
 // we may need to increase it as we increase the time for keygen/keysign and join party
-var ROUNDBLOCK = 50
+var (
+	ROUNDBLOCK = 50
+	DUMPITEM   = 40
+)
 
 // NewBridgeService starts the new bridge service
 func NewBridgeService(config config.Config) {
@@ -262,6 +265,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 	inboundPauseHeight := int64(0)
 	outboundPauseHeight := uint64(0)
 	failedOutbound := atomic.NewInt64(0)
+	inboundWait := atomic.NewBool(false)
 
 	wg.Add(1)
 	go func(wg *sync.WaitGroup) {
@@ -320,15 +324,15 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					continue
 				}
 
-				currentBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
+				currentProcessBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
 
-				ok, _ := oppyChain.CheckAndUpdatePool(grpcClient, currentBlockHeight)
+				ok, _ := oppyChain.CheckAndUpdatePool(grpcClient, currentProcessBlockHeight)
 				if !ok {
 					// it is okay to fail to submit a pool address as other nodes can submit, as long as 2/3 nodes submit, it is fine.
 					zlog.Logger.Warn().Msgf("we fail to submit the new pool address")
 				}
 
-				oppyChain.CurrentHeight = currentBlockHeight
+				oppyChain.CurrentHeight = currentProcessBlockHeight
 
 				// we update the token list, if the current block height refresh the update mark
 				err = tl.UpdateTokenList(oppyChain.CurrentHeight)
@@ -336,7 +340,21 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					zlog.Logger.Warn().Msgf("error in updating token list %v", err)
 				}
 
-				if currentBlockHeight%pubchain.PRICEUPDATEGAP == 0 {
+				if latestHeight%int64(DUMPITEM) == 0 {
+					zlog.Logger.Warn().Msgf("we reload all the failed tx")
+					items := pi.DumpQueue()
+					for _, el := range items {
+						err := oppyChain.CheckTxStatus(grpcClient, el.Hash().Hex())
+						if err == nil {
+							tick := html.UnescapeString("&#" + "127866" + ";")
+							zlog.Info().Msgf(" %v the tx has been submitted, we catch up with others", tick)
+						} else {
+							pi.AddItem(el)
+						}
+					}
+				}
+
+				if currentProcessBlockHeight%pubchain.PRICEUPDATEGAP == 0 {
 					price, err := pi.GetGasPriceWithLock()
 					if err == nil {
 						oppyChain.UpdatePubChainGasPrice(price.Int64())
@@ -347,15 +365,15 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 
 				// we update the tx new, if there exits a processable block
 				processableBlockHeight := int64(0)
-				if currentBlockHeight > oppyRollbackGap {
-					processableBlockHeight = currentBlockHeight - oppyRollbackGap
+				if currentProcessBlockHeight > oppyRollbackGap {
+					processableBlockHeight = currentProcessBlockHeight - oppyRollbackGap
 					processableBlock, err := oppyChain.GetBlockByHeight(grpcClient, processableBlockHeight)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("error in get block to process %v", err)
 						grpcClient.Close()
 						continue
 					}
-					oppyChain.DeleteExpired(currentBlockHeight)
+					oppyChain.DeleteExpired(currentProcessBlockHeight)
 
 					// here we process the outbound tx
 					for _, el := range processableBlock.Data.Txs {
@@ -405,7 +423,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				}
 
 				latestPool := poolInfo[0].CreatePool.PoolAddr
-				moveFound := oppyChain.MoveFound(grpcClient, currentBlockHeight, latestPool)
+				moveFound := oppyChain.MoveFound(grpcClient, currentProcessBlockHeight, latestPool)
 				if moveFound {
 					// if we move fund in this round, we do not send tx to sign
 					grpcClient.Close()
@@ -416,6 +434,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					failedInbound.Store(0)
 					mid := (latestHeight / int64(ROUNDBLOCK)) + 1
 					inboundPauseHeight = mid * int64(ROUNDBLOCK)
+					inboundWait.Store(true)
 				}
 
 				if latestHeight < inboundPauseHeight {
@@ -423,6 +442,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					grpcClient.Close()
 					continue
 				}
+				inboundWait.Store(false)
 
 				// todo we need also to add the check to avoid send tx near the churn blocks
 				if processableBlockHeight-previousTssBlockInbound >= pubchain.GroupBlockGap && pi.Size() != 0 {
@@ -441,7 +461,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
 					}
-					previousTssBlockInbound = currentBlockHeight
+					previousTssBlockInbound = currentProcessBlockHeight
 					firstTimeInbound = true
 					metric.UpdateInboundTxNum(float64(pi.Size()))
 				}
@@ -487,7 +507,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						isMoveFund = pi.MoveFound(wg, height, previousPool, ethClient)
 						ethClient.Close()
 					}
-
 				}
 				if isMoveFund {
 					// once we move fund, we do not send tx to be processed
@@ -583,12 +602,15 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						err = oppyChain.CheckTxStatus(grpcClientLocal, index)
 						if err != nil {
 							zlog.Logger.Error().Err(err).Msgf("the tx index(%v) has not been successfully submitted retry", index)
-							failedInbound.Inc()
-							pi.AddItem(item)
+							if !inboundWait.Load() {
+								failedInbound.Inc()
+							}
+							pi.AddOnHoldQueue(item)
 							return
 						}
 						tick := html.UnescapeString("&#" + "128229" + ";")
 						if txHash == "" {
+							failedInbound.Store(0)
 							zlog.Logger.Info().Msgf("%v index(%v) have successfully top up by others", tick, index)
 						} else {
 							failedInbound.Store(0)
@@ -638,7 +660,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 								bf.MaxElapsedTime = time.Minute
 								bf.MaxInterval = time.Second * 10
 								op := func() error {
-
 									grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
 									if err != nil {
 										return err

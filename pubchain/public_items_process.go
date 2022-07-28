@@ -11,6 +11,23 @@ func (pi *Instance) AddItem(req *common.InBoundReq) {
 	pi.RetryInboundReq.Store(req.Index(), req)
 }
 
+func (pi *Instance) AddOnHoldQueue(item *common.InBoundReq) {
+	pi.onHoldRetryQueueLock.Lock()
+	defer pi.onHoldRetryQueueLock.Unlock()
+	pi.onHoldRetryQueue = append(pi.onHoldRetryQueue, item)
+}
+
+func (pi *Instance) DumpQueue() []*common.InBoundReq {
+	pi.onHoldRetryQueueLock.Lock()
+	defer pi.onHoldRetryQueueLock.Unlock()
+	if len(pi.onHoldRetryQueue) == 0 {
+		return []*common.InBoundReq{}
+	}
+	ret := pi.onHoldRetryQueue
+	pi.onHoldRetryQueue = []*common.InBoundReq{}
+	return ret
+}
+
 func (pi *Instance) ExportItems() []*common.InBoundReq {
 	var items []*common.InBoundReq
 	pi.RetryInboundReq.Range(func(_, value interface{}) bool {
@@ -42,7 +59,7 @@ func (pi *Instance) PopItem(n int) []*common.InBoundReq {
 
 	inboundReqs := make([]*common.InBoundReq, returnNum)
 
-	pi.logger.Warn().Msgf("the pop out items seq array is %v", allkeys[:returnNum])
+	pi.logger.Warn().Msgf("the pop out items seq array is %v----all in queue (%v)", allkeys[:returnNum], len(allkeys))
 	for i := 0; i < returnNum; i++ {
 		el, loaded := pi.RetryInboundReq.LoadAndDelete(allkeys[i])
 		if !loaded {

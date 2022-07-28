@@ -119,10 +119,11 @@ func (oc *OppyChainInstance) CheckWhetherAlreadyExist(conn grpc1.ClientConn, ind
 
 // CheckTxStatus check whether the tx has been done successfully
 func (oc *OppyChainInstance) CheckTxStatus(conn grpc1.ClientConn, index string) error {
-	bf := backoff.NewExponentialBackOff()
-	bf.InitialInterval = time.Second
-	bf.MaxInterval = time.Second * 10
-	bf.MaxElapsedTime = time.Minute
+	//bf := backoff.NewExponentialBackOff()
+	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 20)
+	//bf.InitialInterval = time.Second
+	//bf.MaxInterval = time.Second * 3
+	//bf.MaxElapsedTime = time.Minute
 
 	op := func() error {
 		if oc.CheckWhetherAlreadyExist(conn, index) {
