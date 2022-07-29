@@ -39,7 +39,7 @@ import (
 // we may need to increase it as we increase the time for keygen/keysign and join party
 var (
 	ROUNDBLOCK = 50
-	DUMPITEM   = 40
+	DUMPITEM   = 60
 )
 
 // NewBridgeService starts the new bridge service
@@ -197,6 +197,16 @@ func NewBridgeService(config config.Config) {
 	<-c
 	cancel()
 	wg.Wait()
+
+	items1 := oppyBridge.DumpQueue()
+	for _, el := range items1 {
+		oppyBridge.AddItem(el)
+	}
+
+	items2 := pubChainInstance.DumpQueue()
+	for _, el := range items2 {
+		pubChainInstance.AddItem(el)
+	}
 
 	itemsexported := oppyBridge.ExportItems()
 	err = fsm.SaveOutBoundState(itemsexported)
