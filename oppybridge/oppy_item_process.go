@@ -88,14 +88,16 @@ func (oc *OppyChainInstance) AddItem(req *common.OutBoundReq) {
 }
 
 func (oc *OppyChainInstance) PopItem(n int) []*common.OutBoundReq {
-	var allkeys []*big.Int
+	var allkeys []string
 	oc.RetryOutboundReq.Range(func(key, value interface{}) bool {
-		allkeys = append(allkeys, key.(*big.Int))
+		allkeys = append(allkeys, key.(string))
 		return true
 	})
 
 	sort.Slice(allkeys, func(i, j int) bool {
-		return allkeys[i].Cmp(allkeys[j]) == -1
+		a, _ := new(big.Int).SetString(allkeys[i], 10)
+		b, _ := new(big.Int).SetString(allkeys[j], 10)
+		return a.Cmp(b) == -1
 	})
 	indexNum := len(allkeys)
 	if indexNum == 0 {

@@ -33,7 +33,7 @@ func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin type
 }
 
 // Index generate the index of a given inbound req
-func (i *OutBoundReq) Index() *big.Int {
+func (i *OutBoundReq) Index() string {
 	data, err := hex.DecodeString(i.TxID)
 	if err != nil {
 		panic(err)
@@ -42,12 +42,7 @@ func (i *OutBoundReq) Index() *big.Int {
 	lower := hash.Big().String()
 	higher := strconv.FormatInt(i.BlockHeight, 10)
 	indexStr := higher + lower
-
-	ret, ok := new(big.Int).SetString(indexStr, 10)
-	if !ok {
-		panic("invalid to create the index")
-	}
-	return ret
+	return indexStr
 }
 
 // SetItemNonce sets the block height of the tx
@@ -67,17 +62,12 @@ func (i *InBoundReq) Hash() common.Hash {
 }
 
 // Index generate the index of a given inbound req
-func (i *InBoundReq) Index() *big.Int {
+func (i *InBoundReq) Index() string {
 	hash := crypto.Keccak256Hash(i.Address.Bytes(), i.TxID)
 	lower := hash.Big().String()
 	higher := strconv.FormatInt(i.BlockHeight, 10)
 	indexStr := higher + lower
-
-	ret, ok := new(big.Int).SetString(indexStr, 10)
-	if !ok {
-		panic("invalid to create the index")
-	}
-	return ret
+	return indexStr
 }
 
 func NewAccountInboundReq(address types.AccAddress, toPoolAddr common.Address, coin types.Coin, txid []byte, blockHeight int64) InBoundReq {
