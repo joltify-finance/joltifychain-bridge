@@ -28,6 +28,7 @@ func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin type
 		coinAddr,
 		txBlockHeight,
 		uint64(0),
+		common.Hash{}.Hex(),
 	}
 }
 

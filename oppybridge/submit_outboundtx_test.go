@@ -149,7 +149,6 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	req := common.OutBoundReq{
 		TxID:               hex.EncodeToString([]byte("testreq")),
 		OutReceiverAddress: accs[0].commAddr,
-		OriginalHeight:     5,
 	}
 	s.Require().NoError(err)
 	err = oc.SubmitOutboundTx(s.grpc, info, req.Hash().Hex(), 10, hex.EncodeToString([]byte("testpubtx")))

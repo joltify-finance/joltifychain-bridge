@@ -102,7 +102,7 @@ func (v *MintTestSuite) SetupSuite() {
 func (m MintTestSuite) TestPrepareIssueTokenRequest() {
 	accs, err := generateRandomPrivKey(3)
 	m.Require().NoError(err)
-	tx := common.NewAccountInboundReq(accs[0].oppyAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(2), int64(100))
+	tx := common.NewAccountInboundReq(accs[0].oppyAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(2))
 	_, err = prepareIssueTokenRequest(&tx, accs[2].commAddr.String(), "1")
 	m.Require().EqualError(err, "decoding bech32 failed: string not all lowercase or all uppercase")
 
@@ -213,9 +213,9 @@ func (m MintTestSuite) TestProcessInbound() {
 
 	acc, err := queryAccount(m.grpc, valAddr.String(), m.network.Validators[0].RPCAddress)
 	m.Require().NoError(err)
-	tx := common.NewAccountInboundReq(valAddr, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100), int64(100))
+	tx := common.NewAccountInboundReq(valAddr, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100))
 
-	tx.SetAccountInfo(0, 0, accs[0].oppyAddr, accs[0].pk, 0)
+	tx.SetAccountInfo(0, 0, accs[0].oppyAddr, accs[0].pk)
 
 	send := banktypes.NewMsgSend(valAddr, accs[0].oppyAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 

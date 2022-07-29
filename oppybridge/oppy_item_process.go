@@ -13,6 +13,23 @@ func (oc *OppyChainInstance) AddMoveFundItem(pool *common.PoolInfo, height int64
 	oc.moveFundReq.Store(height, pool)
 }
 
+func (oc *OppyChainInstance) AddOnHoldQueue(item *common.OutBoundReq) {
+	oc.onHoldRetryQueueLock.Lock()
+	defer oc.onHoldRetryQueueLock.Unlock()
+	oc.onHoldRetryQueue = append(oc.onHoldRetryQueue, item)
+}
+
+func (oc *OppyChainInstance) DumpQueue() []*common.OutBoundReq {
+	oc.onHoldRetryQueueLock.Lock()
+	defer oc.onHoldRetryQueueLock.Unlock()
+	if len(oc.onHoldRetryQueue) == 0 {
+		return []*common.OutBoundReq{}
+	}
+	ret := oc.onHoldRetryQueue
+	oc.onHoldRetryQueue = []*common.OutBoundReq{}
+	return ret
+}
+
 func (oc *OppyChainInstance) ExportMoveFundItems() []*common.PoolInfo {
 	var data []*common.PoolInfo
 	oc.moveFundReq.Range(func(key, value any) bool {

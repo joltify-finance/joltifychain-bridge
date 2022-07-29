@@ -1,6 +1,8 @@
 package oppybridge
 
 import (
+	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc"
 	"sync"
 	"time"
 
@@ -69,6 +71,8 @@ type OppyChainInstance struct {
 	CurrentNewBlockChan   <-chan ctypes.ResultEvent
 	CurrentNewValidator   <-chan ctypes.ResultEvent
 	retryLock             *sync.Mutex
+	onHoldRetryQueueLock  *sync.Mutex
+	onHoldRetryQueue      []*bcommon.OutBoundReq
 }
 
 // info the import structure of the cosmos validator info
@@ -92,4 +96,54 @@ type OutboundTx struct {
 	TokenAddr          string         `json:"token_addr"`
 	Fee                sdk.Coin       `json:"fee"`
 	TxID               string         `json:"txid"`
+}
+
+// NewOppyBridge new the instance for the oppy pub_chain
+func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl tokenlist.TokenListI) (*OppyChainInstance, error) {
+	var oppyBridge OppyChainInstance
+	var err error
+	oppyBridge.logger = log.With().Str("module", "oppyChain").Logger()
+
+	oppyBridge.GrpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := tmclienthttp.New(httpAddr, "/websocket")
+	if err != nil {
+		return nil, err
+	}
+	err = client.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	oppyBridge.WsClient = client
+
+	oppyBridge.Keyring = keyring.NewInMemory()
+
+	oppyBridge.tssServer = tssServer
+
+	oppyBridge.keyGenCache = []tssPoolMsg{}
+	oppyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
+	oppyBridge.poolUpdateLocker = &sync.RWMutex{}
+	oppyBridge.inBoundGas = atomic.NewInt64(250000)
+	oppyBridge.outBoundGasPrice = atomic.NewInt64(5000000000)
+
+	encode := MakeEncodingConfig()
+	oppyBridge.encoding = &encode
+	oppyBridge.OutboundReqChan = make(chan *bcommon.OutBoundReq, reqCacheSize)
+	oppyBridge.RetryOutboundReq = &sync.Map{}
+	oppyBridge.moveFundReq = &sync.Map{}
+	oppyBridge.TokenList = tl
+	oppyBridge.pendingTx = &sync.Map{}
+	oppyBridge.ChannelQueueNewBlock = make(chan ctypes.ResultEvent, channelSize)
+	oppyBridge.ChannelQueueValidator = make(chan ctypes.ResultEvent, channelSize)
+	oppyBridge.grpcLock = &sync.RWMutex{}
+	oppyBridge.grpcAddr = grpcAddr
+	oppyBridge.httpAddr = httpAddr
+	oppyBridge.retryLock = &sync.Mutex{}
+	oppyBridge.onHoldRetryQueueLock = &sync.Mutex{}
+	oppyBridge.onHoldRetryQueue = []*bcommon.OutBoundReq{}
+	return &oppyBridge, nil
 }

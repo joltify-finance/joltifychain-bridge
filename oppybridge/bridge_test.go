@@ -173,7 +173,7 @@ func (b BridgeTestSuite) TestBridgeTx() {
 	b.Require().NoError(err)
 	_, err = b.network.WaitForHeightWithTimeout(10, time.Second*30)
 	b.Require().NoError(err)
-	bh, err := oc.GetLastBlockHeightWithLock(b.grpc)
+	bh, err := oc.GetLastBlockHeightWithLock()
 	b.Require().NoError(err)
 	b.Require().Greater(bh, int64(0))
 	err = oc.prepareTssPool(b.network.Validators[0].Address, accs[1].pk, "10")

@@ -6,30 +6,21 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"strconv"
-	"sync"
-
-	ethcommon "github.com/ethereum/go-ethereum/common"
-	grpc1 "github.com/gogo/protobuf/grpc"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-
-	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
-
-	"go.uber.org/atomic"
-
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	prototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	tendertypes "github.com/tendermint/tendermint/types"
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"strconv"
 
 	coscrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/oppyfinance/tss/common"
 	"github.com/oppyfinance/tss/keysign"
 	"github.com/tendermint/tendermint/crypto"
-	tmclienthttp "github.com/tendermint/tendermint/rpc/client/http"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
 	"gitlab.com/oppy-finance/oppychain/x/vault/types"
@@ -40,58 +31,8 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
-	"google.golang.org/grpc"
-
 	xauthsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
-
-// NewOppyBridge new the instance for the oppy pub_chain
-func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl tokenlist.TokenListI) (*OppyChainInstance, error) {
-	var oppyBridge OppyChainInstance
-	var err error
-	oppyBridge.logger = zlog.With().Str("module", "oppyChain").Logger()
-
-	oppyBridge.GrpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := tmclienthttp.New(httpAddr, "/websocket")
-	if err != nil {
-		return nil, err
-	}
-	err = client.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	oppyBridge.WsClient = client
-
-	oppyBridge.Keyring = keyring.NewInMemory()
-
-	oppyBridge.tssServer = tssServer
-
-	oppyBridge.keyGenCache = []tssPoolMsg{}
-	oppyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
-	oppyBridge.poolUpdateLocker = &sync.RWMutex{}
-	oppyBridge.inBoundGas = atomic.NewInt64(250000)
-	oppyBridge.outBoundGasPrice = atomic.NewInt64(5000000000)
-
-	encode := MakeEncodingConfig()
-	oppyBridge.encoding = &encode
-	oppyBridge.OutboundReqChan = make(chan *bcommon.OutBoundReq, reqCacheSize)
-	oppyBridge.RetryOutboundReq = &sync.Map{}
-	oppyBridge.moveFundReq = &sync.Map{}
-	oppyBridge.TokenList = tl
-	oppyBridge.pendingTx = &sync.Map{}
-	oppyBridge.ChannelQueueNewBlock = make(chan ctypes.ResultEvent, channelSize)
-	oppyBridge.ChannelQueueValidator = make(chan ctypes.ResultEvent, channelSize)
-	oppyBridge.grpcLock = &sync.RWMutex{}
-	oppyBridge.grpcAddr = grpcAddr
-	oppyBridge.httpAddr = httpAddr
-	oppyBridge.retryLock = &sync.Mutex{}
-	return &oppyBridge, nil
-}
 
 func (oc *OppyChainInstance) GetTssNodeID() string {
 	return oc.tssServer.GetTssNodeID()

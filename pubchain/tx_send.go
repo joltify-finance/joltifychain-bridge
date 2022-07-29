@@ -203,8 +203,6 @@ func (pi *Instance) ProcessOutBound(toAddr, fromAddr common.Address, tokenAddr s
 		return txHash.Hex(), err
 	}
 
-	tick := html.UnescapeString("&#" + "128228" + ";")
-	pi.logger.Info().Msgf("%v we have done the outbound tx %v", tick, txHash)
 	return txHash.Hex(), nil
 }
 

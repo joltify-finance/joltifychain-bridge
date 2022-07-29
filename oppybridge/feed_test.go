@@ -109,7 +109,7 @@ func createdTestInBoundReqs(n int) []*common.InBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewAccountInboundReq(accs[i].Address, addr, testCoin, []byte(txid), int64(i), int64(i))
+		item := common.NewAccountInboundReq(accs[i].Address, addr, testCoin, []byte(txid), int64(i))
 		retReq[i] = &item
 	}
 	return retReq
@@ -150,7 +150,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		InboundReqChan:  make(chan *common.InBoundReq, 10),
 	}
 
-	err = oc.FeedTx(f.grpc, &poolInfo, &pi, 100)
+	err = oc.FeedTx(f.grpc, &poolInfo, &pi)
 	f.Require().NoError(err)
 	f.Require().Equal(len(pi.InboundReqChan), 0)
 	reqs := createdTestInBoundReqs(1)
@@ -158,7 +158,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		pi.AddItem(el)
 	}
 
-	err = oc.FeedTx(f.grpc, &poolInfo, &pi, 100)
+	err = oc.FeedTx(f.grpc, &poolInfo, &pi)
 	f.Require().NoError(err)
 	value := <-pi.InboundReqChan
 	f.Require().Equal(value.TxID, reqs[0].TxID)
