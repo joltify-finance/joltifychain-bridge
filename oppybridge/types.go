@@ -1,10 +1,11 @@
 package oppybridge
 
 import (
-	"github.com/rs/zerolog/log"
-	"google.golang.org/grpc"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc"
 
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
@@ -31,7 +32,7 @@ const (
 	channelSize   = 2000
 	ROUNDBLOCK    = 50
 	submitBackoff = time.Millisecond * 500
-	GroupBlockGap = 6
+	GroupBlockGap = 2
 )
 
 // tssPoolMsg this is the pool pre-submit message for the given height

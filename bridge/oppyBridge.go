@@ -465,31 +465,41 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				if latestHeight%int64(DUMPITEM) == 0 {
 					zlog.Logger.Warn().Msgf("we reload all the failed tx")
 					itemInbound := pi.DumpQueue()
+					itemsOutBound := oppyChain.DumpQueue()
+					wgDump := &sync.WaitGroup{}
+					wgDump.Add(len(itemInbound) + len(itemsOutBound))
 					for _, el := range itemInbound {
-						err := oppyChain.CheckTxStatus(grpcClient, el.Hash().Hex())
-						if err == nil {
-							tick := html.UnescapeString("&#" + "127866" + ";")
-							zlog.Info().Msgf(" %v the tx has been submitted, we catch up with others on oppyChain", tick)
-						} else {
-							pi.AddItem(el)
-						}
+						go func(each *common2.InBoundReq) {
+							defer wgDump.Done()
+							err := oppyChain.CheckTxStatus(grpcClient, el.Hash().Hex())
+							if err == nil {
+								tick := html.UnescapeString("&#" + "127866" + ";")
+								zlog.Info().Msgf(" %v the tx has been submitted, we catch up with others on oppyChain", tick)
+							} else {
+								pi.AddItem(el)
+							}
+						}(el)
 					}
 
-					itemsOutBound := oppyChain.DumpQueue()
 					for _, el := range itemsOutBound {
-						empty := common.Hash{}.Hex()
-						if el.SubmittedTxHash == empty {
-							oppyChain.AddItem(el)
-							continue
-						}
-						err := pi.CheckTxStatus(el.SubmittedTxHash)
-						if err != nil {
-							oppyChain.AddItem(el)
-							continue
-						}
-						tick := html.UnescapeString("&#" + "127866" + ";")
-						zlog.Info().Msgf(" %v the tx has been submitted, we catch up with others on pubchain", tick)
+						go func(each *common2.OutBoundReq) {
+							defer wgDump.Done()
+							empty := common.Hash{}.Hex()
+							if el.SubmittedTxHash == empty {
+								oppyChain.AddItem(el)
+								return
+							}
+							err := pi.CheckTxStatus(el.SubmittedTxHash)
+							if err != nil {
+								oppyChain.AddItem(el)
+								return
+							}
+							tick := html.UnescapeString("&#" + "127866" + ";")
+							zlog.Info().Msgf(" %v the tx has been submitted, we catch up with others on pubchain", tick)
+						}(el)
+
 					}
+					wgDump.Wait()
 				}
 
 				grpcClient.Close()
