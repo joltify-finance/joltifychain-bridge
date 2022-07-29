@@ -471,12 +471,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					for _, el := range itemInbound {
 						go func(each *common2.InBoundReq) {
 							defer wgDump.Done()
-							err := oppyChain.CheckTxStatus(grpcClient, el.Hash().Hex())
+							err := oppyChain.CheckTxStatus(grpcClient, each.Hash().Hex())
 							if err == nil {
 								tick := html.UnescapeString("&#" + "127866" + ";")
 								zlog.Info().Msgf(" %v the tx has been submitted, we catch up with others on oppyChain", tick)
 							} else {
-								pi.AddItem(el)
+								pi.AddItem(each)
 							}
 						}(el)
 					}
@@ -485,19 +485,18 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						go func(each *common2.OutBoundReq) {
 							defer wgDump.Done()
 							empty := common.Hash{}.Hex()
-							if el.SubmittedTxHash == empty {
-								oppyChain.AddItem(el)
+							if each.SubmittedTxHash == empty {
+								oppyChain.AddItem(each)
 								return
 							}
-							err := pi.CheckTxStatus(el.SubmittedTxHash)
+							err := pi.CheckTxStatus(each.SubmittedTxHash)
 							if err != nil {
-								oppyChain.AddItem(el)
+								oppyChain.AddItem(each)
 								return
 							}
 							tick := html.UnescapeString("&#" + "127866" + ";")
 							zlog.Info().Msgf(" %v the tx has been submitted, we catch up with others on pubchain", tick)
 						}(el)
-
 					}
 					wgDump.Wait()
 				}
@@ -612,7 +611,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						oppyChain.OutboundReqChan <- el
 					}
 				}
-
 			// process the in-bound top up event which will mint coin for users
 			case itemRecv := <-pi.InboundReqChan:
 				wg.Add(1)
