@@ -474,7 +474,7 @@ func (pi *Instance) doMoveBNBFunds(wg *sync.WaitGroup, previousPool *bcommon.Poo
 		return false, false, err
 	}
 	if emptyAccount {
-		zlog.Logger.Info().Msgf("this is the empry account to move fund")
+		zlog.Logger.Info().Msgf("this is the empty account to move fund")
 		return true, true, nil
 	}
 

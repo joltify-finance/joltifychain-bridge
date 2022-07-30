@@ -72,7 +72,7 @@ type Instance struct {
 	lastTwoPools         []*bcommon.PoolInfo
 	poolLocker           *sync.RWMutex
 	tssServer            tssclient.TssInstance
-	InboundReqChan       chan *bcommon.InBoundReq
+	InboundReqChan       chan []*bcommon.InBoundReq
 	RetryInboundReq      *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq          *sync.Map
 	CurrentHeight        int64
@@ -118,7 +118,7 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.T
 		poolLocker:           &sync.RWMutex{},
 		tssServer:            tssServer,
 		lastTwoPools:         make([]*bcommon.PoolInfo, 2),
-		InboundReqChan:       make(chan *bcommon.InBoundReq, inboundprosSize),
+		InboundReqChan:       make(chan []*bcommon.InBoundReq, inboundprosSize),
 		RetryInboundReq:      &sync.Map{},
 		moveFundReq:          &sync.Map{},
 		TokenList:            tl,

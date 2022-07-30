@@ -37,6 +37,15 @@ func (pi *Instance) ExportItems() []*common.InBoundReq {
 	return items
 }
 
+func (pi *Instance) IsEmpty() bool {
+	empty := true
+	pi.RetryInboundReq.Range(func(key, value any) bool {
+		empty = false
+		return false
+	})
+	return empty
+}
+
 func (pi *Instance) PopItem(n int) []*common.InBoundReq {
 	var allkeys []string
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {

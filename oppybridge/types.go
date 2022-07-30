@@ -30,7 +30,7 @@ const (
 	grpcTimeout   = time.Second * 30
 	reqCacheSize  = 1024
 	channelSize   = 2000
-	ROUNDBLOCK    = 50
+	ROUNDBLOCK    = 20
 	submitBackoff = time.Millisecond * 500
 	GroupBlockGap = 2
 )
@@ -59,7 +59,7 @@ type OppyChainInstance struct {
 	poolUpdateLocker      *sync.RWMutex
 	keyGenCache           []tssPoolMsg
 	lastTwoPools          []*bcommon.PoolInfo
-	OutboundReqChan       chan *bcommon.OutBoundReq
+	OutboundReqChan       chan []*bcommon.OutBoundReq
 	RetryOutboundReq      *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq           *sync.Map
 	CurrentHeight         int64
@@ -133,7 +133,7 @@ func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, t
 
 	encode := MakeEncodingConfig()
 	oppyBridge.encoding = &encode
-	oppyBridge.OutboundReqChan = make(chan *bcommon.OutBoundReq, reqCacheSize)
+	oppyBridge.OutboundReqChan = make(chan []*bcommon.OutBoundReq, reqCacheSize)
 	oppyBridge.RetryOutboundReq = &sync.Map{}
 	oppyBridge.moveFundReq = &sync.Map{}
 	oppyBridge.TokenList = tl
