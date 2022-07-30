@@ -3,6 +3,7 @@ package oppybridge
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
@@ -34,6 +35,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64) error {
 	var pubkeys []string
 	doKeyGen := false
 	for _, el := range lastValidators {
+		fmt.Printf("we add validator %v", el.Address.String())
 		key := ed25519.PubKey{
 			Key: el.PubKey,
 		}
@@ -59,6 +61,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64) error {
 		pubkeys = append(pubkeys, pk)
 	}
 	if doKeyGen {
+		oc.logger.Info().Msgf("at %v we create the keysign with %v", blockHeight, pubkeys)
 		resp, err := oc.tssServer.KeyGen(pubkeys, blockHeight, tssclient.TssVersion)
 		if err != nil {
 			oc.logger.Error().Err(err).Msg("fail to do the keygen")

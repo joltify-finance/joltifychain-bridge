@@ -454,7 +454,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				}
 
 				if latestHeight < inboundPauseHeight {
-					zlog.Logger.Warn().Msgf("too many error for inbound, we wait for %v blocks to continue", inboundPauseHeight-latestHeight)
+					zlog.Logger.Warn().Msgf("to many errors for inbound, we wait for %v blocks to continue", inboundPauseHeight-latestHeight)
 					if latestHeight == inboundPauseHeight-1 {
 						zlog.Info().Msgf("we now load the onhold tx")
 						putOnHoldBlockInBoundBack(oppyGrpc, pi, oppyChain)
@@ -528,24 +528,20 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					continue
 				}
 
-				if amISigner {
-					err = pi.ProcessNewBlock(processableBlockHeight)
-					pi.CurrentHeight = head.Number.Int64()
-					if err != nil {
-						zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
-					}
+				if !amISigner {
+					zlog.Logger.Info().Msg("we are not the signer, we quite the block process")
+					continue
+				}
+
+				err = pi.ProcessNewBlock(processableBlockHeight)
+				pi.CurrentHeight = head.Number.Int64()
+				if err != nil {
+					zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
 				}
 				isMoveFund := false
 				previousPool, height := pi.PopMoveFundItemAfterBlock(head.Number.Int64())
-				isSigner := false
-				if previousPool != nil {
-					isSigner, err = oppyChain.CheckWhetherSigner(previousPool.PoolInfo)
-					if err != nil {
-						zlog.Logger.Warn().Msg("fail in check whether we are signer in moving fund")
-					}
-				}
 
-				if isSigner && previousPool != nil {
+				if previousPool != nil {
 					// we move fund in the public chain
 					ethClient, err := ethclient.Dial(pubChainWsAddress)
 					if err != nil {
@@ -570,7 +566,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				}
 
 				if latestHeight.NumberU64() < outboundPauseHeight {
-					zlog.Logger.Warn().Msgf("too many error for outbound we wait for %v blocks to continue", outboundPauseHeight-latestHeight.NumberU64())
+					zlog.Logger.Warn().Msgf("to many errors for outbound we wait for %v blocks to continue", outboundPauseHeight-latestHeight.NumberU64())
+					if latestHeight.NumberU64() == outboundPauseHeight-1 {
+						zlog.Info().Msgf("we now load the onhold tx")
+						putOnHoldBlockOutBoundBack(oppyGrpc, pi, oppyChain)
+					}
 					continue
 				}
 
@@ -582,8 +582,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					continue
 				}
 
+				if oppyChain.IsEmpty() {
+					zlog.Logger.Debug().Msgf("the inbound queue is empty, we put all onhold back")
+					putOnHoldBlockOutBoundBack(oppyGrpc, pi, oppyChain)
+				}
+
 				// todo we need also to add the check to avoid send tx near the churn blocks
-				if processableBlockHeight.Int64()-previousTssBlockOutBound >= oppybridge.GroupBlockGap && oppyChain.Size() != 0 {
+				if processableBlockHeight.Int64()-previousTssBlockOutBound >= oppybridge.GroupBlockGap && !oppyChain.IsEmpty() {
 					// if we do not have enough tx to process, we wait for another round
 					if oppyChain.Size() < pubchain.GroupSign && firstTimeOutbound {
 						firstTimeOutbound = false
@@ -771,7 +776,7 @@ func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain
 	}
 	defer grpcClient.Close()
 
-	zlog.Logger.Warn().Msgf("we reload all the failed tx")
+	zlog.Logger.Debug().Msgf("we reload all the failed tx")
 	itemInbound := pi.DumpQueue()
 	wgDump := &sync.WaitGroup{}
 	wgDump.Add(len(itemInbound))
@@ -799,7 +804,7 @@ func putOnHoldBlockOutBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChai
 	}
 	defer grpcClient.Close()
 
-	zlog.Logger.Warn().Msgf("we reload all the failed tx")
+	zlog.Logger.Debug().Msgf("we reload all the failed tx")
 	itemsOutBound := oppyChain.DumpQueue()
 	wgDump := &sync.WaitGroup{}
 	wgDump.Add(len(itemsOutBound))

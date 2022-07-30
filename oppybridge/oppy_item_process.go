@@ -122,6 +122,16 @@ func (oc *OppyChainInstance) PopItem(n int) []*common.OutBoundReq {
 	return inboundReqs
 }
 
+func (oc *OppyChainInstance) IsEmpty() bool {
+	empty := true
+	oc.RetryOutboundReq.Range(func(key, value interface{}) bool {
+		empty = false
+		return false
+	})
+	return empty
+
+}
+
 func (oc *OppyChainInstance) Size() int {
 	i := 0
 	oc.RetryOutboundReq.Range(func(key, value interface{}) bool {
