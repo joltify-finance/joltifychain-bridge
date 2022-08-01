@@ -3,6 +3,8 @@ package oppybridge
 import (
 	"context"
 	"errors"
+	"github.com/cosmos/cosmos-sdk/client"
+	"sync"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
@@ -162,6 +164,53 @@ func (oc *OppyChainInstance) waitAndSend(conn grpc1.ClientConn, poolAddress sdk.
 	return err
 }
 
+func (oc *OppyChainInstance) batchComposeAndSend(conn grpc1.ClientConn, sendMsg []sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (map[uint64]string, error) {
+
+	gasWanted := oc.GetGasEstimation()
+	txBuilderSeqMap, err := oc.batchGenSendTx(sendMsg, accSeq, accNum, uint64(gasWanted), signMsg)
+	if err != nil {
+		oc.logger.Error().Err(err).Msg("fail to generate the tx")
+		return nil, err
+	}
+
+	wg := sync.WaitGroup{}
+	txHashes := make(map[uint64]string)
+	for seq, el := range txBuilderSeqMap {
+		if el == nil {
+			oc.logger.Error().Msgf("the seq %v has nil tx builder!!", seq)
+			txHashes[seq] = ""
+			continue
+		}
+		wg.Add(1)
+		go func(accSeq uint64, txBuilder client.TxBuilder) {
+			defer wg.Done()
+
+			ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
+			defer cancel()
+
+			txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
+			if err != nil {
+				oc.logger.Error().Err(err).Msg("fail to encode the tx")
+				txHashes[seq] = ""
+				return
+			}
+
+			err = oc.waitAndSend(conn, poolAddress, accSeq)
+			if err == nil {
+				isTssMsg := true
+				_, resp, err := oc.BroadcastTx(ctx, conn, txBytes, isTssMsg)
+				if err != nil {
+					oc.logger.Error().Err(err).Msg("fail to broadcast the signature")
+				}
+				txHashes[seq] = resp
+				return
+			}
+		}(seq, el)
+	}
+	wg.Wait()
+	return txHashes, errors.New("fail to broadcast one or more txs")
+
+}
 func (oc *OppyChainInstance) composeAndSend(conn grpc1.ClientConn, operator keyring.Info, sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
 	gasWanted := oc.GetGasEstimation()
 	txBuilder, err := oc.genSendTx(operator, []sdk.Msg{sendMsg}, accSeq, accNum, uint64(gasWanted), signMsg)

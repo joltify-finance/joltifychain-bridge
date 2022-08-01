@@ -622,16 +622,17 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				go func() {
 					defer wg.Done()
 					defer inBoundProcessDone.Store(true)
-					localWait := &sync.WaitGroup{}
-					localWait.Add(len(itemsRecv))
-					for i, eachItem := range itemsRecv {
-						go func(index int, el *common2.InBoundReq) {
-							defer localWait.Done()
-							processEachInbound(oppyGrpc, oppyChain, pi, el, inBoundWait, failedInbound)
-							zlog.Info().Msgf("finish processing %v item", index)
-						}(i, eachItem)
-					}
-					localWait.Wait()
+					//localWait := &sync.WaitGroup{}
+					//localWait.Add(len(itemsRecv))
+					processEachInbound(oppyGrpc, oppyChain, pi, itemsRecv, inBoundWait, failedInbound)
+					//for i, eachItem := range itemsRecv {
+					//	go func(index int, el *common2.InBoundReq) {
+					//		defer localWait.Done()
+					//		processEachInbound(oppyGrpc, oppyChain, pi, el, inBoundWait, failedInbound)
+					//		zlog.Info().Msgf("finish processing %v item", index)
+					//	}(i, eachItem)
+					//}
+					//localWait.Wait()
 				}()
 
 			case itemsRecv := <-oppyChain.OutboundReqChan:
@@ -667,7 +668,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 	}(wg)
 }
 
-func processEachInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, item *common2.InBoundReq, inBoundWait *atomic.Bool, failedInbound *atomic.Int32) {
+func processEachInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, items []*common2.InBoundReq, inBoundWait *atomic.Bool, failedInbound *atomic.Int32) {
 	grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")
@@ -675,28 +676,40 @@ func processEachInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance
 	}
 	defer grpcClient.Close()
 
-	txHash, indexRet, err := oppyChain.ProcessInBound(grpcClient, item)
-	if txHash == "" && indexRet == "" && err == nil {
-		return
+	itemsMap := make(map[string]*common2.InBoundReq)
+	for _, el := range items {
+		itemsMap[el.Hash().Hex()] = el
 	}
 
-	err = oppyChain.CheckTxStatus(grpcClient, indexRet, 20)
-	if err != nil {
-		zlog.Logger.Error().Err(err).Msgf("the tx index(%v) has not been successfully submitted retry", indexRet)
-		if !inBoundWait.Load() {
-			failedInbound.Inc()
-		}
-		pi.AddOnHoldQueue(item)
-		return
+	hashIndexMap, err := oppyChain.ProcessInBound(grpcClient, items)
+	wg := sync.WaitGroup{}
+	for index, txHash := range hashIndexMap {
+		wg.Add(1)
+		go func(eachIndex, eachTxHash string) {
+
+			err = oppyChain.CheckTxStatus(grpcClient, eachIndex, 20)
+			if err != nil {
+				zlog.Logger.Error().Err(err).Msgf("the tx index(%v) has not been successfully submitted retry", eachIndex)
+				if !inBoundWait.Load() {
+					failedInbound.Inc()
+				}
+				pi.AddOnHoldQueue(itemsMap[index])
+				return
+			}
+			tick := html.UnescapeString("&#" + "128229" + ";")
+			if txHash == "" {
+				failedInbound.Store(0)
+				zlog.Logger.Info().Msgf("%v index(%v) have successfully top up by others", tick, eachIndex)
+			} else {
+				failedInbound.Store(0)
+				zlog.Logger.Info().Msgf("%v txid(%v) have successfully top up", tick, txHash)
+			}
+
+		}(index, txHash)
+
 	}
-	tick := html.UnescapeString("&#" + "128229" + ";")
-	if txHash == "" {
-		failedInbound.Store(0)
-		zlog.Logger.Info().Msgf("%v index(%v) have successfully top up by others", tick, indexRet)
-	} else {
-		failedInbound.Store(0)
-		zlog.Logger.Info().Msgf("%v txid(%v) have successfully top up", tick, txHash)
-	}
+	wg.Wait()
+
 }
 
 func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, item *common2.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {

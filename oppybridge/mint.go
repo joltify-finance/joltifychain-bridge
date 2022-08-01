@@ -1,9 +1,9 @@
 package oppybridge
 
 import (
-	"errors"
 	"html"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	grpc1 "github.com/gogo/protobuf/grpc"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 
@@ -22,47 +22,64 @@ func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string
 }
 
 // ProcessInBound mint the token in oppy chain
-func (oc *OppyChainInstance) ProcessInBound(conn grpc1.ClientConn, item *common.InBoundReq) (string, string, error) {
-	accSeq, accNum, poolAddress, poolPk := item.GetAccountInfo()
-	// we need to check against the previous account sequence
-	index := item.Hash().Hex()
-	if oc.CheckWhetherAlreadyExist(conn, index) {
-		oc.logger.Warn().Msg("already submitted by others")
-		return "", "", nil
+func (oc *OppyChainInstance) ProcessInBound(conn grpc1.ClientConn, items []*common.InBoundReq) (map[string]string, error) {
+
+	var needToBeProcessed []*common.InBoundReq
+	for _, item := range items {
+		// we need to check against the previous account sequence
+		index := item.Hash().Hex()
+		if oc.CheckWhetherAlreadyExist(conn, index) {
+			oc.logger.Warn().Msg("already submitted by others")
+			continue
+		}
+		needToBeProcessed = append(needToBeProcessed, item)
 	}
 
-	oc.logger.Info().Msgf("we are about to prepare the tx with other nodes with index %v", index)
-	issueReq, err := prepareIssueTokenRequest(item, poolAddress.String(), index)
-	if err != nil {
-		oc.logger.Error().Err(err).Msg("fail to prepare the issuing of the token")
-		return "", "", err
-	}
+	var signMsgs []*tssclient.TssSignigMsg
+	var issueReqs []sdk.Msg
 
 	blockHeight, err := oc.GetLastBlockHeightWithLock()
 	if err != nil {
-		return "", "", err
+		oc.logger.Error().Err(err).Msgf("fail to get the block height in process the inbound tx")
+		return nil, err
 	}
-
 	roundBlockHeight := blockHeight / ROUNDBLOCK
-	tick := html.UnescapeString("&#" + "128296" + ";")
-	oc.logger.Info().Msgf("%v we do the top up for %v at height %v", tick, issueReq.Receiver.String(), roundBlockHeight)
-	signMsg := tssclient.TssSignigMsg{
-		Pk:          poolPk,
-		Signers:     nil,
-		BlockHeight: roundBlockHeight,
-		Version:     tssclient.TssVersion,
+	for _, item := range needToBeProcessed {
+		index := item.Hash().Hex()
+		_, _, poolAddress, poolPk := item.GetAccountInfo()
+		oc.logger.Info().Msgf("we are about to prepare the tx with other nodes with index %v", index)
+		issueReq, err := prepareIssueTokenRequest(item, poolAddress.String(), index)
+		if err != nil {
+			oc.logger.Error().Err(err).Msg("fail to prepare the issuing of the token")
+			return nil, err
+		}
+
+		tick := html.UnescapeString("&#" + "128296" + ";")
+		oc.logger.Info().Msgf("%v we do the top up for %v at height %v", tick, issueReq.Receiver.String(), roundBlockHeight)
+		signMsg := tssclient.TssSignigMsg{
+			Pk:          poolPk,
+			Signers:     nil,
+			BlockHeight: roundBlockHeight,
+			Version:     tssclient.TssVersion,
+		}
+		signMsgs = append(signMsgs, &signMsg)
+		issueReqs = append(issueReqs, issueReq)
 	}
 
-	key, err := oc.Keyring.Key("operator")
+	// as in a group, the accseq MUST has been sorted.
+	accSeq, accNum, poolAddress, _ := items[0].GetAccountInfo()
+	// for batchsigning, the signMsgs for all the members in the grop is the same
+	txHashes, err := oc.batchComposeAndSend(conn, issueReqs, accSeq, accNum, signMsgs[0], poolAddress)
 	if err != nil {
-		oc.logger.Error().Err(err).Msg("fail to get the operator key")
-		return "", "", err
+		oc.logger.Error().Msgf("we fail to process one or more txs")
 	}
 
-	ok, txHash, err := oc.composeAndSend(conn, key, issueReq, accSeq, accNum, &signMsg, poolAddress)
-	if err != nil || !ok {
-		oc.logger.Error().Err(err).Msgf("fail to broadcast the tx->%v", txHash)
-		return "", index, errors.New("fail to process the inbound tx")
+	hashIndexMap := make(map[string]string)
+	for _, el := range items {
+		index := el.Hash().Hex()
+		txHash := txHashes[el.AccSeq]
+		hashIndexMap[index] = txHash
 	}
-	return txHash, index, nil
+
+	return hashIndexMap, nil
 }

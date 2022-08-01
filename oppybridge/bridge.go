@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strconv"
+
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -14,7 +16,6 @@ import (
 	tendertypes "github.com/tendermint/tendermint/types"
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
-	"strconv"
 
 	coscrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -46,6 +47,123 @@ func (oc *OppyChainInstance) TerminateBridge() error {
 	}
 	oc.tssServer.Stop()
 	return nil
+}
+
+func (oc *OppyChainInstance) batchGenSendTx(sdkMsg []sdk.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (map[uint64]client.TxBuilder, error) {
+	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
+	// following function.
+	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, tssSignMsg.Pk) // nolint
+	if err != nil {
+		oc.logger.Error().Err(err).Msgf("fail to get the pubkey")
+		return nil, err
+	}
+
+	encCfg := *oc.encoding
+	var tssSignRawMsgs []string
+	txBuilderMap := make(map[string]client.TxBuilder)
+	unSignedSigMap := make(map[string]*signing.SignatureV2)
+	txBuilderSeqMap := make(map[uint64]client.TxBuilder)
+	for i, eachMsg := range sdkMsg {
+		// Create a new TxBuilder.
+		txBuilder := encCfg.TxConfig.NewTxBuilder()
+		err := txBuilder.SetMsgs(eachMsg)
+		if err != nil {
+			return nil, err
+		}
+		// we use the default here
+		txBuilder.SetGasLimit(gasWanted)
+		// txBuilder.SetFeeAmount(...)
+		// txBuilder.SetMemo(...)
+		// txBuilder.SetTimeoutHeight(...)
+		var sigV2 signing.SignatureV2
+
+		pk := tssSignMsg.Pk
+		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) // nolint
+		if err != nil {
+			oc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
+			return nil, err
+		}
+		sigV2 = signing.SignatureV2{
+			PubKey: cPk,
+			Data: &signing.SingleSignatureData{
+				SignMode:  encCfg.TxConfig.SignModeHandler().DefaultMode(),
+				Signature: nil,
+			},
+			Sequence: accSeq + uint64(i),
+		}
+
+		err = txBuilder.SetSignatures(sigV2)
+		if err != nil {
+			oc.logger.Error().Err(err).Msgf("fail to build the signature")
+			continue
+		}
+
+		signMode := encCfg.TxConfig.SignModeHandler().DefaultMode()
+
+		signerData := xauthsigning.SignerData{
+			ChainID:       config.ChainID,
+			AccountNumber: accNum,
+			Sequence:      accSeq + uint64(i),
+		}
+
+		// Generate the bytes to be signed.
+		signBytes, err := encCfg.TxConfig.SignModeHandler().GetSignBytes(signMode, signerData, txBuilder.GetTx())
+		if err != nil {
+			oc.logger.Error().Err(err).Msgf("fail to build the signature")
+			continue
+		}
+
+		hashedMsg := crypto.Sha256(signBytes)
+		encodedMsg := base64.StdEncoding.EncodeToString(hashedMsg)
+		tssSignRawMsgs = append(tssSignRawMsgs, encodedMsg)
+		txBuilderMap[encodedMsg] = txBuilder
+		unSignedSigMap[encodedMsg] = &sigV2
+	}
+
+	tssSignMsg.Msgs = tssSignRawMsgs
+	resp, err := oc.doTssSign(tssSignMsg)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Status != common.Success {
+		oc.logger.Error().Err(err).Msg("fail to generate the signature")
+		// todo we need to handle the blame
+		return nil, err
+	}
+	if len(resp.Signatures) != len(tssSignRawMsgs) {
+		oc.logger.Error().Msgf("the signature and msg to be signed mismathch")
+		return nil, errors.New("more than 1 signature received")
+	}
+
+	for _, el := range resp.Signatures {
+		thisSignature, err := misc.SerializeSig(&el, false)
+		if err != nil {
+			oc.logger.Error().Msgf("fail to encode the signature")
+			continue
+		}
+
+		txBuilder := txBuilderMap[el.Msg]
+		unSignedSig := unSignedSigMap[el.Msg]
+		// Construct the SignatureV2 struct
+		sigData := signing.SingleSignatureData{
+			SignMode:  encCfg.TxConfig.SignModeHandler().DefaultMode(),
+			Signature: thisSignature,
+		}
+
+		signedSigV2 := signing.SignatureV2{
+			PubKey:   pubkey,
+			Data:     &sigData,
+			Sequence: unSignedSig.Sequence,
+		}
+
+		err = txBuilder.SetSignatures(signedSigV2)
+		if err != nil {
+			oc.logger.Error().Err(err).Msgf("fail to set the signature")
+			txBuilderSeqMap[unSignedSig.Sequence] = nil
+		}
+		txBuilderSeqMap[unSignedSig.Sequence] = txBuilder
+	}
+	return txBuilderSeqMap, nil
 }
 
 func (oc *OppyChainInstance) genSendTx(key keyring.Info, sdkMsg []sdk.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (client.TxBuilder, error) {
