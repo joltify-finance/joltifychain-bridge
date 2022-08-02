@@ -686,7 +686,7 @@ func processEachInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance
 	for index, txHash := range hashIndexMap {
 		wg.Add(1)
 		go func(eachIndex, eachTxHash string) {
-
+			defer wg.Done()
 			err = oppyChain.CheckTxStatus(grpcClient, eachIndex, 20)
 			if err != nil {
 				zlog.Logger.Error().Err(err).Msgf("the tx index(%v) has not been successfully submitted retry", eachIndex)
@@ -704,12 +704,9 @@ func processEachInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance
 				failedInbound.Store(0)
 				zlog.Logger.Info().Msgf("%v txid(%v) have successfully top up", tick, txHash)
 			}
-
 		}(index, txHash)
-
 	}
 	wg.Wait()
-
 }
 
 func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, item *common2.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
