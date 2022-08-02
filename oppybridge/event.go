@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
@@ -61,6 +62,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64) error {
 		pubkeys = append(pubkeys, pk)
 	}
 	if doKeyGen {
+		sort.Strings(pubkeys)
 		oc.logger.Info().Msgf("at %v we create the keysign with %v", blockHeight, pubkeys)
 		resp, err := oc.tssServer.KeyGen(pubkeys, blockHeight, tssclient.TssVersion)
 		if err != nil {
