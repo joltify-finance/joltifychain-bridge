@@ -622,17 +622,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				go func() {
 					defer wg.Done()
 					defer inBoundProcessDone.Store(true)
-					//localWait := &sync.WaitGroup{}
-					//localWait.Add(len(itemsRecv))
 					processInbound(oppyGrpc, oppyChain, pi, itemsRecv, inBoundWait, failedInbound)
-					//for i, eachItem := range itemsRecv {
-					//	go func(index int, el *common2.InBoundReq) {
-					//		defer localWait.Done()
-					//		processInbound(oppyGrpc, oppyChain, pi, el, inBoundWait, failedInbound)
-					//		zlog.Info().Msgf("finish processing %v item", index)
-					//	}(i, eachItem)
-					//}
-					//localWait.Wait()
 				}()
 
 			case itemsRecv := <-oppyChain.OutboundReqChan:
@@ -681,7 +671,31 @@ func processInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi
 		itemsMap[el.Hash().Hex()] = el
 	}
 
-	hashIndexMap, err := oppyChain.ProcessInBound(grpcClient, items)
+	var needToBeProcessed []*common2.InBoundReq
+	for _, item := range items {
+		// we need to check against the previous account sequence
+		index := item.Hash().Hex()
+		if oppyChain.CheckWhetherAlreadyExist(grpcClient, index) {
+			zlog.Logger.Warn().Msg("already submitted by others")
+			continue
+		}
+		needToBeProcessed = append(needToBeProcessed, item)
+	}
+	//if all the tx has been processed, we quit
+	if len(needToBeProcessed) == 0 {
+		failedInbound.Store(0)
+		return
+	}
+
+	hashIndexMap, err := oppyChain.ProcessInBound(grpcClient, needToBeProcessed)
+	if err != nil {
+		//we add all the txs back to wait list
+		for _, el := range items {
+			pi.AddOnHoldQueue(el)
+		}
+		return
+	}
+
 	wg := sync.WaitGroup{}
 	for index, txHash := range hashIndexMap {
 		wg.Add(1)

@@ -24,17 +24,6 @@ func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string
 // ProcessInBound mint the token in oppy chain
 func (oc *OppyChainInstance) ProcessInBound(conn grpc1.ClientConn, items []*common.InBoundReq) (map[string]string, error) {
 
-	var needToBeProcessed []*common.InBoundReq
-	for _, item := range items {
-		// we need to check against the previous account sequence
-		index := item.Hash().Hex()
-		if oc.CheckWhetherAlreadyExist(conn, index) {
-			oc.logger.Warn().Msg("already submitted by others")
-			continue
-		}
-		needToBeProcessed = append(needToBeProcessed, item)
-	}
-
 	var signMsgs []*tssclient.TssSignigMsg
 	var issueReqs []sdk.Msg
 
@@ -44,14 +33,14 @@ func (oc *OppyChainInstance) ProcessInBound(conn grpc1.ClientConn, items []*comm
 		return nil, err
 	}
 	roundBlockHeight := blockHeight / ROUNDBLOCK
-	for _, item := range needToBeProcessed {
+	for _, item := range items {
 		index := item.Hash().Hex()
 		_, _, poolAddress, poolPk := item.GetAccountInfo()
 		oc.logger.Info().Msgf("we are about to prepare the tx with other nodes with index %v", index)
 		issueReq, err := prepareIssueTokenRequest(item, poolAddress.String(), index)
 		if err != nil {
 			oc.logger.Error().Err(err).Msg("fail to prepare the issuing of the token")
-			return nil, err
+			continue
 		}
 
 		tick := html.UnescapeString("&#" + "128296" + ";")
@@ -65,7 +54,6 @@ func (oc *OppyChainInstance) ProcessInBound(conn grpc1.ClientConn, items []*comm
 		signMsgs = append(signMsgs, &signMsg)
 		issueReqs = append(issueReqs, issueReq)
 	}
-
 	// as in a group, the accseq MUST has been sorted.
 	accSeq, accNum, poolAddress, _ := items[0].GetAccountInfo()
 	// for batchsigning, the signMsgs for all the members in the grop is the same
