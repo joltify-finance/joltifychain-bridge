@@ -723,20 +723,31 @@ func processInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi
 	wg.Wait()
 }
 
-func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, item *common2.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
+func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, items []*common2.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
 
-	submittedTx, err := oppyChain.GetPubChainSubmittedTx(*item)
-	if err != nil {
-		zlog.Logger.Info().Msg("we continue process this tx as it has not been submitted")
-	}
+	checkWg := sync.WaitGroup{}
+	var needToBeProcessed []*common2.OutBoundReq
+	for _, el := range items {
+		checkWg.Add(1)
+		go func(each *common2.OutBoundReq) {
+			defer checkWg.Done()
+			submittedTx, err := oppyChain.GetPubChainSubmittedTx(*each)
+			if err != nil {
+				zlog.Logger.Info().Msg("we continue process this tx as it has not been submitted")
+				needToBeProcessed = append(needToBeProcessed, each)
+				return
+			}
 
-	if submittedTx != "" {
-		zlog.Logger.Info().Msgf("we check whether someone has already submitted this tx %v", submittedTx)
-		err := pi.CheckTxStatus(submittedTx)
-		if err == nil {
-			zlog.Logger.Info().Msg("this tx has been submitted by others, we skip it")
-			return
-		}
+			if submittedTx != "" {
+				zlog.Logger.Info().Msgf("we check whether someone has already submitted this tx %v", submittedTx)
+				err := pi.CheckTxStatus(submittedTx)
+				if err == nil {
+					zlog.Logger.Info().Msg("this tx has been submitted by others, we skip it")
+					return
+				}
+				needToBeProcessed = append(needToBeProcessed, each)
+			}
+		}(el)
 	}
 
 	toAddr, fromAddr, tokenAddr, amount, nonce := item.GetOutBoundInfo()
