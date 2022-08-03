@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"html"
@@ -630,17 +631,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				go func() {
 					defer outBoundProcessDone.Store(true)
 					defer wg.Done()
-					localWait := &sync.WaitGroup{}
-					localWait.Add(len(itemsRecv))
-
-					for i, eachItem := range itemsRecv {
-						go func(index int, el *common2.OutBoundReq) {
-							defer localWait.Done()
-							processEachOutBound(oppyGrpc, oppyChain, pi, el, failedOutbound, outBoundWait, &localSubmitLocker)
-							zlog.Info().Msgf("finish processing %v item", index)
-						}(i, eachItem)
-					}
-
+					processEachOutBound(oppyGrpc, oppyChain, pi, itemsRecv, failedOutbound, outBoundWait, &localSubmitLocker)
 				}()
 
 			case <-time.After(time.Second * 15):
@@ -749,57 +740,111 @@ func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstanc
 			}
 		}(el)
 	}
+	checkWg.Wait()
 
-	toAddr, fromAddr, tokenAddr, amount, nonce := item.GetOutBoundInfo()
-	txHash, err := pi.ProcessOutBound(toAddr, fromAddr, tokenAddr, amount, nonce)
-	if err != nil {
-		zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
-	}
-	// though we submit the tx successful, we may still fail as tx may run out of gas,so we need to check
+	// now we process each tx
+	tssWaitGroup := &sync.WaitGroup{}
+	bc := pubchain.NewBroadcaster()
+	tssReqChan := make(chan *pubchain.TssReq, len(needToBeProcessed))
 	emptyHash := common.Hash{}.Hex()
-	if txHash != emptyHash {
-		err := pi.CheckTxStatus(txHash)
-		if err == nil {
-			failedOutBound.Store(0)
-			tick := html.UnescapeString("&#" + "128228" + ";")
-			zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, fromAddr, toAddr, amount.String())
-			// now we submit our public chain tx to oppychain
-			localSubmitLocker.Lock()
-			bf := backoff.NewExponentialBackOff()
-			bf.MaxElapsedTime = time.Minute
-			bf.MaxInterval = time.Second * 10
-			op := func() error {
-				grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
-				if err != nil {
-					return err
-				}
-				defer grpcClient.Close()
-
-				// we need to submit the pool created height as the validator may change in chain cosmos staking module
-				// since we have started process the block, it is confirmed we have two pools
-				pools := pi.GetPool()
-				poolCreateHeight, err := strconv.ParseInt(pools[1].PoolInfo.BlockHeight, 10, 64)
-				if err != nil {
-					panic("blockheigh convert should never fail")
-				}
-				errInner := oppyChain.SubmitOutboundTx(grpcClient, nil, item.Hash().Hex(), poolCreateHeight, txHash)
-				return errInner
-			}
-			err := backoff.Retry(op, bf)
+	defer close(tssReqChan)
+	for i, pItem := range needToBeProcessed {
+		tssWaitGroup.Add(1)
+		go func(index int, item *common2.OutBoundReq) {
+			defer tssWaitGroup.Done()
+			toAddr, fromAddr, tokenAddr, amount, nonce := item.GetOutBoundInfo()
+			tssRespChan, err := bc.Subscribe(int64(index))
 			if err != nil {
-				zlog.Logger.Error().Err(err).Msgf("we have tried but failed to submit the record with backoff")
+				panic("should not been subscribed!!")
 			}
-			localSubmitLocker.Unlock()
+			defer bc.Unsubscribe(int64(index))
+			txHash, err := pi.ProcessOutBound(index, toAddr, fromAddr, tokenAddr, amount, nonce, tssReqChan, tssRespChan)
+			if err != nil {
+				zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
+			}
+			if txHash != emptyHash {
+				err := pi.CheckTxStatus(txHash)
+				if err == nil {
+					failedOutBound.Store(0)
+					tick := html.UnescapeString("&#" + "128228" + ";")
+					zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, fromAddr, toAddr, amount.String())
+					// now we submit our public chain tx to oppychain
+					localSubmitLocker.Lock()
+					bf := backoff.NewExponentialBackOff()
+					bf.MaxElapsedTime = time.Minute
+					bf.MaxInterval = time.Second * 10
+					op := func() error {
+						grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
+						if err != nil {
+							return err
+						}
+						defer grpcClient.Close()
+
+						// we need to submit the pool created height as the validator may change in chain cosmos staking module
+						// since we have started process the block, it is confirmed we have two pools
+						pools := pi.GetPool()
+						poolCreateHeight, err := strconv.ParseInt(pools[1].PoolInfo.BlockHeight, 10, 64)
+						if err != nil {
+							panic("blockheigh convert should never fail")
+						}
+						errInner := oppyChain.SubmitOutboundTx(grpcClient, nil, item.Hash().Hex(), poolCreateHeight, txHash)
+						return errInner
+					}
+					err := backoff.Retry(op, bf)
+					if err != nil {
+						zlog.Logger.Error().Err(err).Msgf("we have tried but failed to submit the record with backoff")
+					}
+					localSubmitLocker.Unlock()
+					return
+				}
+			}
+			zlog.Logger.Warn().Msgf("the tx is fail in submission, we need to resend")
+			if !outBoundWait.Load() {
+				failedOutBound.Inc()
+			}
+			item.SubmittedTxHash = txHash
+			oppyChain.AddOnHoldQueue(item)
+		}(i, pItem)
+	}
+	// here we process the tss msg in batch
+	tssWaitGroup.Add(1)
+	go func() {
+		defer tssWaitGroup.Done()
+		var allsignMSgs [][]byte
+		received := make(map[int][]byte)
+		collected := false
+		for {
+			select {
+			case msg := <-tssReqChan:
+				received[msg.Index] = msg.Data
+				if len(received) >= len(needToBeProcessed) {
+					collected = true
+				}
+			}
+			if collected {
+				break
+			}
+		}
+		for _, val := range received {
+			if bytes.Equal([]byte("none"), val) {
+				continue
+			}
+			allsignMSgs = append(allsignMSgs, val)
+		}
+
+		lastPool := pi.GetPool()[1]
+		latest, err := pi.GetBlockByNumberWithLock(nil)
+		if err != nil {
+			zlog.Logger.Error().Err(err).Msgf("fail to get the latest height")
+			bc.Broadcast(nil)
 			return
 		}
-	}
-	zlog.Logger.Warn().Msgf("the tx is fail in submission, we need to resend")
-	if !outBoundWait.Load() {
-		failedOutBound.Inc()
-	}
-	item.SubmittedTxHash = txHash
-	oppyChain.AddOnHoldQueue(item)
-
+		blockHeight := int64(latest.NumberU64()) / pubchain.ROUNDBLOCK
+		signature, err := pi.TssSignBatch(allsignMSgs, lastPool.Pk, blockHeight)
+		bc.Broadcast(signature)
+		return
+	}()
+	tssWaitGroup.Wait()
 }
 
 func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain *oppybridge.OppyChainInstance) {

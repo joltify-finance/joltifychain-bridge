@@ -60,6 +60,64 @@ func (pi *Instance) waitToSend(poolAddress common.Address, targetNonce uint64) e
 }
 
 // SendNativeToken sends the native token to the public chain
+func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, bool, error) {
+
+	// fixme, we set the fixed gaslimit
+	gasLimit, err := strconv.ParseUint(config.DefaultPUBChainGasWanted, 10, 64)
+	if err != nil {
+		panic("fail to parse the default pubchain gas wanted")
+	}
+	//fixme need to check what is the gas price here
+	gasPrice, err := pi.GetGasPriceWithLock()
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
+		return common.Hash{}, false, err
+	}
+
+	totalFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasLimit)))
+	// we have already check the tx fee once is it put on chain
+	//if amount.Cmp(totalFee) != 1 {
+	//	return common.Hash{}, true, nil
+	//}
+
+	txo, err := pi.composeTxBatch(index, sender, pi.chainID, tssReqChan, tssRespChan)
+	if err != nil {
+		return common.Hash{}, false, err
+	}
+	if nonce != nil {
+		txo.Nonce = nonce
+	}
+	pi.logger.Info().Msgf("we have get the signature for native token")
+	sendAmount := new(big.Int).Sub(amount, totalFee)
+	txo.Value = sendAmount
+
+	var data []byte
+	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: gasLimit, To: &receiver, Value: sendAmount, Data: data})
+
+	signedTx, err := txo.Signer(sender, tx)
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to sign the tx")
+		return common.Hash{}, false, err
+	}
+
+	ctxSend, cancelSend := context.WithTimeout(context.Background(), chainQueryTimeout)
+	defer cancelSend()
+
+	if nonce != nil {
+		err = pi.waitToSend(sender, nonce.Uint64())
+		if err != nil {
+			return signedTx.Hash(), false, err
+		}
+	}
+
+	err = pi.sendTransactionWithLock(ctxSend, signedTx)
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("we fail to send the outbound native tx, have reset the eth client")
+	}
+	return signedTx.Hash(), false, err
+}
+
+// SendNativeToken sends the native token to the public chain
 func (pi *Instance) SendNativeToken(signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int) (common.Hash, bool, error) {
 
 	// fixme, we set the fixed gaslimit
@@ -131,6 +189,46 @@ func (pi *Instance) SendNativeToken(signerPk string, sender, receiver common.Add
 }
 
 // SendToken sends the token to the public chain
+func (pi *Instance) SendTokenBatch(index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
+
+	txo, err := pi.composeTxBatch(index, sender, pi.chainID, tssReqChan, tssRespChan)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	if nonce != nil {
+		txo.Nonce = nonce
+	}
+	pi.logger.Info().Msgf("we have get the signature from tss module")
+	txo.NoSend = true
+	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), pi.EthClient)
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("fail to generate token instance for %v while processing outbound tx", tokenAddr)
+		return common.Hash{}, err
+	}
+	readyTx, err := tokenInstance.Transfer(txo, receiver, amount)
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("fail to send the token to the address %v with amount %v", receiver, amount.String())
+		return common.Hash{}, err
+	}
+
+	ctxSend, cancelSend := context.WithTimeout(context.Background(), chainQueryTimeout)
+	defer cancelSend()
+
+	if nonce != nil {
+		err = pi.waitToSend(sender, nonce.Uint64())
+		if err != nil {
+			return readyTx.Hash(), err
+		}
+	}
+	err = pi.sendTransactionWithLock(ctxSend, readyTx)
+	if err != nil {
+		//we reset the ethcliet
+		pi.logger.Error().Err(err).Msgf("we fail to send the outbound ERC20 tx, have reset the eth client")
+	}
+	return readyTx.Hash(), err
+}
+
+// SendToken sends the token to the public chain
 func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string) (common.Hash, error) {
 	if signerPk == "" {
 		lastPool := pi.GetPool()[1]
@@ -185,14 +283,16 @@ func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, 
 }
 
 // ProcessOutBound send the money to public chain
-func (pi *Instance) ProcessOutBound(toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, nonce uint64) (string, error) {
+func (pi *Instance) ProcessOutBound(index int, toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, nonce uint64, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (string, error) {
 	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v of %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18), tokenAddr)
 	var txHash common.Hash
 	var err error
 	if tokenAddr == config.NativeSign {
-		txHash, _, err = pi.SendNativeToken("", fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce))
+		txHash, _, err = pi.SendNativeTokenBatch(index, fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce), tssReqChan, tssRespChan)
+		tssReqChan <- &TssReq{Index: index, Data: []byte("done")}
 	} else {
-		txHash, err = pi.SendToken("", fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce), tokenAddr)
+		txHash, err = pi.SendTokenBatch(index, fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce), tokenAddr, tssReqChan, tssRespChan)
+		tssReqChan <- &TssReq{Index: index, Data: []byte("done")}
 	}
 	if err != nil {
 		if err.Error() == "already known" {
@@ -231,6 +331,35 @@ func (pi *Instance) tssSign(msg []byte, pk string, blockHeight int64) ([]byte, e
 	return signature, nil
 }
 
+func (pi *Instance) TssSignBatch(msgs [][]byte, pk string, blockHeight int64) (map[string][]byte, error) {
+	var encodedMSgs []string
+	for _, el := range msgs {
+		encodedMsg := base64.StdEncoding.EncodeToString(el)
+		encodedMSgs = append(encodedMSgs, encodedMsg)
+	}
+	resp, err := pi.tssServer.KeySign(pk, encodedMSgs, blockHeight, nil, "0.15.0")
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to run the keysign")
+		return nil, err
+	}
+
+	if resp.Status != common3.Success {
+		pi.logger.Error().Err(err).Msg("fail to generate the signature")
+		// todo we need to handle the blame
+		return nil, err
+	}
+	signatureMap := make(map[string][]byte)
+	for _, eachSign := range resp.Signatures {
+		signature, err := misc.SerializeSig(&eachSign, true)
+		if err != nil {
+			pi.logger.Error().Msgf("fail to encode the signature")
+			continue
+		}
+		signatureMap[eachSign.Msg] = signature
+	}
+	return signatureMap, nil
+}
+
 func (pi *Instance) composeTx(signerPk string, sender common.Address, chainID *big.Int, blockHeight int64) (*bind.TransactOpts, error) {
 	if chainID == nil {
 		return nil, bind.ErrNoChainID
@@ -248,6 +377,35 @@ func (pi *Instance) composeTx(signerPk string, sender common.Address, chainID *b
 				return nil, errors.New("fail to sign the tx")
 			}
 			return tx.WithSignature(signer, signature)
+		},
+		Context: context.Background(),
+	}, nil
+}
+
+func (pi *Instance) composeTxBatch(index int, sender common.Address, chainID *big.Int, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (*bind.TransactOpts, error) {
+	if chainID == nil {
+		return nil, bind.ErrNoChainID
+	}
+	signer := types.LatestSignerForChainID(chainID)
+	return &bind.TransactOpts{
+		From: sender,
+		Signer: func(address common.Address, tx *types.Transaction) (*types.Transaction, error) {
+			if address != sender {
+				return nil, errors.New("the address is different from the sender")
+			}
+			msg := signer.Hash(tx).Bytes()
+			tssReqChan <- &TssReq{Data: msg, Index: index}
+			signature := <-tssRespChan
+			if signature == nil {
+				return nil, errors.New("fail to sign the tx")
+			}
+
+			expected := base64.StdEncoding.EncodeToString(msg)
+			sig, ok := signature[expected]
+			if !ok {
+				return nil, errors.New("fail to sign the tx")
+			}
+			return tx.WithSignature(signer, sig)
 		},
 		Context: context.Background(),
 	}, nil

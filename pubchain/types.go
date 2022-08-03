@@ -61,6 +61,11 @@ type InboundTxBnb struct {
 	Fee         sdk.Coin `json:"fee"`
 }
 
+type TssReq struct {
+	Data  []byte
+	Index int
+}
+
 // Instance hold the oppy_bridge entity
 type Instance struct {
 	EthClient            *ethclient.Client
