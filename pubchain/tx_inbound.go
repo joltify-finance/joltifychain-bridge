@@ -10,7 +10,6 @@ import (
 	"math"
 	"math/big"
 	"strings"
-	"sync"
 
 	"github.com/cenkalti/backoff"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -405,20 +404,20 @@ func (pi *Instance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommo
 //	return rawTx.Hash().Hex(), nil
 //}
 
-func (pi *Instance) moveERC20Token(wg *sync.WaitGroup, senderPk string, sender, receiver common.Address, balance *big.Int, tokenAddr string) (string, error) {
-	txHash, err := pi.SendToken(senderPk, sender, receiver, balance, nil, tokenAddr)
+func (pi *Instance) moveERC20Token(index int, sender, receiver common.Address, balance *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
+	txHash, err := pi.SendTokenBatch(index, sender, receiver, balance, nil, tokenAddr, tssReqChan, tssRespChan)
 	if err != nil {
 		if err.Error() == "already known" {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")
-			return txHash.Hex(), nil
+			return txHash, nil
 		}
 		pi.logger.Error().Err(err).Msgf("fail to send the token with err %v for amount %v ", err, balance)
-		return txHash.Hex(), err
+		return txHash, err
 	}
-	return txHash.Hex(), nil
+	return txHash, nil
 }
 
-func (pi *Instance) doMoveTokenFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address, tokenAddr string, ethClient *ethclient.Client) (bool, error) {
+func (pi *Instance) doMoveTokenFunds(index int, previousPool *bcommon.PoolInfo, receiver common.Address, tokenAddr string, ethClient *ethclient.Client, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (bool, error) {
 	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), ethClient)
 	if err != nil {
 		return false, err
@@ -436,22 +435,31 @@ func (pi *Instance) doMoveTokenFunds(wg *sync.WaitGroup, previousPool *bcommon.P
 	}
 
 	if balance.Cmp(big.NewInt(0)) == 1 {
-		erc20TxHash, err := pi.moveERC20Token(wg, previousPool.Pk, previousPool.EthAddress, receiver, balance, tokenAddr)
+		erc20TxHash, err := pi.moveERC20Token(index, previousPool.EthAddress, receiver, balance, tokenAddr, tssReqChan, tssRespChan)
 		// if we fail erc20 token transfer, we should not transfer the bnb otherwise,we do not have enough fee to pay retry
 		if err != nil {
 			return false, errors.New("fail to transfer erc20 token")
 		}
-		tick = html.UnescapeString("&#" + "127974" + ";")
-		zlog.Logger.Info().Msgf(" %v we have moved the erc20 %v with hash %v", tick, balance.String(), erc20TxHash)
-		// next round, we will handle bnb transfer
+
+		err1 := pi.CheckTxStatus(erc20TxHash.Hex())
+		if err1 != nil {
+			return false, err1
+		}
+
+		nowBalance, err2 := tokenInstance.BalanceOf(&bind.CallOpts{}, previousPool.EthAddress)
+		if err2 == nil && nowBalance.Cmp(big.NewInt(0)) == 0 {
+			tick = html.UnescapeString("&#" + "127974" + ";")
+			zlog.Logger.Info().Msgf(" %v we have moved the erc20 %v with hash %v", tick, balance.String(), erc20TxHash)
+			return true, nil
+		}
 		return false, nil
 	}
 	pi.logger.Warn().Msg("0 ERC20 balance do not need to move")
 
-	return false, nil
+	return false, errors.New("we failed to move fund for this token")
 }
 
-func (pi *Instance) doMoveBNBFunds(wg *sync.WaitGroup, previousPool *bcommon.PoolInfo, receiver common.Address) (bool, bool, error) {
+func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver common.Address) (bool, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel()
 	balanceBnB, err := pi.getBalanceWithLock(ctx, previousPool.EthAddress)
@@ -478,8 +486,26 @@ func (pi *Instance) doMoveBNBFunds(wg *sync.WaitGroup, previousPool *bcommon.Poo
 		return true, true, nil
 	}
 
+	errCheck := pi.CheckTxStatus(bnbTxHash.Hex())
+	if errCheck != nil {
+		return false, false, errCheck
+	}
 	tick = html.UnescapeString("&#" + "127974" + ";")
 	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain (BNB): %v with hash %v", tick, balanceBnB.String(), bnbTxHash)
+
+	nowBalanceBnB, err := pi.getBalanceWithLock(ctx, previousPool.EthAddress)
+	if err != nil {
+		return false, false, nil
+	}
+
+	totalFee, _, _, err := pi.GetFeeLimitWithLock()
+	if err != nil {
+		return false, false, err
+	}
+	// this statement is useful in
+	if nowBalanceBnB.Cmp(totalFee) != 1 {
+		return true, true, nil
+	}
 
 	return true, false, nil
 }

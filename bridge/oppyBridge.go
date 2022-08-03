@@ -743,10 +743,10 @@ func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstanc
 	checkWg.Wait()
 
 	// now we process each tx
+	emptyHash := common.Hash{}.Hex()
 	tssWaitGroup := &sync.WaitGroup{}
 	bc := pubchain.NewBroadcaster()
 	tssReqChan := make(chan *pubchain.TssReq, len(needToBeProcessed))
-	emptyHash := common.Hash{}.Hex()
 	defer close(tssReqChan)
 	for i, pItem := range needToBeProcessed {
 		tssWaitGroup.Add(1)

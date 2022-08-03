@@ -120,19 +120,12 @@ func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Addr
 // SendNativeToken sends the native token to the public chain
 func (pi *Instance) SendNativeToken(signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int) (common.Hash, bool, error) {
 
-	// fixme, we set the fixed gaslimit
-	gasLimit, err := strconv.ParseUint(config.DefaultPUBChainGasWanted, 10, 64)
-	if err != nil {
-		panic("fail to parse the default pubchain gas wanted")
-	}
-	//fixme need to check what is the gas price here
-	gasPrice, err := pi.GetGasPriceWithLock()
+	totalFee, gasPrice, gasLimit, err := pi.GetFeeLimitWithLock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
 		return common.Hash{}, false, err
 	}
 
-	totalFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasLimit)))
 	// this statement is useful in
 	if amount.Cmp(totalFee) != 1 {
 		return common.Hash{}, true, nil
@@ -163,7 +156,7 @@ func (pi *Instance) SendNativeToken(signerPk string, sender, receiver common.Add
 	txo.Value = sendAmount
 
 	var data []byte
-	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: gasLimit, To: &receiver, Value: sendAmount, Data: data})
+	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: uint64(gasLimit), To: &receiver, Value: sendAmount, Data: data})
 
 	signedTx, err := txo.Signer(sender, tx)
 	if err != nil {
@@ -188,7 +181,7 @@ func (pi *Instance) SendNativeToken(signerPk string, sender, receiver common.Add
 	return signedTx.Hash(), false, err
 }
 
-// SendToken sends the token to the public chain
+// SendTokenBatch sends the token to the public chain
 func (pi *Instance) SendTokenBatch(index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
 
 	txo, err := pi.composeTxBatch(index, sender, pi.chainID, tssReqChan, tssRespChan)

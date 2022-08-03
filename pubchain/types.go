@@ -176,6 +176,38 @@ func (pi *Instance) getTransactionReceiptWithLock(ctx context.Context, txHash co
 	return receipt, err
 }
 
+func (pi *Instance) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
+	defer cancel()
+	pi.ethClientLocker.RLock()
+	gasPrice, err1 := pi.EthClient.SuggestGasPrice(ctx)
+	mockMsg := ethereum.CallMsg{
+		From:     common.HexToAddress("0xbDf7Fb0Ad9b0D722ea54D808b79751608E7AE991"),
+		To:       nil,
+		GasPrice: gasPrice,
+		Value:    big.NewInt(2),
+		Data:     []byte("hello"),
+	}
+	gas, err2 := pi.EthClient.EstimateGas(ctx, mockMsg)
+	pi.ethClientLocker.RUnlock()
+	if err1 != nil || err2 != nil {
+		// we reset the ethcliet
+		pi.logger.Error().Err(err1).Msgf("error of the ethclient")
+		pi.wg.Add(1)
+		go func() {
+			defer pi.wg.Done()
+			err := pi.RetryPubChain()
+			if err != nil {
+				pi.logger.Error().Err(err).Msgf("we fail to restart the eth client")
+			}
+		}()
+	}
+
+	adjGas := int64(float32(gas) * 1.1)
+	totalFee := new(big.Int).Mul(gasPrice, big.NewInt(adjGas))
+	return totalFee, gasPrice, adjGas, errors.New("fail to get the fee")
+}
+
 func (pi *Instance) GetGasPriceWithLock() (*big.Int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
