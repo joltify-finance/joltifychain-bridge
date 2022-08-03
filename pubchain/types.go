@@ -201,11 +201,12 @@ func (pi *Instance) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, error) {
 				pi.logger.Error().Err(err).Msgf("we fail to restart the eth client")
 			}
 		}()
+		return big.NewInt(0), big.NewInt(0), 0, errors.New("fail to get the fee")
 	}
 
 	adjGas := int64(float32(gas) * 1.1)
 	totalFee := new(big.Int).Mul(gasPrice, big.NewInt(adjGas))
-	return totalFee, gasPrice, adjGas, errors.New("fail to get the fee")
+	return totalFee, gasPrice, adjGas, nil
 }
 
 func (pi *Instance) GetGasPriceWithLock() (*big.Int, error) {
