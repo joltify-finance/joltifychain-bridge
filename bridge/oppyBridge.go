@@ -176,7 +176,7 @@ func NewBridgeService(config config.Config) {
 
 	moveFundMgr := storage.NewMoveFundStateMgr(config.HomeDir)
 
-	pubItems, oppyItems, err := moveFundMgr.LoadPendingItems()
+	pubItems, err := moveFundMgr.LoadPendingItems()
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to load the pending move fund, we skip!!")
 	}
@@ -184,12 +184,6 @@ func NewBridgeService(config config.Config) {
 	if len(pubItems) != 0 {
 		for _, item := range pubItems {
 			pubChainInstance.AddMoveFundItem(item, item.Height)
-		}
-	}
-
-	if len(oppyItems) != 0 {
-		for _, item := range oppyItems {
-			oppyBridge.AddMoveFundItem(item, item.Height)
 		}
 	}
 
@@ -229,9 +223,8 @@ func NewBridgeService(config config.Config) {
 
 	// we now save the move fund items
 	pubItemsSave := pubChainInstance.ExportMoveFundItems()
-	oppyItemsSave := oppyBridge.ExportMoveFundItems()
 
-	err = moveFundMgr.SavePendingItems(pubItemsSave, oppyItemsSave)
+	err = moveFundMgr.SavePendingItems(pubItemsSave)
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to save move fund items")
 	}
@@ -385,7 +378,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					previousPool := oppyChain.UpdatePool(poolInfo[0])
 					if previousPool.Pk != poolInfo[0].CreatePool.PoolPubKey {
 						// we force the first try of the tx to be run without blocking by the block wait
-						oppyChain.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5)
 						pi.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5)
 					}
 				}
@@ -437,14 +429,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					} else {
 						zlog.Logger.Error().Err(err).Msg("fail to get the suggest gas price")
 					}
-				}
-
-				latestPool := poolInfo[0].CreatePool.PoolAddr
-				moveFound := oppyChain.MoveFound(grpcClient, currentProcessBlockHeight, latestPool)
-				if moveFound {
-					// if we move fund in this round, we do not send tx to sign
-					grpcClient.Close()
-					continue
 				}
 
 				if failedInbound.Load() > 5 {

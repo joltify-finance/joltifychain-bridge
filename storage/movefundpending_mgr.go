@@ -30,19 +30,12 @@ func NewMoveFundStateMgr(folder string) *PendingMoveFundMgr {
 	}
 }
 
-func (fsm *PendingMoveFundMgr) SavePendingItems(pendingTxsPub, pendingTxOppy []*bcommon.PoolInfo) error {
+func (fsm *PendingMoveFundMgr) SavePendingItems(pendingTxsPub []*bcommon.PoolInfo) error {
 	fsm.writePendingLock.Lock()
 	defer fsm.writePendingLock.Unlock()
 
 	pubfile := filepath.Join(fsm.folder, "movefundpending_pub.dat")
-	oppyfile := filepath.Join(fsm.folder, "movefundpending_oppy.dat")
 	bufPub, err := json.Marshal(pendingTxsPub)
-	if err != nil {
-		fsm.logger.Error().Err(err).Msgf("fail to marshal the inbound pending tx")
-		return err
-	}
-
-	bufOppy, err := json.Marshal(pendingTxOppy)
 	if err != nil {
 		fsm.logger.Error().Err(err).Msgf("fail to marshal the inbound pending tx")
 		return err
@@ -55,31 +48,20 @@ func (fsm *PendingMoveFundMgr) SavePendingItems(pendingTxsPub, pendingTxOppy []*
 		fsm.logger.Error().Err(err).Msgf("fail to load the pub move fund")
 		errtwo = err1
 	}
-	err2 := ioutil.WriteFile(oppyfile, bufOppy, 0600)
-	if err != nil {
-		fsm.logger.Error().Err(err).Msgf("fail to load the oppy move fund")
-		errtwo = err2
-	}
+
 	return errtwo
 }
 
-func (fsm *PendingMoveFundMgr) LoadPendingItems() ([]*bcommon.PoolInfo, []*bcommon.PoolInfo, error) {
-	var moveFundPendingPub, moveFundPendingOppy []*bcommon.PoolInfo
+func (fsm *PendingMoveFundMgr) LoadPendingItems() ([]*bcommon.PoolInfo, error) {
+	var moveFundPendingPub []*bcommon.PoolInfo
 	if len(fsm.folder) < 1 {
-		return nil, nil, errors.New("base file path is invalid")
+		return nil, errors.New("base file path is invalid")
 	}
 	pubFilePathName := filepath.Join(fsm.folder, "movefundpending_pub.dat")
 	_, err := os.Stat(pubFilePathName)
 	if err != nil {
 		fsm.logger.Error().Err(err).Msgf("fail to load the move fund on pub chain")
 		pubFilePathName = ""
-	}
-
-	oppyFilePathName := filepath.Join(fsm.folder, "movefundpending_oppy.dat")
-	_, err = os.Stat(oppyFilePathName)
-	if err != nil {
-		oppyFilePathName = ""
-		fsm.logger.Error().Err(err).Msgf("fail to load the move fund on oppy chain")
 	}
 
 	fsm.writePendingLock.RLock()
@@ -96,15 +78,5 @@ func (fsm *PendingMoveFundMgr) LoadPendingItems() ([]*bcommon.PoolInfo, []*bcomm
 		}
 	}
 
-	if len(oppyFilePathName) != 0 {
-		inputOppy, err := ioutil.ReadFile(oppyFilePathName)
-		if err != nil {
-			fsm.logger.Error().Err(err).Msgf("fail to read the move fund on pub chain")
-		}
-		err = json.Unmarshal(inputOppy, &moveFundPendingOppy)
-		if err != nil {
-			fsm.logger.Error().Err(err).Msgf("fail to unmarshal the inbound pending tx")
-		}
-	}
-	return moveFundPendingPub, moveFundPendingOppy, nil
+	return moveFundPendingPub, nil
 }
