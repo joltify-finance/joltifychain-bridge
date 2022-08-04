@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
+	github.com/containerd/containerd v1.6.2
 	github.com/cosmos/cosmos-sdk v0.45.6
 	github.com/ethereum/go-ethereum v1.10.17
 	github.com/gogo/protobuf v1.3.3
@@ -11,7 +12,7 @@ require (
 	github.com/ipfs/go-log v1.0.5
 	github.com/libp2p/go-libp2p-peerstore v0.6.0
 	github.com/multiformats/go-multiaddr v0.5.0
-	github.com/oppyfinance/tss v1.7.3
+	github.com/oppyfinance/tss v1.7.4
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/zerolog v1.26.0
 	github.com/stretchr/testify v1.7.1
@@ -56,7 +57,6 @@ require (
 	github.com/coinbase/rosetta-sdk-go v0.7.0 // indirect
 	github.com/confio/ics23/go v0.6.6 // indirect
 	github.com/containerd/cgroups v1.0.3 // indirect
-	github.com/containerd/containerd v1.6.2 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/cosmos/btcutil v1.0.4 // indirect
 	github.com/cosmos/go-bip39 v1.0.0 // indirect

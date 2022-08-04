@@ -39,7 +39,7 @@ import (
 
 // we may need to increase it as we increase the time for keygen/keysign and join party
 var (
-	ROUNDBLOCK = 50
+	ROUNDBLOCK = 100
 )
 
 // NewBridgeService starts the new bridge service
@@ -841,6 +841,9 @@ func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstanc
 		}
 		blockHeight := int64(latest.NumberU64()) / pubchain.ROUNDBLOCK
 		signature, err := pi.TssSignBatch(allsignMSgs, lastPool.Pk, blockHeight)
+		if err != nil {
+			zlog.Info().Msgf("fail to run batch keysign")
+		}
 		bc.Broadcast(signature)
 		return
 	}()
