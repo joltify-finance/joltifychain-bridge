@@ -41,15 +41,13 @@ func (fsm *PendingMoveFundMgr) SavePendingItems(pendingTxsPub []*bcommon.PoolInf
 		return err
 	}
 
-	var errtwo error
-	errtwo = nil
-	err1 := ioutil.WriteFile(pubfile, bufPub, 0600)
+	err = ioutil.WriteFile(pubfile, bufPub, 0600)
 	if err != nil {
 		fsm.logger.Error().Err(err).Msgf("fail to load the pub move fund")
-		errtwo = err1
+		return err
 	}
 
-	return errtwo
+	return nil
 }
 
 func (fsm *PendingMoveFundMgr) LoadPendingItems() ([]*bcommon.PoolInfo, error) {
