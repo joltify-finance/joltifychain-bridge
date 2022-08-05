@@ -312,6 +312,7 @@ func (pi *Instance) renewEthClientWithLock(ethclient *ethclient.Client) error {
 	err := pi.UpdateSubscription(ctx)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("we fail to update the pubchain subscription")
+		pi.ethClientLocker.Unlock()
 		return err
 	}
 	pi.ethClientLocker.Unlock()
