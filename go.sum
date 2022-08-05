@@ -1630,8 +1630,8 @@ github.com/openzipkin/zipkin-go v0.1.6/go.mod h1:QgAqvLzwWbR/WpD4A3cGpPtJrZXNIiJ
 github.com/openzipkin/zipkin-go v0.2.1/go.mod h1:NaW6tEwdmWMaCDZzg8sh+IBNOxHMPnhQw8ySjnjRyN4=
 github.com/openzipkin/zipkin-go v0.2.2/go.mod h1:NaW6tEwdmWMaCDZzg8sh+IBNOxHMPnhQw8ySjnjRyN4=
 github.com/openzipkin/zipkin-go v0.2.5/go.mod h1:KpXfKdgRDnnhsxw4pNIH9Md5lyFqKUa4YDFlwRYAMyE=
-github.com/oppyfinance/tss v1.7.4 h1:p0i6kdyCzy6b3DRZ+lLUADrUXbSySXXQa6MgftV9SnQ=
-github.com/oppyfinance/tss v1.7.4/go.mod h1:oGMIRv9HIBjOZgGUFMKwC49MrBo9pJgQsJZ8Cjl6zds=
+github.com/oppyfinance/tss v1.7.6 h1:QMiFLGwb2rDSFnSvagTeWE8+ItY9TUlKhH/83wOmN2M=
+github.com/oppyfinance/tss v1.7.6/go.mod h1:oGMIRv9HIBjOZgGUFMKwC49MrBo9pJgQsJZ8Cjl6zds=
 github.com/ory/dockertest v3.3.5+incompatible h1:iLLK6SQwIhcbrG783Dghaaa3WPzGc+4Emza6EbVUUGA=
 github.com/ory/dockertest v3.3.5+incompatible/go.mod h1:1vX4m9wsvi00u5bseYwXaSnhNrne+V0E6LAcBILJdPs=
 github.com/otiai10/copy v1.6.0 h1:IinKAryFFuPONZ7cm6T6E2QX/vcJwSnlaA5lfoaXIiQ=

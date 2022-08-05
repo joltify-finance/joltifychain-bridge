@@ -741,6 +741,9 @@ func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstanc
 		}(el)
 	}
 	checkWg.Wait()
+	if len(needToBeProcessed) == 0 {
+		return
+	}
 
 	// now we process each tx
 	emptyHash := common.Hash{}.Hex()
