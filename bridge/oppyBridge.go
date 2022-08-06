@@ -719,6 +719,9 @@ func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstanc
 	checkWg := sync.WaitGroup{}
 	var needToBeProcessed []*common2.OutBoundReq
 	for _, el := range items {
+		if el == nil {
+			continue
+		}
 		checkWg.Add(1)
 		go func(each *common2.OutBoundReq) {
 			defer checkWg.Done()
