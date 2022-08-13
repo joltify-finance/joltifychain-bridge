@@ -280,6 +280,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 
 	inBoundProcessDone := atomic.NewBool(true)
 	outBoundProcessDone := atomic.NewBool(true)
+	inKeygenInProgress := atomic.NewBool(false)
 
 	wg.Add(1)
 	go func(wg *sync.WaitGroup) {
@@ -307,7 +308,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					continue
 				}
 
-				err = oppyChain.HandleUpdateValidators(height)
+				err = oppyChain.HandleUpdateValidators(height, wg, inKeygenInProgress)
 				if err != nil {
 					zlog.Logger.Info().Msgf("error in handle update validator")
 					continue
@@ -486,6 +487,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						grpcClient.Close()
 						continue
 					}
+					if inKeygenInProgress.Load() {
+						zlog.Warn().Msgf("we are in keygen process, we do not feed more tx")
+						metric.UpdateOutboundTxNum(float64(oppyChain.Size()))
+						continue
+					}
 
 					zlog.Logger.Warn().Msgf("we feed the inbound tx now %v", pools[1].PoolInfo.CreatePool.String())
 
@@ -584,6 +590,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 
 				if !outBoundProcessDone.Load() {
 					zlog.Warn().Msgf("the previous outbound has not been fully processed, we do not feed more tx")
+					metric.UpdateOutboundTxNum(float64(oppyChain.Size()))
+					continue
+				}
+
+				if inKeygenInProgress.Load() {
+					zlog.Warn().Msgf("we are in keygen process, we do not feed more tx")
 					metric.UpdateOutboundTxNum(float64(oppyChain.Size()))
 					continue
 				}

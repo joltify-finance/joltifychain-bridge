@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
+	"github.com/oppyfinance/tss/keygen"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
+	"go.uber.org/atomic"
 
 	"github.com/oppyfinance/tss/common"
 
@@ -16,9 +20,10 @@ import (
 )
 
 const capacity = 10000
+const maxretry = 5
 
 // HandleUpdateValidators check whether we need to generate the new tss pool message
-func (oc *OppyChainInstance) HandleUpdateValidators(height int64) error {
+func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitGroup, inKeygenProcess *atomic.Bool) error {
 	v, err := oc.getValidators(strconv.FormatInt(height, 10))
 	if err != nil {
 		return err
@@ -61,34 +66,61 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64) error {
 		}
 		pubkeys = append(pubkeys, pk)
 	}
-	if doKeyGen {
+	if !doKeyGen {
+		return nil
+	}
+	var errKeygen error
+	var keygenResponse *keygen.Response
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		sort.Strings(pubkeys)
 		oc.logger.Info().Msgf("at %v we create the keysign with %v", blockHeight, pubkeys)
-		resp, err := oc.tssServer.KeyGen(pubkeys, blockHeight, tssclient.TssVersion)
-		if err != nil {
-			oc.logger.Error().Err(err).Msg("fail to do the keygen")
-			return err
+		inKeygenProcess.Store(true)
+		defer inKeygenProcess.Store(false)
+		retry := 0
+		for retry = 0; retry < maxretry; retry++ {
+			resp, err := oc.tssServer.KeyGen(pubkeys, blockHeight, tssclient.TssVersion)
+			if err != nil {
+				oc.logger.Error().Err(err).Msgf("fail to do the keygen with retry %v", retry)
+				time.Sleep(time.Minute * 2)
+				continue
+			}
+			if resp.Status != common.Success {
+				// todo we need to put our blame on pub_chain as well
+				oc.logger.Error().Msgf("we fail to ge the valid key")
+				time.Sleep(time.Minute * 2)
+				continue
+			}
+			keygenResponse = &resp
+			break
 		}
-		if resp.Status != common.Success {
-			// todo we need to put our blame on pub_chain as well
-			oc.logger.Error().Msgf("we fail to ge the valid key")
-			return errors.New("fail to get the valid key")
+
+		if retry >= maxretry {
+			errKeygen = errors.New("fail to get the valid key")
+			return
 		}
+
+		oc.logger.Info().Msgf("we done the keygen at height %v successfully\n", blockHeight)
+
 		// now we put the tss key on pub_chain
 		// fixme we need to allow user to choose the name of the key
 		creator, err := oc.Keyring.Key("operator")
 		if err != nil {
 			oc.logger.Error().Msgf("fail to get the operator key :%v", err)
-			return err
+			errKeygen = err
+			return
 		}
 
-		err = oc.prepareTssPool(creator.GetAddress(), resp.PubKey, strconv.FormatInt(blockHeight+1, 10))
+		err = oc.prepareTssPool(creator.GetAddress(), keygenResponse.PubKey, strconv.FormatInt(blockHeight+1, 10))
 		if err != nil {
 			oc.logger.Error().Msgf("fail to broadcast the tss generated key on pub_chain")
-			return err
+			errKeygen = err
+			return
 		}
 		oc.logger.Info().Msgf("successfully prepared the tss key info on pub_chain")
-		return nil
-	}
-	return nil
+		return
+
+	}()
+	return errKeygen
 }
