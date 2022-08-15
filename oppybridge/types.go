@@ -32,7 +32,7 @@ const (
 	channelSize   = 2000
 	ROUNDBLOCK    = 20
 	submitBackoff = time.Millisecond * 500
-	GroupBlockGap = 2
+	GroupBlockGap = 4
 )
 
 // tssPoolMsg this is the pool pre-submit message for the given height
@@ -64,7 +64,7 @@ type OppyChainInstance struct {
 	moveFundReq           *sync.Map
 	CurrentHeight         int64
 	inBoundGas            *atomic.Int64
-	outBoundGasPrice      *atomic.Int64
+	outBoundFee           *atomic.Int64
 	TokenList             tokenlist.TokenListI
 	pendingTx             *sync.Map
 	ChannelQueueNewBlock  chan ctypes.ResultEvent
@@ -129,7 +129,7 @@ func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, t
 	oppyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
 	oppyBridge.poolUpdateLocker = &sync.RWMutex{}
 	oppyBridge.inBoundGas = atomic.NewInt64(250000)
-	oppyBridge.outBoundGasPrice = atomic.NewInt64(5000000000)
+	oppyBridge.outBoundFee = atomic.NewInt64(5000000000)
 
 	encode := MakeEncodingConfig()
 	oppyBridge.encoding = &encode

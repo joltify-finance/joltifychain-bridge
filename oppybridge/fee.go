@@ -5,8 +5,8 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 )
 
-func (oc *OppyChainInstance) GetPubChainGasPrice() int64 {
-	return oc.outBoundGasPrice.Load()
+func (oc *OppyChainInstance) GetPubChainFee() int64 {
+	return oc.outBoundFee.Load()
 }
 
 // UpdateGas update the gas needed from the last tx
@@ -14,8 +14,8 @@ func (oc *OppyChainInstance) UpdateGas(gasUsed int64) {
 	oc.inBoundGas.Store(gasUsed)
 }
 
-func (oc *OppyChainInstance) UpdatePubChainGasPrice(gasPrice int64) {
-	oc.outBoundGasPrice.Store(gasPrice)
+func (oc *OppyChainInstance) UpdatePubChainFee(gasPrice int64) {
+	oc.outBoundFee.Store(gasPrice)
 }
 
 // GetGasEstimation get the gas estimation

@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 
 	grpc1 "github.com/gogo/protobuf/grpc"
@@ -22,13 +21,8 @@ import (
 )
 
 func (oc *OppyChainInstance) calculateGas() sdk.Coin {
-	gasWanted, ok := new(big.Int).SetString(config.DefaultPUBChainGasWanted, 10)
-	if !ok {
-		panic("fail to load the gas wanted")
-	}
-	price := oc.GetPubChainGasPrice()
-	expectedFeeAmount := new(big.Int).Mul(big.NewInt(price), gasWanted)
-	expectedFee := types.NewCoin(config.OutBoundDenomFee, types.NewIntFromBigInt(expectedFeeAmount))
+	fee := oc.GetPubChainFee()
+	expectedFee := types.NewCoin(config.OutBoundDenomFee, types.NewIntFromUint64(uint64(fee)))
 	return expectedFee
 }
 
@@ -144,7 +138,7 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 		}
 		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight)
 		oc.AddItem(&itemReq)
-		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", txBlockHeight, oc.CurrentHeight)
+		oc.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v)", txBlockHeight, oc.CurrentHeight)
 		return nil
 	}
 	return nil

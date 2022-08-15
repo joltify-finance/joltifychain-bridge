@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"html"
 	"math/big"
-	"strconv"
 	"time"
 
 	"gitlab.com/oppy-finance/oppy-bridge/config"
@@ -59,22 +58,14 @@ func (pi *Instance) waitToSend(poolAddress common.Address, targetNonce uint64) e
 	return err
 }
 
-// SendNativeToken sends the native token to the public chain
+// SendNativeTokenBatch sends the native token to the public chain
 func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, bool, error) {
 
-	// fixme, we set the fixed gaslimit
-	gasLimit, err := strconv.ParseUint(config.DefaultPUBChainGasWanted, 10, 64)
-	if err != nil {
-		panic("fail to parse the default pubchain gas wanted")
-	}
-	//fixme need to check what is the gas price here
-	gasPrice, err := pi.GetGasPriceWithLock()
+	totalFee, gasPrice, adjGas, err := pi.GetFeeLimitWithLock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
 		return common.Hash{}, false, err
 	}
-
-	totalFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasLimit)))
 	// we have already check the tx fee once is it put on chain
 	//if amount.Cmp(totalFee) != 1 {
 	//	return common.Hash{}, true, nil
@@ -92,7 +83,7 @@ func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Addr
 	txo.Value = sendAmount
 
 	var data []byte
-	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: gasLimit, To: &receiver, Value: sendAmount, Data: data})
+	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: uint64(adjGas), To: &receiver, Value: sendAmount, Data: data})
 
 	signedTx, err := txo.Signer(sender, tx)
 	if err != nil {

@@ -432,9 +432,9 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				}
 
 				if currentProcessBlockHeight%pubchain.PRICEUPDATEGAP == 0 {
-					price, err := pi.GetGasPriceWithLock()
+					fee, _, _, err := pi.GetFeeLimitWithLock()
 					if err == nil {
-						oppyChain.UpdatePubChainGasPrice(price.Int64())
+						oppyChain.UpdatePubChainFee(fee.Int64())
 					} else {
 						zlog.Logger.Error().Err(err).Msg("fail to get the suggest gas price")
 					}

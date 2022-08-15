@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"math/big"
 	"strings"
 	"sync"
@@ -35,7 +36,7 @@ const (
 	ROUNDBLOCK          = 50
 	submitBackoff       = time.Second * 4
 	GroupBlockGap       = 8
-	GroupSign           = 2
+	GroupSign           = 4
 	PRICEUPDATEGAP      = 10
 	OppyContractAddress = "0x94277968dff216265313657425d9d7577ad32dd1"
 	movefundretrygap    = 3
@@ -204,7 +205,7 @@ func (pi *Instance) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, error) {
 		return big.NewInt(0), big.NewInt(0), 0, errors.New("fail to get the fee")
 	}
 
-	adjGas := int64(float32(gas) * 1.1)
+	adjGas := int64(float32(gas) * config.PubChainGASFEERATIO)
 	totalFee := new(big.Int).Mul(gasPrice, big.NewInt(adjGas))
 	return totalFee, gasPrice, adjGas, nil
 }

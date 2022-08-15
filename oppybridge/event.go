@@ -41,7 +41,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 	var pubkeys []string
 	doKeyGen := false
 	for _, el := range lastValidators {
-		fmt.Printf("we add validator %v", el.Address.String())
+		fmt.Printf("we add validator %v\n", el.Address.String())
 		key := ed25519.PubKey{
 			Key: el.PubKey,
 		}
@@ -75,7 +75,6 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 	go func() {
 		defer wg.Done()
 		sort.Strings(pubkeys)
-		oc.logger.Info().Msgf("at %v we create the keysign with %v", blockHeight, pubkeys)
 		inKeygenProcess.Store(true)
 		defer inKeygenProcess.Store(false)
 		retry := 0
