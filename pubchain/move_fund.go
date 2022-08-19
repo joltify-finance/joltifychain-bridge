@@ -56,13 +56,13 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, height int64, previousPool *bc
 			// once there exists one token in the current pool, then we need to addMoveFundItem
 			if err != nil {
 				zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v for token %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String(), tokenAddr)
-				emptyERC20Tokens.Set()
+				emptyERC20Tokens.Unset()
 				return
 			}
 
 			// once there exists non-empty token in the pool account, we have to addMoveFundItem
 			if !tokenIsEmpty {
-				emptyERC20Tokens.Set()
+				emptyERC20Tokens.Unset()
 				return
 			}
 		}(i, tokenAddr)
