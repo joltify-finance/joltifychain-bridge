@@ -709,7 +709,15 @@ func processInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi
 		wg.Add(1)
 		go func(eachIndex, eachTxHash string) {
 			defer wg.Done()
-			err = oppyChain.CheckTxStatus(grpcClient, eachIndex, 20)
+
+			grpcClientLocal, errLocal := grpc.Dial(oppyGrpc, grpc.WithInsecure())
+			if errLocal != nil {
+				zlog.Logger.Error().Err(errLocal).Msgf("fail to dial the grpc end-point")
+				return
+			}
+			defer grpcClientLocal.Close()
+
+			err := oppyChain.CheckTxStatus(grpcClientLocal, eachIndex, 20)
 			if err != nil {
 				zlog.Logger.Error().Err(err).Msgf("the tx index(%v) has not been successfully submitted retry", eachIndex)
 				if !inBoundWait.Load() {

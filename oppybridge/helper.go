@@ -3,8 +3,9 @@ package oppybridge
 import (
 	"context"
 	"errors"
-	"github.com/cosmos/cosmos-sdk/client"
 	"sync"
+
+	"github.com/cosmos/cosmos-sdk/client"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
@@ -175,6 +176,7 @@ func (oc *OppyChainInstance) batchComposeAndSend(conn grpc1.ClientConn, sendMsg 
 
 	wg := sync.WaitGroup{}
 	txHashes := make(map[uint64]string)
+	txHashesLocker := &sync.RWMutex{}
 	for seq, el := range txBuilderSeqMap {
 		if el == nil {
 			oc.logger.Error().Msgf("the seq %v has nil tx builder!!", seq)
@@ -191,7 +193,9 @@ func (oc *OppyChainInstance) batchComposeAndSend(conn grpc1.ClientConn, sendMsg 
 			txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 			if err != nil {
 				oc.logger.Error().Err(err).Msg("fail to encode the tx")
+				txHashesLocker.Lock()
 				txHashes[seq] = ""
+				txHashesLocker.Unlock()
 				return
 			}
 
@@ -202,7 +206,9 @@ func (oc *OppyChainInstance) batchComposeAndSend(conn grpc1.ClientConn, sendMsg 
 				if err != nil {
 					oc.logger.Error().Err(err).Msg("fail to broadcast the signature")
 				}
+				txHashesLocker.Lock()
 				txHashes[seq] = resp
+				txHashesLocker.Unlock()
 				return
 			}
 		}(seq, el)
