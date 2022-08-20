@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"math/big"
 	"strings"
 	"sync"
 	"time"
+
+	"gitlab.com/oppy-finance/oppy-bridge/config"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -168,9 +169,9 @@ func (pi *Instance) getTransactionReceiptWithLock(ctx context.Context, txHash co
 		pi.wg.Add(1)
 		go func() {
 			defer pi.wg.Done()
-			err = pi.RetryPubChain()
-			if err != nil {
-				pi.logger.Error().Err(err).Msgf("we fail to restart the eth client")
+			errInner := pi.RetryPubChain()
+			if errInner != nil {
+				pi.logger.Error().Err(errInner).Msgf("we fail to restart the eth client")
 			}
 		}()
 	}
