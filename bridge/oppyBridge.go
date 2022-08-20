@@ -679,7 +679,7 @@ func processInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi
 		itemsMap[el.Hash().Hex()] = el
 	}
 
-	var needToBeProcessed []*common2.InBoundReq
+	needToBeProcessed := make([]*common2.InBoundReq, 0)
 	for _, item := range items {
 		// we need to check against the previous account sequence
 		index := item.Hash().Hex()
@@ -734,7 +734,8 @@ func processInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi
 func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, items []*common2.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
 
 	checkWg := sync.WaitGroup{}
-	var needToBeProcessed []*common2.OutBoundReq
+	needToBeProcessed := make([]*common2.OutBoundReq, 0)
+	needToBeProcessedLock := sync.Mutex{}
 	for _, el := range items {
 		if el == nil {
 			continue
@@ -745,7 +746,9 @@ func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstanc
 			submittedTx, err := oppyChain.GetPubChainSubmittedTx(*each)
 			if err != nil {
 				zlog.Logger.Info().Msg("we continue process this tx as it has not been submitted")
+				needToBeProcessedLock.Lock()
 				needToBeProcessed = append(needToBeProcessed, each)
+				needToBeProcessedLock.Unlock()
 				return
 			}
 
@@ -756,12 +759,15 @@ func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstanc
 					zlog.Logger.Info().Msg("this tx has been submitted by others, we skip it")
 					return
 				}
+				needToBeProcessedLock.Lock()
 				needToBeProcessed = append(needToBeProcessed, each)
+				needToBeProcessedLock.Unlock()
 			}
 		}(el)
 	}
 	checkWg.Wait()
 	if len(needToBeProcessed) == 0 {
+		failedOutBound.Store(0)
 		return
 	}
 
