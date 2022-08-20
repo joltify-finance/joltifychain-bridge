@@ -163,7 +163,7 @@ func (pi *Instance) getTransactionReceiptWithLock(ctx context.Context, txHash co
 	receipt, err := pi.EthClient.TransactionReceipt(ctx, txHash)
 	pi.ethClientLocker.RUnlock()
 
-	if err != nil {
+	if err != nil && err.Error() != "not found" {
 		// we reset the ethcliet
 		pi.logger.Error().Err(err).Msgf("error of the ethclient")
 		pi.wg.Add(1)
