@@ -61,7 +61,6 @@ type OppyChainInstance struct {
 	lastTwoPools          []*bcommon.PoolInfo
 	OutboundReqChan       chan []*bcommon.OutBoundReq
 	RetryOutboundReq      *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
-	moveFundReq           *sync.Map
 	CurrentHeight         int64
 	inBoundGas            *atomic.Int64
 	outBoundFee           *atomic.Int64
@@ -135,7 +134,6 @@ func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, t
 	oppyBridge.encoding = &encode
 	oppyBridge.OutboundReqChan = make(chan []*bcommon.OutBoundReq, reqCacheSize)
 	oppyBridge.RetryOutboundReq = &sync.Map{}
-	oppyBridge.moveFundReq = &sync.Map{}
 	oppyBridge.TokenList = tl
 	oppyBridge.pendingTx = &sync.Map{}
 	oppyBridge.ChannelQueueNewBlock = make(chan ctypes.ResultEvent, channelSize)
