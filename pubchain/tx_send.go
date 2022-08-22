@@ -66,10 +66,6 @@ func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Addr
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
 		return common.Hash{}, false, err
 	}
-	// we have already check the tx fee once is it put on chain
-	//if amount.Cmp(totalFee) != 1 {
-	//	return common.Hash{}, true, nil
-	//}
 
 	txo, err := pi.composeTxBatch(index, sender, pi.chainID, tssReqChan, tssRespChan)
 	if err != nil {
@@ -182,7 +178,6 @@ func (pi *Instance) SendTokenBatch(index int, sender, receiver common.Address, a
 	if nonce != nil {
 		txo.Nonce = nonce
 	}
-	pi.logger.Info().Msgf("we have get the signature from tss module")
 	txo.NoSend = true
 	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), pi.EthClient)
 	if err != nil {

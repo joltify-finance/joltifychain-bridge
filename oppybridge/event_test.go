@@ -3,9 +3,6 @@ package oppybridge
 import (
 	"context"
 	"encoding/base64"
-	"strconv"
-	"testing"
-
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -18,15 +15,21 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"gitlab.com/oppy-finance/oppychain/testutil/network"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
+	"go.uber.org/atomic"
+	"strconv"
+	"sync"
+	"testing"
+	"time"
 )
 
 type EventTestSuite struct {
 	suite.Suite
-	cfg         network.Config
-	network     *network.Network
-	validatorky keyring.Keyring
-	queryClient tmservice.ServiceClient
-	grpc        grpc1.ClientConn
+	cfg          network.Config
+	network      *network.Network
+	validatorKey keyring.Keyring
+	queryClient  tmservice.ServiceClient
+	grpc         grpc1.ClientConn
+	validators   []*vaulttypes.Validator
 }
 
 func (v *EventTestSuite) SetupSuite() {
@@ -34,7 +37,7 @@ func (v *EventTestSuite) SetupSuite() {
 	cfg := network.DefaultConfig()
 	cfg.BondDenom = "stake"
 	v.cfg = cfg
-	v.validatorky = keyring.NewInMemory()
+	v.validatorKey = keyring.NewInMemory()
 	// now we put the mock pool list in the test
 	state := vaulttypes.GenesisState{}
 	stateStaking := stakingtypes.GenesisState{}
@@ -42,7 +45,7 @@ func (v *EventTestSuite) SetupSuite() {
 	v.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[vaulttypes.ModuleName], &state))
 	v.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[stakingtypes.ModuleName], &stateStaking))
 
-	validators, err := genNValidator(3, v.validatorky)
+	validators, err := genNValidator(3, v.validatorKey)
 	v.Require().NoError(err)
 	for i := 1; i < 5; i++ {
 		randPoolSk := ed25519.GenPrivKey()
@@ -70,6 +73,7 @@ func (v *EventTestSuite) SetupSuite() {
 		v := vaulttypes.Validator{Pubkey: sk.PubKey().Bytes(), Power: 10}
 		allV = append(allV, &v)
 	}
+	v.validators = allV
 
 	state.ValidatorinfoList = append(state.ValidatorinfoList, &vaulttypes.Validators{AllValidators: allV, Height: 100})
 	state.ValidatorinfoList = append(state.ValidatorinfoList, &vaulttypes.Validators{AllValidators: allV, Height: 200})
@@ -147,22 +151,29 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
 		}
 	}()
+
+	_, err = e.network.WaitForHeightWithTimeout(10, time.Second*30)
+	e.Require().NoError(err)
+
 	oc.GrpcClient = e.network.Validators[0].ClientCtx
 	err = oc.InitValidators(e.network.Validators[0].APIAddress)
 	e.Require().NoError(err)
-	data := base64.StdEncoding.EncodeToString(e.network.Validators[0].PubKey.Bytes())
-	oc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value = data
 
-	err = oc.HandleUpdateValidators(100)
+	wg := sync.WaitGroup{}
+	inKeyGen := atomic.NewBool(true)
+	err = oc.HandleUpdateValidators(100, &wg, inKeyGen)
 	e.Require().NoError(err)
 	e.Require().Equal(len(oc.keyGenCache), 0)
 	tss.keygenSuccess = true
 
-	// we set the keyring as the validator key, it should run the keygen successfully
-	oc.Keyring = e.validatorky
-	err = oc.HandleUpdateValidators(100)
+	oc.Keyring = e.validatorKey
+	// we set the validator key, it should run the keygen successfully
+	data := base64.StdEncoding.EncodeToString(e.validators[0].GetPubkey())
+	oc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value = data
+	err = oc.HandleUpdateValidators(100, &wg, inKeyGen)
+	wg.Wait()
 	e.Require().NoError(err)
-	e.Require().Equal(len(oc.keyGenCache), 1)
+	e.Require().Equal(1, len(oc.keyGenCache))
 }
 
 func TestEvent(t *testing.T) {

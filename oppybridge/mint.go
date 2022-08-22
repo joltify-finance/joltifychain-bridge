@@ -21,11 +21,10 @@ func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string
 	return a, nil
 }
 
-// ProcessInBound mint the token in oppy chain
-func (oc *OppyChainInstance) ProcessInBound(conn grpc1.ClientConn, items []*common.InBoundReq) (map[string]string, error) {
-
-	var signMsgs []*tssclient.TssSignigMsg
-	var issueReqs []sdk.Msg
+// DoProcessInBound mint the token in oppy chain
+func (oc *OppyChainInstance) DoProcessInBound(conn grpc1.ClientConn, items []*common.InBoundReq) (map[string]string, error) {
+	signMsgs := make([]*tssclient.TssSignigMsg, len(items))
+	issueReqs := make([]sdk.Msg, len(items))
 
 	blockHeight, err := oc.GetLastBlockHeightWithLock()
 	if err != nil {
@@ -33,7 +32,7 @@ func (oc *OppyChainInstance) ProcessInBound(conn grpc1.ClientConn, items []*comm
 		return nil, err
 	}
 	roundBlockHeight := blockHeight / ROUNDBLOCK
-	for _, item := range items {
+	for i, item := range items {
 		index := item.Hash().Hex()
 		_, _, poolAddress, poolPk := item.GetAccountInfo()
 		oc.logger.Info().Msgf("we are about to prepare the tx with other nodes with index %v", index)
@@ -51,8 +50,8 @@ func (oc *OppyChainInstance) ProcessInBound(conn grpc1.ClientConn, items []*comm
 			BlockHeight: roundBlockHeight,
 			Version:     tssclient.TssVersion,
 		}
-		signMsgs = append(signMsgs, &signMsg)
-		issueReqs = append(issueReqs, issueReq)
+		signMsgs[i] = &signMsg
+		issueReqs[i] = issueReq
 	}
 	// as in a group, the accseq MUST has been sorted.
 	accSeq, accNum, poolAddress, _ := items[0].GetAccountInfo()

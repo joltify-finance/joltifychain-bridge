@@ -27,7 +27,7 @@ func createdTestOutBoundReqs(n int) []*common.InBoundReq {
 		if err != nil {
 			panic(err)
 		}
-		item := common.NewAccountInboundReq(oaddr, addr, testCoin, []byte(txid), int64(i), int64(i))
+		item := common.NewAccountInboundReq(oaddr, addr, testCoin, []byte(txid), int64(i))
 		retReq[i] = &item
 	}
 	return retReq
@@ -38,7 +38,7 @@ func TestConfig(t *testing.T) {
 	reqs := createdTestOutBoundReqs(100)
 	oc := Instance{
 		RetryInboundReq: &sync.Map{},
-		InboundReqChan:  make(chan *common.InBoundReq, 10),
+		InboundReqChan:  make(chan []*common.InBoundReq, 10),
 		moveFundReq:     &sync.Map{},
 	}
 
@@ -49,13 +49,17 @@ func TestConfig(t *testing.T) {
 
 	poped := oc.PopItem(1000)
 	assert.Equal(t, 100, len(poped))
-	var allindex []*big.Int
-	for _, el := range poped {
-		allindex = append(allindex, el.Index())
+	allIndex := make([]string, len(poped))
+	for i, el := range poped {
+		allIndex[i] = el.Index()
 	}
-	//now we check it is sorted
+	// now we check it is sorted
 	for i := 1; i < len(poped); i++ {
-		assert.Equal(t, allindex[i].Cmp(allindex[i-1]), 1)
+		a, ok := new(big.Int).SetString(allIndex[i], 10)
+		assert.True(t, ok)
+		b, ok := new(big.Int).SetString(allIndex[i-1], 10)
+		assert.True(t, ok)
+		assert.True(t, a.Cmp(b) == 1)
 	}
 
 	assert.Equal(t, oc.Size(), 0)
@@ -84,7 +88,6 @@ func TestConfig(t *testing.T) {
 	oc.AddMoveFundItem(&pool1, 11)
 	popedItem, _ := oc.PopMoveFundItemAfterBlock(15)
 	assert.Nil(t, popedItem)
-
 	popedItem, _ = oc.PopMoveFundItemAfterBlock(20)
 	assert.Equal(t, popedItem.Pk, accs[0].pk)
 }

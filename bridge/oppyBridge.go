@@ -673,15 +673,15 @@ func processInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi
 		}
 		needToBeProcessed = append(needToBeProcessed, item)
 	}
-	//if all the tx has been processed, we quit
+	// if all the tx has been processed, we quit
 	if len(needToBeProcessed) == 0 {
 		failedInbound.Store(0)
 		return
 	}
 
-	hashIndexMap, err := oppyChain.ProcessInBound(grpcClient, needToBeProcessed)
+	hashIndexMap, err := oppyChain.DoProcessInBound(grpcClient, needToBeProcessed)
 	if err != nil {
-		//we add all the txs back to wait list
+		// we add all the txs back to wait list
 		for _, el := range items {
 			pi.AddOnHoldQueue(el)
 		}
@@ -835,12 +835,10 @@ func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstanc
 		received := make(map[int][]byte)
 		collected := false
 		for {
-			select {
-			case msg := <-tssReqChan:
-				received[msg.Index] = msg.Data
-				if len(received) >= len(needToBeProcessed) {
-					collected = true
-				}
+			msg := <-tssReqChan
+			received[msg.Index] = msg.Data
+			if len(received) >= len(needToBeProcessed) {
+				collected = true
 			}
 			if collected {
 				break
@@ -866,13 +864,11 @@ func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstanc
 			zlog.Info().Msgf("fail to run batch keysign")
 		}
 		bc.Broadcast(signature)
-		return
 	}()
 	tssWaitGroup.Wait()
 }
 
 func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain *oppybridge.OppyChainInstance) {
-
 	grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")

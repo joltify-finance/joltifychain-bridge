@@ -3,6 +3,8 @@ package oppybridge
 import (
 	"context"
 	"encoding/hex"
+	"go.uber.org/atomic"
+	"sync"
 	"testing"
 	"time"
 
@@ -123,7 +125,9 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	s.Require().NoError(err)
 
 	oc.validatorSet = validators.NewValidator()
-	err = oc.HandleUpdateValidators(20)
+	wg := sync.WaitGroup{}
+	inkeygen := atomic.NewBool(true)
+	err = oc.HandleUpdateValidators(20, &wg, inkeygen)
 	s.Require().NoError(err)
 	info, _ := s.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()

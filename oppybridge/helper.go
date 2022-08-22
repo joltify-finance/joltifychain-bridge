@@ -166,7 +166,6 @@ func (oc *OppyChainInstance) waitAndSend(conn grpc1.ClientConn, poolAddress sdk.
 }
 
 func (oc *OppyChainInstance) batchComposeAndSend(conn grpc1.ClientConn, sendMsg []sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (map[uint64]string, error) {
-
 	gasWanted := oc.GetGasEstimation()
 	txBuilderSeqMap, err := oc.batchGenSendTx(sendMsg, accSeq, accNum, uint64(gasWanted), signMsg)
 	if err != nil {
@@ -194,7 +193,7 @@ func (oc *OppyChainInstance) batchComposeAndSend(conn grpc1.ClientConn, sendMsg 
 			if err != nil {
 				oc.logger.Error().Err(err).Msg("fail to encode the tx")
 				txHashesLocker.Lock()
-				txHashes[seq] = ""
+				txHashes[accSeq] = ""
 				txHashesLocker.Unlock()
 				return
 			}
@@ -207,7 +206,7 @@ func (oc *OppyChainInstance) batchComposeAndSend(conn grpc1.ClientConn, sendMsg 
 					oc.logger.Error().Err(err).Msg("fail to broadcast the signature")
 				}
 				txHashesLocker.Lock()
-				txHashes[seq] = resp
+				txHashes[accSeq] = resp
 				txHashesLocker.Unlock()
 				return
 			}

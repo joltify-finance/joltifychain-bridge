@@ -72,7 +72,7 @@ func (tn *TestNetTestSuite) SetupSuite() {
 }
 
 func (tn TestNetTestSuite) TestProcessNewBlock() {
-	err := tn.pubChain.ProcessNewBlock(big.NewInt(18427951), 100)
+	err := tn.pubChain.ProcessNewBlock(big.NewInt(18427951))
 	tn.Require().NoError(err)
 }
 

@@ -176,6 +176,7 @@ func Gensigntx(oc *OppyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum
 	return txBuilder, nil
 }
 
+//nolint:funlen
 func (m MintTestSuite) TestProcessInbound() {
 	accs, err := generateRandomPrivKey(2)
 	m.Require().NoError(err)
@@ -205,6 +206,9 @@ func (m MintTestSuite) TestProcessInbound() {
 	_, err = m.network.WaitForHeightWithTimeout(10, time.Second*30)
 	m.Require().NoError(err)
 
+	//err = oc.InitValidators(m.network.Validators[0].APIAddress)
+	//m.Require().NoError(err)
+
 	info, _ := m.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()
 	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
@@ -219,7 +223,6 @@ func (m MintTestSuite) TestProcessInbound() {
 
 	send := banktypes.NewMsgSend(valAddr, accs[0].oppyAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
-	// txBuilder, err := oc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
 	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), m.network.Validators[0].ClientCtx.Keyring)
 	m.Require().NoError(err)
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
@@ -237,8 +240,8 @@ func (m MintTestSuite) TestProcessInbound() {
 	oc.lastTwoPools[0] = &pool
 	oc.lastTwoPools[1] = &pool
 
-	_, _, err = oc.ProcessInBound(m.grpc, &tx)
-	m.Require().Error(err)
+	_, err = oc.DoProcessInBound(m.grpc, []*common.InBoundReq{&tx})
+	m.Require().NoError(err)
 }
 
 func TestMint(t *testing.T) {

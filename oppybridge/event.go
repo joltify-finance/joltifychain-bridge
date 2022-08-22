@@ -3,7 +3,6 @@ package oppybridge
 import (
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"sort"
 	"strconv"
 	"sync"
@@ -38,10 +37,9 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 
 	oc.logger.Info().Msgf(">>>>>>>>>>>>>>>>at block height %v system do keygen>>>>>>>>>>>>>>>\n", blockHeight)
 
-	var pubkeys []string
+	pubKeys := make([]string, len(lastValidators))
 	doKeyGen := false
-	for _, el := range lastValidators {
-		fmt.Printf("we add validator %v\n", el.Address.String())
+	for i, el := range lastValidators {
 		key := ed25519.PubKey{
 			Key: el.PubKey,
 		}
@@ -64,7 +62,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 		if key.Equals(&myValidatorPubKey) {
 			doKeyGen = true
 		}
-		pubkeys = append(pubkeys, pk)
+		pubKeys[i] = pk
 	}
 	if !doKeyGen {
 		return nil
@@ -74,12 +72,12 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		sort.Strings(pubkeys)
+		sort.Strings(pubKeys)
 		inKeygenProcess.Store(true)
 		defer inKeygenProcess.Store(false)
 		retry := 0
 		for retry = 0; retry < maxretry; retry++ {
-			resp, err := oc.tssServer.KeyGen(pubkeys, blockHeight, tssclient.TssVersion)
+			resp, err := oc.tssServer.KeyGen(pubKeys, blockHeight, tssclient.TssVersion)
 			if err != nil {
 				oc.logger.Error().Err(err).Msgf("fail to do the keygen with retry %v", retry)
 				time.Sleep(time.Minute * 2)
@@ -118,8 +116,6 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 			return
 		}
 		oc.logger.Info().Msgf("successfully prepared the tss key info on pub_chain")
-		return
-
 	}()
 	return errKeygen
 }

@@ -55,7 +55,7 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, height int64, previousPool *bc
 			tssReqChan <- &TssReq{Index: index, Data: []byte("done")}
 			// once there exists one token in the current pool, then we need to addMoveFundItem
 			if err != nil {
-				zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v for token %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String(), tokenAddr)
+				zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v for token %v", previousPool.EthAddress.String(), currentPool[1].EthAddress.String(), thisTokenAddr)
 				emptyERC20Tokens.Unset()
 				return
 			}
@@ -74,12 +74,10 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, height int64, previousPool *bc
 		received := make(map[int][]byte)
 		collected := false
 		for {
-			select {
-			case msg := <-tssReqChan:
-				received[msg.Index] = msg.Data
-				if len(received) >= len(needToMove) {
-					collected = true
-				}
+			msg := <-tssReqChan
+			received[msg.Index] = msg.Data
+			if len(received) >= len(needToMove) {
+				collected = true
 			}
 			if collected {
 				break
@@ -91,7 +89,7 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, height int64, previousPool *bc
 			}
 			allsignMSgs = append(allsignMSgs, val)
 		}
-
+		var err error
 		latest, err := pi.GetBlockByNumberWithLock(nil)
 		if err != nil {
 			zlog.Logger.Error().Err(err).Msgf("fail to get the latest height")
@@ -100,8 +98,12 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, height int64, previousPool *bc
 		}
 		blockHeight := int64(latest.NumberU64()) / ROUNDBLOCK
 		signature, err := pi.TssSignBatch(allsignMSgs, previousPool.Pk, blockHeight)
+		if err != nil {
+			zlog.Logger.Error().Err(err).Msgf("fail to get the latest height")
+			bc.Broadcast(nil)
+			return
+		}
 		bc.Broadcast(signature)
-		return
 	}()
 
 	waitForFinish.Wait()

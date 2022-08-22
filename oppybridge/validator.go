@@ -155,8 +155,8 @@ func (oc *OppyChainInstance) doInitValidator(i info, blockHeight int64, values [
 	oc.validatorSet = validators.NewValidator()
 
 	encCfg := MakeEncodingConfig()
-	var localVals []*validators.Validator
-	for _, el := range values {
+	localVals := make([]*validators.Validator, len(values))
+	for index, el := range values {
 		var pk cryptotypes.PubKey
 		if err := encCfg.InterfaceRegistry.UnpackAny(el.PubKey, &pk); err != nil {
 			return err
@@ -171,8 +171,7 @@ func (oc *OppyChainInstance) doInitValidator(i info, blockHeight int64, values [
 			PubKey:      pk.Bytes(),
 			VotingPower: el.VotingPower,
 		}
-		localVals = append(localVals, &e)
-
+		localVals[index] = &e
 	}
 
 	oc.validatorSet.SetupValidatorSet(localVals, blockHeight)

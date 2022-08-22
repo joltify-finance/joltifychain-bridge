@@ -408,7 +408,7 @@ func (oc *OppyChainInstance) prepareTssPool(creator sdk.AccAddress, pubKey, heig
 	return nil
 }
 
-// GetLastBlockHeight gets the current block height
+// GetLastBlockHeightWithLock gets the current block height
 func (oc *OppyChainInstance) GetLastBlockHeightWithLock() (int64, error) {
 	oc.grpcLock.Lock()
 	b, err := GetLastBlockHeight(oc.GrpcClient)

@@ -147,7 +147,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 	_ = acc
 	pi := pubchain.Instance{
 		RetryInboundReq: &sync.Map{},
-		InboundReqChan:  make(chan *common.InBoundReq, 10),
+		InboundReqChan:  make(chan []*common.InBoundReq, 10),
 	}
 
 	err = oc.FeedTx(f.grpc, &poolInfo, &pi)
@@ -161,7 +161,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 	err = oc.FeedTx(f.grpc, &poolInfo, &pi)
 	f.Require().NoError(err)
 	value := <-pi.InboundReqChan
-	f.Require().Equal(value.TxID, reqs[0].TxID)
+	f.Require().Equal(value[0].TxID, reqs[0].TxID)
 }
 
 func TestFedTransaction(t *testing.T) {

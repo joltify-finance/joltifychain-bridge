@@ -366,7 +366,7 @@ func TestProcessEachBlock(t *testing.T) {
 		poolLocker:      &sync.RWMutex{},
 		tokenAbi:        &tAbi,
 		RetryInboundReq: &sync.Map{},
-		InboundReqChan:  make(chan *common2.InBoundReq, 1),
+		InboundReqChan:  make(chan []*common2.InBoundReq, 1),
 		TokenList:       tl,
 	}
 
@@ -436,7 +436,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 		lastTwoPools:    make([]*common2.PoolInfo, 2),
 		poolLocker:      &sync.RWMutex{},
 		tokenAbi:        &tAbi,
-		InboundReqChan:  make(chan *common2.InBoundReq, 1),
+		InboundReqChan:  make(chan []*common2.InBoundReq, 1),
 		TokenList:       tl,
 		RetryInboundReq: &sync.Map{},
 	}

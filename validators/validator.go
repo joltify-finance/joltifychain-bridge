@@ -18,7 +18,7 @@ func NewValidator() *ValidatorSet {
 	}
 }
 
-//SetupValidatorSet set up the validator set
+// SetupValidatorSet set up the validator set
 func (v *ValidatorSet) SetupValidatorSet(validators []*Validator, blockHeight int64) {
 	v.locker = &sync.RWMutex{}
 	v.locker.Lock()
@@ -43,7 +43,6 @@ func (v *ValidatorSet) UpdateValidatorSet(validatorUpdates []*vaulttypes.Validat
 	v.blockHeight = blockHeight
 	newValidatorSet := make(map[string]*Validator)
 	for _, el := range validatorUpdates {
-
 		cosPubkey := ed25519.PubKey{
 			Key: el.GetPubkey(),
 		}
