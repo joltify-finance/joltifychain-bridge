@@ -12,9 +12,8 @@ type Broadcaster struct {
 
 func NewBroadcaster() *Broadcaster {
 	return &Broadcaster{
-		mu: &sync.Mutex{},
-		//TODO we assume that we always have less than 100 tss message to be processed one time
-		clients: make(map[int64]chan map[string][]byte, 100),
+		mu:      &sync.Mutex{},
+		clients: make(map[int64]chan map[string][]byte),
 	}
 }
 
