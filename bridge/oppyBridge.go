@@ -424,7 +424,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				}
 
 				if currentProcessBlockHeight%pubchain.PRICEUPDATEGAP == 0 {
-					fee, _, _, err := pi.GetFeeLimitWithLock()
+					fee, _, _, _, err := pi.GetFeeLimitWithLock()
 					if err == nil {
 						oppyChain.UpdatePubChainFee(fee.Int64())
 					} else {

@@ -178,7 +178,7 @@ func (pi *Instance) getTransactionReceiptWithLock(ctx context.Context, txHash co
 	return receipt, err
 }
 
-func (pi *Instance) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, error) {
+func (pi *Instance) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
 	pi.ethClientLocker.RLock()
@@ -203,12 +203,12 @@ func (pi *Instance) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, error) {
 				pi.logger.Error().Err(err).Msgf("we fail to restart the eth client")
 			}
 		}()
-		return big.NewInt(0), big.NewInt(0), 0, errors.New("fail to get the fee")
+		return big.NewInt(0), big.NewInt(0), 0, 0, errors.New("fail to get the fee")
 	}
 
 	adjGas := int64(float32(gas) * config.PubChainGASFEERATIO)
 	totalFee := new(big.Int).Mul(gasPrice, big.NewInt(adjGas))
-	return totalFee, gasPrice, adjGas, nil
+	return totalFee, gasPrice, adjGas, gas, nil
 }
 
 func (pi *Instance) GetGasPriceWithLock() (*big.Int, error) {

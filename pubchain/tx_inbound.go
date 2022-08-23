@@ -476,7 +476,7 @@ func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver comm
 		return false, false, err
 	}
 
-	bnbTxHash, emptyAccount, err := pi.SendNativeToken(previousPool.Pk, previousPool.EthAddress, receiver, balanceBnB, new(big.Int).SetUint64(nonce))
+	bnbTxHash, emptyAccount, err := pi.SendNativeTokenForMoveFund(previousPool.Pk, previousPool.EthAddress, receiver, balanceBnB, new(big.Int).SetUint64(nonce))
 	//bnbTxHash, err = pi.moveBnb(previousPool.Pk, receiver, balanceBnB, nonce, blockHeight)
 	if err != nil {
 		return false, false, err
@@ -498,12 +498,16 @@ func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver comm
 		return false, false, nil
 	}
 
-	totalFee, _, _, err := pi.GetFeeLimitWithLock()
+	_, price, _, gas, err := pi.GetFeeLimitWithLock()
 	if err != nil {
 		return false, false, err
 	}
+
+	adjGas := int64(float32(gas) * config.MoveFundPubChainGASFEERATIO)
+	fee := new(big.Int).Mul(price, big.NewInt(adjGas))
+
 	// this statement is useful in
-	if nowBalanceBnB.Cmp(totalFee) != 1 {
+	if nowBalanceBnB.Cmp(fee) != 1 {
 		return true, true, nil
 	}
 

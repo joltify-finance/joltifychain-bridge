@@ -6,11 +6,11 @@ const (
 	OutBoundDenomFee = "abnb"
 	NativeSign       = "native"
 
-	TxTimeout           = 300
-	GASFEERATIO         = "1.5"
-	PubChainGASFEERATIO = 1.5
-	DUSTBNB             = "0.0005"
-	MINCHECKBLOCKGAP    = 6
+	TxTimeout                   = 300
+	GASFEERATIO                 = "1.5"
+	PubChainGASFEERATIO         = 3
+	MoveFundPubChainGASFEERATIO = 1.2
+	MINCHECKBLOCKGAP            = 6
 )
 
 var ChainID = "oppyChain-1"
