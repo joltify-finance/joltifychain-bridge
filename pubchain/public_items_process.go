@@ -11,6 +11,23 @@ func (pi *Instance) AddItem(req *common.InBoundReq) {
 	pi.RetryInboundReq.Store(req.Index(), req)
 }
 
+func (pi *Instance) AddOnHoldQueue(item *common.InBoundReq) {
+	pi.onHoldRetryQueueLock.Lock()
+	defer pi.onHoldRetryQueueLock.Unlock()
+	pi.onHoldRetryQueue = append(pi.onHoldRetryQueue, item)
+}
+
+func (pi *Instance) DumpQueue() []*common.InBoundReq {
+	pi.onHoldRetryQueueLock.Lock()
+	defer pi.onHoldRetryQueueLock.Unlock()
+	if len(pi.onHoldRetryQueue) == 0 {
+		return []*common.InBoundReq{}
+	}
+	ret := pi.onHoldRetryQueue
+	pi.onHoldRetryQueue = []*common.InBoundReq{}
+	return ret
+}
+
 func (pi *Instance) ExportItems() []*common.InBoundReq {
 	var items []*common.InBoundReq
 	pi.RetryInboundReq.Range(func(_, value interface{}) bool {
@@ -20,41 +37,26 @@ func (pi *Instance) ExportItems() []*common.InBoundReq {
 	return items
 }
 
-func (pi *Instance) AddPendingTx(pendingTx *InboundTx) {
-	pi.pendingInbounds.Store(pendingTx.TxID, pendingTx)
-}
-
-func (pi *Instance) AddPendingTxBnb(pendingTxBnb *InboundTxBnb) {
-	pi.pendingInboundsBnB.Store(pendingTxBnb.TxID, pendingTxBnb)
-}
-
-func (pi *Instance) ExportPendingItems() []*InboundTx {
-	var items []*InboundTx
-	pi.pendingInbounds.Range(func(_, value interface{}) bool {
-		items = append(items, value.(*InboundTx))
-		return true
+func (pi *Instance) IsEmpty() bool {
+	empty := true
+	pi.RetryInboundReq.Range(func(key, value any) bool {
+		empty = false
+		return false
 	})
-	return items
-}
-
-func (pi *Instance) ExportPendingBnbItems() []*InboundTxBnb {
-	var items []*InboundTxBnb
-	pi.pendingInboundsBnB.Range(func(key, value interface{}) bool {
-		items = append(items, value.(*InboundTxBnb))
-		return true
-	})
-	return items
+	return empty
 }
 
 func (pi *Instance) PopItem(n int) []*common.InBoundReq {
-	var allkeys []*big.Int
+	var allkeys []string
 	pi.RetryInboundReq.Range(func(key, value interface{}) bool {
-		allkeys = append(allkeys, key.(*big.Int))
+		allkeys = append(allkeys, key.(string))
 		return true
 	})
 
 	sort.Slice(allkeys, func(i, j int) bool {
-		return allkeys[i].Cmp(allkeys[j]) == -1
+		a, _ := new(big.Int).SetString(allkeys[i], 10)
+		b, _ := new(big.Int).SetString(allkeys[j], 10)
+		return a.Cmp(b) == -1
 	})
 	indexNum := len(allkeys)
 	if indexNum == 0 {
@@ -68,6 +70,7 @@ func (pi *Instance) PopItem(n int) []*common.InBoundReq {
 
 	inboundReqs := make([]*common.InBoundReq, returnNum)
 
+	pi.logger.Warn().Msgf("the pop out items seq array is %v----all in queue (%v)", allkeys[:returnNum], len(allkeys))
 	for i := 0; i < returnNum; i++ {
 		el, loaded := pi.RetryInboundReq.LoadAndDelete(allkeys[i])
 		if !loaded {

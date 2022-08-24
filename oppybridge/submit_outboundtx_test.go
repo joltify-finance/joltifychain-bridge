@@ -2,6 +2,9 @@ package oppybridge
 
 import (
 	"context"
+	"encoding/hex"
+	"go.uber.org/atomic"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,10 +15,12 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"gitlab.com/oppy-finance/oppy-bridge/validators"
 	"gitlab.com/oppy-finance/oppychain/testutil/network"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
@@ -27,6 +32,7 @@ type SubmitOutBoundTestSuite struct {
 	network     *network.Network
 	validatorky keyring.Keyring
 	queryClient tmservice.ServiceClient
+	grpc        grpc1.ClientConn
 }
 
 func (v *SubmitOutBoundTestSuite) SetupSuite() {
@@ -85,7 +91,7 @@ func (v *SubmitOutBoundTestSuite) SetupSuite() {
 	v.Require().NoError(err)
 	err = v.validatorky.ImportPrivKey("operator", sk, "12345678")
 	v.Require().NoError(err)
-
+	v.grpc = v.network.Validators[0].ClientCtx
 	v.queryClient = tmservice.NewServiceClient(v.network.Validators[0].ClientCtx)
 }
 
@@ -100,14 +106,14 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	s.Require().NoError(err)
 	oc, err := NewOppyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, &tss, tl)
 	s.Require().NoError(err)
 	oc.Keyring = s.validatorky
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	oc.grpcClient = s.network.Validators[0].ClientCtx
+	oc.GrpcClient = s.network.Validators[0].ClientCtx
 	defer func() {
 		err := oc.TerminateBridge()
 		if err != nil {
@@ -119,7 +125,9 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	s.Require().NoError(err)
 
 	oc.validatorSet = validators.NewValidator()
-	err = oc.HandleUpdateValidators(20)
+	wg := sync.WaitGroup{}
+	inkeygen := atomic.NewBool(true)
+	err = oc.HandleUpdateValidators(20, &wg, inkeygen)
 	s.Require().NoError(err)
 	info, _ := s.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()
@@ -127,7 +135,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
 	s.Require().NoError(err)
 
-	acc, err := queryAccount(valAddr.String(), oc.grpcClient)
+	acc, err := queryAccount(s.grpc, valAddr.String(), "")
 	s.Require().NoError(err)
 
 	operatorInfo, _ := oc.Keyring.Key("operator")
@@ -138,17 +146,16 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	s.Require().NoError(err)
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	s.Require().NoError(err)
-	ret, _, err := oc.BroadcastTx(context.Background(), txBytes, false)
+	ret, _, err := oc.BroadcastTx(context.Background(), s.grpc, txBytes, false)
 	s.Require().NoError(err)
 	s.Require().True(ret)
 
 	req := common.OutBoundReq{
-		TxID:               "testreq",
+		TxID:               hex.EncodeToString([]byte("testreq")),
 		OutReceiverAddress: accs[0].commAddr,
-		OriginalHeight:     5,
 	}
 	s.Require().NoError(err)
-	err = oc.SubmitOutboundTx(info, req.Hash().Hex(), 10, "testpubtx")
+	err = oc.SubmitOutboundTx(s.grpc, info, req.Hash().Hex(), 10, hex.EncodeToString([]byte("testpubtx")))
 	s.Require().NoError(err)
 	_, err = oc.GetPubChainSubmittedTx(req)
 	s.Require().NoError(err)

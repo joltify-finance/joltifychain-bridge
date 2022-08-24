@@ -10,8 +10,10 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/ethereum/go-ethereum/crypto"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -31,6 +33,7 @@ type FeedtransactionTestSuite struct {
 	network     *network.Network
 	validatorky keyring.Keyring
 	queryClient tmservice.ServiceClient
+	grpc        grpc1.ClientConn
 }
 
 func (f *FeedtransactionTestSuite) SetupSuite() {
@@ -90,7 +93,7 @@ func (f *FeedtransactionTestSuite) SetupSuite() {
 
 	_, err = f.network.WaitForHeight(1)
 	f.Require().Nil(err)
-
+	f.grpc = f.network.Validators[0].ClientCtx
 	f.queryClient = tmservice.NewServiceClient(f.network.Validators[0].ClientCtx)
 }
 
@@ -106,7 +109,7 @@ func createdTestInBoundReqs(n int) []*common.InBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewAccountInboundReq(accs[i].Address, addr, testCoin, []byte(txid), int64(i), int64(i))
+		item := common.NewAccountInboundReq(accs[i].Address, addr, testCoin, []byte(txid), int64(i))
 		retReq[i] = &item
 	}
 	return retReq
@@ -123,12 +126,12 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	f.Require().NoError(err)
 	oc, err := NewOppyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl)
 	f.Require().NoError(err)
 	oc.Keyring = f.validatorky
-	oc.grpcClient = f.network.Validators[0].ClientCtx
+	oc.GrpcClient = f.network.Validators[0].ClientCtx
 	info, err := oc.Keyring.Key("operator")
 	f.Require().NoError(err)
 	poolInfo := vaulttypes.PoolInfo{
@@ -139,15 +142,15 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		},
 	}
 
-	acc, err := queryAccount(f.network.Validators[0].Address.String(), oc.grpcClient)
+	acc, err := queryAccount(f.grpc, f.network.Validators[0].Address.String(), "")
 	f.Require().NoError(err)
 	_ = acc
 	pi := pubchain.Instance{
 		RetryInboundReq: &sync.Map{},
-		InboundReqChan:  make(chan *common.InBoundReq, 10),
+		InboundReqChan:  make(chan []*common.InBoundReq, 10),
 	}
 
-	err = oc.FeedTx(&poolInfo, &pi, 100)
+	err = oc.FeedTx(f.grpc, &poolInfo, &pi)
 	f.Require().NoError(err)
 	f.Require().Equal(len(pi.InboundReqChan), 0)
 	reqs := createdTestInBoundReqs(1)
@@ -155,10 +158,10 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		pi.AddItem(el)
 	}
 
-	err = oc.FeedTx(&poolInfo, &pi, 100)
+	err = oc.FeedTx(f.grpc, &poolInfo, &pi)
 	f.Require().NoError(err)
 	value := <-pi.InboundReqChan
-	f.Require().Equal(value.TxID, reqs[0].TxID)
+	f.Require().Equal(value[0].TxID, reqs[0].TxID)
 }
 
 func TestFedTransaction(t *testing.T) {

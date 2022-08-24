@@ -1,9 +1,10 @@
 package validators
 
 import (
+	"sync"
+
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
-	"sync"
 
 	"github.com/cosmos/cosmos-sdk/types"
 )
@@ -17,7 +18,7 @@ func NewValidator() *ValidatorSet {
 	}
 }
 
-//SetupValidatorSet set up the validator set
+// SetupValidatorSet set up the validator set
 func (v *ValidatorSet) SetupValidatorSet(validators []*Validator, blockHeight int64) {
 	v.locker = &sync.RWMutex{}
 	v.locker.Lock()
@@ -40,25 +41,22 @@ func (v *ValidatorSet) UpdateValidatorSet(validatorUpdates []*vaulttypes.Validat
 	v.locker.Lock()
 	defer v.locker.Unlock()
 	v.blockHeight = blockHeight
+	newValidatorSet := make(map[string]*Validator)
 	for _, el := range validatorUpdates {
-
 		cosPubkey := ed25519.PubKey{
 			Key: el.GetPubkey(),
 		}
 
 		addr := types.GetConsAddress(&cosPubkey)
 
-		if el.Power == 0 {
-			delete(v.activeValidators, addr.String())
-		} else {
-			localVal := Validator{
-				addr,
-				cosPubkey.Bytes(),
-				el.Power,
-			}
-			v.activeValidators[addr.String()] = &localVal
+		localVal := Validator{
+			addr,
+			cosPubkey.Bytes(),
+			el.Power,
 		}
+		newValidatorSet[addr.String()] = &localVal
 	}
+	v.activeValidators = newValidatorSet
 	return nil
 }
 

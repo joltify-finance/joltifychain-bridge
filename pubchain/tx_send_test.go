@@ -1,13 +1,16 @@
 package pubchain
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
+	zlog "github.com/rs/zerolog/log"
 	"math/big"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -49,12 +52,10 @@ func TestPubChainInstance_composeTx(t *testing.T) {
 	assert.Nil(t, err)
 	tssServer := TssMock{accs[1].sk}
 	pi := Instance{
-		lastTwoPools:       make([]*common.PoolInfo, 2),
-		poolLocker:         &sync.RWMutex{},
-		pendingInbounds:    &sync.Map{},
-		pendingInboundsBnB: &sync.Map{},
-		InboundReqChan:     make(chan *common.InBoundReq, 1),
-		tssServer:          &tssServer,
+		lastTwoPools:   make([]*common.PoolInfo, 2),
+		poolLocker:     &sync.RWMutex{},
+		InboundReqChan: make(chan []*common.InBoundReq, 1),
+		tssServer:      &tssServer,
 	}
 
 	poolInfo0 := vaulttypes.PoolInfo{
@@ -123,9 +124,10 @@ func TestSendToken(t *testing.T) {
 	}
 	websocketTest := "ws://rpc.test.oppy.zone:8456/"
 	tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	assert.Nil(t, err)
-	pubChain, err := NewChainInstance(websocketTest, &tss, tl)
+	wg := sync.WaitGroup{}
+	pubChain, err := NewChainInstance(websocketTest, &tss, tl, &wg)
 	assert.Nil(t, err)
 
 	poolInfo := vaulttypes.PoolInfo{
@@ -140,38 +142,87 @@ func TestSendToken(t *testing.T) {
 	assert.NoError(t, err)
 
 	// we firstly test the subscription of the pubchain new block
-	ctx, cancel := context.WithCancel(context.Background())
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	sbHead, err := pubChain.StartSubscription(ctx, &wg)
-	assert.Nil(t, err)
-
-	counter := 0
-	for {
-		<-sbHead
-		counter++
-		if counter > 2 {
-			cancel()
-			break
-		}
-	}
-	cancel()
-	wg.Wait()
+	//ctx, cancel := context.WithCancel(context.Background())
+	//err = pubChain.StartSubscription(ctx, &wg)
+	//assert.Nil(t, err)
+	//
+	//counter := 0
+	//for {
+	//	<-pubChain.SubChannelNow
+	//	counter++
+	//	if counter > 2 {
+	//		cancel()
+	//		break
+	//	}
+	//}
+	//cancel()
+	//wg.Wait()
 
 	// now we test send the token with wrong nonce
-	wg2 := sync.WaitGroup{}
-	nonce, err := pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
-	assert.Nil(t, err)
-	_, err = pubChain.ProcessOutBound(&wg2, accs[0].commAddr, fromAddrEth, tokenAddrTest, big.NewInt(100), int64(10), nonce)
-	assert.Nil(t, err)
-	wg2.Wait()
+	tssWaitGroup := sync.WaitGroup{}
+	needToBeProcessed := 2
+	tssReqChan := make(chan *TssReq, needToBeProcessed)
+	bc := NewBroadcaster()
 
-	// now we test send the token
-	nonce, err = pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
-	assert.Nil(t, err)
+	defer close(tssReqChan)
+	tssWaitGroup.Add(2)
+	for i := 0; i < 2; i++ {
+		go func(index int) {
+			defer tssWaitGroup.Done()
+			tssRespChan, err := bc.Subscribe(int64(index))
+			assert.Nil(t, err)
+			defer bc.Unsubscribe(int64(index))
 
-	_, err = pubChain.ProcessOutBound(&wg2, accs[0].commAddr, fromAddrEth, tokenAddrTest, big.NewInt(100), int64(10), nonce)
-	assert.Nil(t, err)
+			nonce, err := pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
+			assert.Nil(t, err)
+			_, err = pubChain.ProcessOutBound(index, accs[0].commAddr, fromAddrEth, tokenAddrTest, big.NewInt(100), nonce+uint64(index), tssReqChan, tssRespChan)
+			if index == 0 {
+				assert.Nil(t, err)
+			} else {
+				assert.NotNil(t, err)
+			}
+		}(i)
+	}
+
+	tssWaitGroup.Add(1)
+	go func() {
+		defer tssWaitGroup.Done()
+		var allsignMSgs [][]byte
+		received := make(map[int][]byte)
+		collected := false
+		for {
+			msg := <-tssReqChan
+			received[msg.Index] = msg.Data
+			if len(received) >= needToBeProcessed {
+				collected = true
+			}
+			if collected {
+				break
+			}
+		}
+		for _, val := range received {
+			if bytes.Equal([]byte("none"), val) {
+				continue
+			}
+			allsignMSgs = append(allsignMSgs, val)
+		}
+
+		lastPool := pubChain.GetPool()[1]
+		latest, err := pubChain.GetBlockByNumberWithLock(nil)
+		if err != nil {
+			zlog.Logger.Error().Err(err).Msgf("fail to get the latest height")
+			bc.Broadcast(nil)
+			return
+		}
+
+		blockHeight := int64(latest.NumberU64()) / ROUNDBLOCK
+		signature, err := pubChain.TssSignBatch(allsignMSgs, lastPool.Pk, blockHeight)
+		if err != nil {
+			zlog.Info().Msgf("fail to run batch keysign")
+		}
+		bc.Broadcast(signature)
+	}()
+	tssWaitGroup.Wait()
 
 	pubChain.tssServer.Stop()
 }

@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/client"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -31,6 +33,7 @@ type MintTestSuite struct {
 	network     *network.Network
 	validatorky keyring.Keyring
 	queryClient tmservice.ServiceClient
+	grpc        grpc1.ClientConn
 }
 
 func (v *MintTestSuite) SetupSuite() {
@@ -92,14 +95,14 @@ func (v *MintTestSuite) SetupSuite() {
 
 	_, err = v.network.WaitForHeight(1)
 	v.Require().Nil(err)
-
+	v.grpc = v.network.Validators[0].ClientCtx
 	v.queryClient = tmservice.NewServiceClient(v.network.Validators[0].ClientCtx)
 }
 
 func (m MintTestSuite) TestPrepareIssueTokenRequest() {
 	accs, err := generateRandomPrivKey(3)
 	m.Require().NoError(err)
-	tx := common.NewAccountInboundReq(accs[0].oppyAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(2), int64(100))
+	tx := common.NewAccountInboundReq(accs[0].oppyAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(2))
 	_, err = prepareIssueTokenRequest(&tx, accs[2].commAddr.String(), "1")
 	m.Require().EqualError(err, "decoding bech32 failed: string not all lowercase or all uppercase")
 
@@ -173,6 +176,7 @@ func Gensigntx(oc *OppyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum
 	return txBuilder, nil
 }
 
+//nolint:funlen
 func (m MintTestSuite) TestProcessInbound() {
 	accs, err := generateRandomPrivKey(2)
 	m.Require().NoError(err)
@@ -184,14 +188,14 @@ func (m MintTestSuite) TestProcessInbound() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	m.Require().NoError(err)
 	oc, err := NewOppyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, &tss, tl)
 	m.Require().NoError(err)
 	oc.Keyring = m.validatorky
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	oc.grpcClient = m.network.Validators[0].ClientCtx
+	oc.GrpcClient = m.network.Validators[0].ClientCtx
 	defer func() {
 		err := oc.TerminateBridge()
 		if err != nil {
@@ -202,26 +206,28 @@ func (m MintTestSuite) TestProcessInbound() {
 	_, err = m.network.WaitForHeightWithTimeout(10, time.Second*30)
 	m.Require().NoError(err)
 
+	//err = oc.InitValidators(m.network.Validators[0].APIAddress)
+	//m.Require().NoError(err)
+
 	info, _ := m.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()
 	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
 	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
 	m.Require().NoError(err)
 
-	acc, err := queryAccount(valAddr.String(), oc.grpcClient)
+	acc, err := queryAccount(m.grpc, valAddr.String(), m.network.Validators[0].RPCAddress)
 	m.Require().NoError(err)
-	tx := common.NewAccountInboundReq(valAddr, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100), int64(100))
+	tx := common.NewAccountInboundReq(valAddr, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100))
 
-	tx.SetAccountInfoAndHeight(0, 0, accs[0].oppyAddr, accs[0].pk, 0)
+	tx.SetAccountInfo(0, 0, accs[0].oppyAddr, accs[0].pk)
 
 	send := banktypes.NewMsgSend(valAddr, accs[0].oppyAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
-	// txBuilder, err := oc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
 	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), m.network.Validators[0].ClientCtx.Keyring)
 	m.Require().NoError(err)
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	m.Require().NoError(err)
-	ret, _, err := oc.BroadcastTx(context.Background(), txBytes, false)
+	ret, _, err := oc.BroadcastTx(context.Background(), m.grpc, txBytes, false)
 	m.Require().NoError(err)
 	m.Require().True(ret)
 
@@ -234,8 +240,8 @@ func (m MintTestSuite) TestProcessInbound() {
 	oc.lastTwoPools[0] = &pool
 	oc.lastTwoPools[1] = &pool
 
-	_, _, err = oc.ProcessInBound(&tx)
-	m.Require().Error(err)
+	_, err = oc.DoProcessInBound(m.grpc, []*common.InBoundReq{&tx})
+	m.Require().NoError(err)
 }
 
 func TestMint(t *testing.T) {

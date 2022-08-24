@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -23,7 +24,7 @@ func createdTestOutBoundReqs(n int) []*OutBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := NewOutboundReq(txid, addr, addr, testCoin, addr.Hex(), int64(i), int64(i))
+		item := NewOutboundReq(hex.EncodeToString([]byte(txid)), addr, addr, testCoin, addr.Hex(), int64(i))
 		retReq[i] = &item
 	}
 	return retReq
@@ -41,7 +42,7 @@ func createdTestInBoundReqs(n int) []*InBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := NewAccountInboundReq(accs[i].Address, addr, testCoin, []byte(txid), int64(i), int64(i))
+		item := NewAccountInboundReq(accs[i].Address, addr, testCoin, []byte(txid), int64(i))
 		retReq[i] = &item
 	}
 	return retReq
@@ -52,11 +53,10 @@ func TestOutBoundTx(t *testing.T) {
 	index := outboundreqs[0].Index()
 	assert.NotNil(t, index)
 	addr := common.Address{}
-	outboundreqs[0].SetItemHeightAndNonce(2, 100, addr, 23)
+	outboundreqs[0].SetItemNonce(addr, 23)
 	h := outboundreqs[0].Hash()
 	assert.NotNil(t, h.Bytes())
-	_, _, _, _, blockheight, nonce := outboundreqs[0].GetOutBoundInfo()
-	assert.Equal(t, blockheight, int64(2))
+	_, _, _, _, nonce := outboundreqs[0].GetOutBoundInfo()
 	assert.Equal(t, nonce, uint64(23))
 }
 
@@ -64,10 +64,10 @@ func TestInBoundTx(t *testing.T) {
 	outboundreqs := createdTestInBoundReqs(2)
 	index := outboundreqs[0].Index()
 	assert.NotNil(t, index)
-	outboundreqs[0].SetAccountInfoAndHeight(2, 100, outboundreqs[1].PoolOppyAddress, "123", 100)
+	outboundreqs[0].SetAccountInfo(2, 100, outboundreqs[1].PoolOppyAddress, "123")
 	seq, num, _, _ := outboundreqs[0].GetAccountInfo()
 	assert.Equal(t, seq, uint64(100))
 	assert.Equal(t, num, uint64(2))
-	_, _, _, _, blockHeight := outboundreqs[0].GetInboundReqInfo()
-	assert.Equal(t, blockHeight, int64(100))
+	_, _, coin, _ := outboundreqs[0].GetInboundReqInfo()
+	assert.Equal(t, coin.Amount.String(), "32")
 }

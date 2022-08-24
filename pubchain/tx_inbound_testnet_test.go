@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
@@ -57,11 +58,12 @@ func (tn *TestNetTestSuite) SetupSuite() {
 	tn.sk2 = &sk2
 
 	tss := TssMock{sk: &sk}
-	tl, err := createMockTokenlist("0xeB42ff4cA651c91EB248f8923358b6144c6B4b79", "JUSD")
+	tl, err := tokenlist.CreateMockTokenlist([]string{"0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"}, []string{"JUSD"})
 	if err != nil {
 		panic(err)
 	}
-	pubChain, err := NewChainInstance(websocketTest, &tss, tl)
+	wg := sync.WaitGroup{}
+	pubChain, err := NewChainInstance(websocketTest, &tss, tl, &wg)
 	if err != nil {
 		panic(err)
 	}
@@ -70,7 +72,7 @@ func (tn *TestNetTestSuite) SetupSuite() {
 }
 
 func (tn TestNetTestSuite) TestProcessNewBlock() {
-	err := tn.pubChain.ProcessNewBlock(big.NewInt(18427951), 100)
+	err := tn.pubChain.ProcessNewBlock(big.NewInt(18427951))
 	tn.Require().NoError(err)
 }
 
@@ -128,29 +130,37 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	err = tn.pubChain.UpdatePool(&poolInfo2)
 	tn.Require().NoError(err)
 
-	ret := tn.pubChain.MoveFound(&wg, 100, &pool)
+	// if the  test fail, you need to disable the check for pool1->pool2 and
+	// run the test once to allow the fund move from pool2 back to pool1
+	// currently, we return false to enable double check of ERC20 token transfer
+	ret := tn.pubChain.MoveFound(&wg, 100, &pool, tn.pubChain.EthClient)
 	time.Sleep(time.Second * 10)
+	// as we always retry, so we get false fir the first time we run the check
+	tn.Require().False(ret)
+	ret = tn.pubChain.MoveFound(&wg, 100, &pool, tn.pubChain.EthClient)
 	tn.Require().True(ret)
-	tn.pubChain.MoveFound(&wg, 100, &pool)
+
+	tn.pubChain.MoveFound(&wg, 100, &pool, tn.pubChain.EthClient)
 	time.Sleep(time.Second * 10)
 	tn.Require().True(ret)
 
-	tn.pubChain.MoveFound(&wg, 100, &pool)
-	time.Sleep(time.Second * 10)
-	tn.Require().True(ret)
-
+	// move token back
 	tn.pubChain.tssServer = &TssMock{sk: tn.sk2}
 	err = tn.pubChain.UpdatePool(&poolInfo1)
 	tn.Require().NoError(err)
 	err = tn.pubChain.UpdatePool(&poolInfo1)
 	tn.Require().NoError(err)
 
-	ret = tn.pubChain.MoveFound(&wg, 100, &pool2)
+	ret = tn.pubChain.MoveFound(&wg, 100, &pool2, tn.pubChain.EthClient)
 	time.Sleep(time.Second * 10)
+	tn.Require().False(ret)
+
+	ret = tn.pubChain.MoveFound(&wg, 100, &pool2, tn.pubChain.EthClient)
 	tn.Require().True(ret)
-	tn.pubChain.MoveFound(&wg, 100, &pool2)
-	time.Sleep(time.Second * 10)
+
+	ret = tn.pubChain.MoveFound(&wg, 100, &pool2, tn.pubChain.EthClient)
 	tn.Require().True(ret)
+
 	wg.Wait()
 }
 

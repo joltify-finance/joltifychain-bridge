@@ -79,9 +79,9 @@ func DefaultConfig() Config {
 	flag.StringVar(&config.OppyChain.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for oppy pub_chain")
 	flag.StringVar(&config.OppyChain.HTTPAddress, "http-port", "http://localhost:26657", "ws address for oppy pub_chain")
 	flag.StringVar(&config.OppyChain.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for oppy pub_chain")
-	flag.IntVar(&config.OppyChain.RollbackGap, "oppy-rollback-gap", 10, "delay the transaction process to prevent chain rollback")
+	flag.IntVar(&config.OppyChain.RollbackGap, "oppy-rollback-gap", 1, "delay the transaction process to prevent chain rollback")
 	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://rpc.test.oppy.zone:8456/", "endpoint for public pub_chain listener")
-	flag.IntVar(&config.PubChainConfig.RollbackGap, "pubchain-rollback-gap", 10, "delay the transaction process to prevent chain rollback")
+	flag.IntVar(&config.PubChainConfig.RollbackGap, "pubchain-rollback-gap", 1, "delay the transaction process to prevent chain rollback")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
 	flag.StringVar(&config.HomeDir, "home", "/root/.oppyChain/config", "home director for oppy_bridge")
 	flag.StringVar(&config.TokenListPath, "token-list", "tokenlist.json", "file path to load token white list")
@@ -90,8 +90,8 @@ func DefaultConfig() Config {
 
 	// we setup the Tss parameter configuration
 	flag.DurationVar(&config.TssConfig.KeyGenTimeout, "gentimeout", 30*time.Second, "keygen timeout")
-	flag.DurationVar(&config.TssConfig.KeySignTimeout, "signtimeout", 30*time.Second, "keysign timeout")
-	flag.DurationVar(&config.TssConfig.PartyTimeout, "joinpartytimeout", 30*time.Second, "join party timeout")
+	flag.DurationVar(&config.TssConfig.KeySignTimeout, "signtimeout", 50*time.Second, "keysign timeout")
+	flag.DurationVar(&config.TssConfig.PartyTimeout, "joinpartytimeout", 45*time.Second, "join party timeout")
 
 	flag.DurationVar(&config.TssConfig.PreParamTimeout, "preparamtimeout", 5*time.Minute, "pre-parameter generation timeout")
 	flag.BoolVar(&config.EnableMonitor, "enablemonitor", true, "enable the oppyChain monitor")

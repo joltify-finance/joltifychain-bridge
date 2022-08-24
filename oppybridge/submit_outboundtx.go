@@ -3,8 +3,10 @@ package oppybridge
 import (
 	"context"
 	"errors"
-	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"strconv"
+
+	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	grpc1 "github.com/gogo/protobuf/grpc"
 
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 
@@ -12,7 +14,7 @@ import (
 )
 
 // SubmitOutboundTx submit the outbound record to oppy chain
-func (oc *OppyChainInstance) SubmitOutboundTx(operator keyring.Info, requestID string, blockHeight int64, pubchainTx string) error {
+func (oc *OppyChainInstance) SubmitOutboundTx(conn grpc1.ClientConn, operator keyring.Info, requestID string, blockHeight int64, pubchainTx string) error {
 	var err error
 	if operator == nil {
 		operator, err = oc.Keyring.Key("operator")
@@ -20,7 +22,7 @@ func (oc *OppyChainInstance) SubmitOutboundTx(operator keyring.Info, requestID s
 			return err
 		}
 	}
-	acc, err := queryAccount(operator.GetAddress().String(), oc.grpcClient)
+	acc, err := queryAccount(conn, operator.GetAddress().String(), "")
 	if err != nil {
 		oc.logger.Error().Err(err).Msgf("fail to query the account")
 		return err
@@ -34,7 +36,7 @@ func (oc *OppyChainInstance) SubmitOutboundTx(operator keyring.Info, requestID s
 		BlockHeight: strconv.FormatInt(blockHeight, 10),
 	}
 
-	ok, _, err := oc.composeAndSend(operator, &outboundMsg, accSeq, accNum, nil, operator.GetAddress())
+	ok, _, err := oc.composeAndSend(conn, operator, &outboundMsg, accSeq, accNum, nil, operator.GetAddress())
 	if !ok || err != nil {
 		oc.logger.Error().Err(err).Msgf("fail to submit the outbound tx record")
 		return errors.New("fail to broadcast the outbound tx record")
@@ -46,7 +48,7 @@ func (oc *OppyChainInstance) SubmitOutboundTx(operator keyring.Info, requestID s
 func (oc *OppyChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (string, error) {
 	reqStr := req.Hash().Hex()
 	oc.logger.Info().Msgf("we check the hash %v\n", reqStr)
-	vaultQuery := vaulttypes.NewQueryClient(oc.grpcClient)
+	vaultQuery := vaulttypes.NewQueryClient(oc.GrpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 	outboundTxRequest := vaulttypes.QueryGetOutboundTxRequest{RequestID: reqStr}

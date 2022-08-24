@@ -3,14 +3,13 @@ package oppybridge
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
 	"testing"
 	"time"
 
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"gitlab.com/oppy-finance/oppychain/app"
@@ -39,6 +38,7 @@ type BridgeTestSuite struct {
 	network      *network.Network
 	validatorKey keyring.Keyring
 	queryClient  tmservice.ServiceClient
+	grpc         grpc1.ClientConn
 }
 
 func (b *BridgeTestSuite) SetupSuite() {
@@ -104,6 +104,7 @@ func (b *BridgeTestSuite) SetupSuite() {
 
 	_, err = b.network.WaitForHeight(1)
 	b.Require().Nil(err)
+	b.grpc = b.network.Validators[0].ClientCtx
 	b.queryClient = tmservice.NewServiceClient(b.network.Validators[0].ClientCtx)
 }
 
@@ -116,14 +117,14 @@ func (b BridgeTestSuite) TestBridgeTx() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	b.Require().NoError(err)
 	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
 	oc.Keyring = b.validatorKey
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	oc.grpcClient = b.network.Validators[0].ClientCtx
+	oc.GrpcClient = b.network.Validators[0].ClientCtx
 	defer func() {
 		err := oc.TerminateBridge()
 		if err != nil {
@@ -136,13 +137,13 @@ func (b BridgeTestSuite) TestBridgeTx() {
 		PoolPubKey:  accs[1].pk,
 		BlockHeight: "5",
 	}
-	acc, err := queryAccount(b.network.Validators[0].Address.String(), oc.grpcClient)
+	acc, err := queryAccount(b.grpc, b.network.Validators[0].Address.String(), "")
 	b.Require().NoError(err)
 
 	num, seq := acc.GetAccountNumber(), acc.GetSequence()
 	_, err = b.network.WaitForHeightWithTimeout(5, time.Minute*5)
 	b.Require().NoError(err)
-	gas, err := oc.GasEstimation([]sdk.Msg{&tmsg}, seq, nil)
+	gas, err := oc.GasEstimation(b.grpc, []sdk.Msg{&tmsg}, seq, nil)
 	b.Require().NoError(err)
 	b.Require().Greater(gas, uint64(0))
 
@@ -168,11 +169,11 @@ func (b BridgeTestSuite) TestBridgeTx() {
 
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	b.Require().NoError(err)
-	_, _, err = oc.BroadcastTx(context.Background(), txBytes, false)
+	_, _, err = oc.BroadcastTx(context.Background(), b.grpc, txBytes, false)
 	b.Require().NoError(err)
 	_, err = b.network.WaitForHeightWithTimeout(10, time.Second*30)
 	b.Require().NoError(err)
-	bh, err := oc.GetLastBlockHeight()
+	bh, err := oc.GetLastBlockHeightWithLock()
 	b.Require().NoError(err)
 	b.Require().Greater(bh, int64(0))
 	err = oc.prepareTssPool(b.network.Validators[0].Address, accs[1].pk, "10")
@@ -192,14 +193,14 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	b.Require().NoError(err)
 	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
 	oc.Keyring = b.validatorKey
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	oc.grpcClient = b.network.Validators[0].ClientCtx
+	oc.GrpcClient = b.network.Validators[0].ClientCtx
 	defer func() {
 		err := oc.TerminateBridge()
 		if err != nil {
@@ -213,34 +214,8 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 	err = oc.prepareTssPool(b.network.Validators[0].Address, creatorPk, "10")
 	b.Require().NoError(err)
 	b.Require().Equal(len(oc.keyGenCache), 1)
-	ret, _ := oc.CheckAndUpdatePool(10)
+	ret, _ := oc.CheckAndUpdatePool(b.grpc, 10)
 	b.Require().False(ret)
-}
-
-func createMockTokenlist(tokenAddr string, tokenDenom string) (*tokenlist.TokenList, error) {
-	// init the token list file path
-	current, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	// write the temp file for mockTokenlist
-	tokenlistPath := path.Join(current, "../test_data/tokenlist/tokenlist_mock.json")
-	tempTL := make(map[string]string)
-	tempTL[tokenAddr] = tokenDenom
-	buf, err := json.Marshal(&tempTL)
-	if err != nil {
-		return nil, err
-	}
-	err = ioutil.WriteFile(tokenlistPath, buf, 0o655)
-	if err != nil {
-		return nil, err
-	}
-	// init the tokenlist with provided tokenAddress,tokenDenom pair
-	tl, err := tokenlist.NewTokenList(tokenlistPath, 100)
-	if err != nil {
-		return nil, err
-	}
-	return tl, nil
 }
 
 func (b BridgeTestSuite) TestCheckOutBoundTx() {
@@ -252,7 +227,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 		true,
 		true,
 	}
-	tl, err := createMockTokenlist("testAddr", "testDenom")
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	b.Require().NoError(err)
 	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
@@ -266,7 +241,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	oc.lastTwoPools[0] = &pool
 	oc.lastTwoPools[1] = &pool
 
-	oc.grpcClient = b.network.Validators[0].ClientCtx
+	oc.GrpcClient = b.network.Validators[0].ClientCtx
 	defer func() {
 		err := oc.TerminateBridge()
 		if err != nil {
@@ -282,7 +257,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 
 	send := banktypes.NewMsgSend(valAddr, accs[0].oppyAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
-	acc, err := queryAccount(valAddr.String(), oc.grpcClient)
+	acc, err := queryAccount(b.grpc, valAddr.String(), "")
 	b.Require().NoError(err)
 
 	// txBuilder, err := oc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
@@ -290,19 +265,19 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	b.Require().NoError(err)
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	b.Require().NoError(err)
-	ret, txHash, err := oc.BroadcastTx(context.Background(), txBytes, false)
+	ret, txHash, err := oc.BroadcastTx(context.Background(), b.grpc, txBytes, false)
 	b.Require().NoError(err)
 	b.Require().True(ret)
 	err = b.network.WaitForNextBlock()
 	b.Require().NoError(err)
-	txClient := cosTx.NewServiceClient(oc.grpcClient)
+	txClient := cosTx.NewServiceClient(oc.GrpcClient)
 	txquery := cosTx.GetTxRequest{Hash: txHash}
 	resp, err := txClient.GetTx(context.Background(), &txquery, nil)
 	b.Require().NoError(err)
-	block, err := oc.GetBlockByHeight(resp.TxResponse.Height)
+	block, err := oc.GetBlockByHeight(b.grpc, resp.TxResponse.Height)
 	b.Require().NoError(err)
 	tx := block.Data.Txs[0]
-	oc.CheckOutBoundTx(1, tx)
+	oc.CheckOutBoundTx(b.grpc, 1, tx)
 }
 
 func TestBridge(t *testing.T) {

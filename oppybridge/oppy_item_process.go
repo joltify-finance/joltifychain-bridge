@@ -4,31 +4,24 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/ethereum/go-ethereum/common/math"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
-	"gitlab.com/oppy-finance/oppy-bridge/config"
 )
 
-func (oc *OppyChainInstance) AddMoveFundItem(pool *common.PoolInfo, height int64) {
-	oc.moveFundReq.Store(height, pool)
+func (oc *OppyChainInstance) AddOnHoldQueue(item *common.OutBoundReq) {
+	oc.onHoldRetryQueueLock.Lock()
+	defer oc.onHoldRetryQueueLock.Unlock()
+	oc.onHoldRetryQueue = append(oc.onHoldRetryQueue, item)
 }
 
-// popMoveFundItemAfterBlock pop a move fund item after give block duration
-func (oc *OppyChainInstance) popMoveFundItemAfterBlock(currentBlockHeight int64) (*common.PoolInfo, int64) {
-	min := int64(math.MaxInt64)
-	oc.moveFundReq.Range(func(key, value interface{}) bool {
-		h := key.(int64)
-		if h <= min {
-			min = h
-		}
-		return true
-	})
-
-	if min < math.MaxInt64 && (currentBlockHeight-min > config.MINCHECKBLOCKGAP) {
-		item, _ := oc.moveFundReq.LoadAndDelete(min)
-		return item.(*common.PoolInfo), min
+func (oc *OppyChainInstance) DumpQueue() []*common.OutBoundReq {
+	oc.onHoldRetryQueueLock.Lock()
+	defer oc.onHoldRetryQueueLock.Unlock()
+	if len(oc.onHoldRetryQueue) == 0 {
+		return []*common.OutBoundReq{}
 	}
-	return nil, 0
+	ret := oc.onHoldRetryQueue
+	oc.onHoldRetryQueue = []*common.OutBoundReq{}
+	return ret
 }
 
 func (oc *OppyChainInstance) ExportItems() []*common.OutBoundReq {
@@ -40,19 +33,36 @@ func (oc *OppyChainInstance) ExportItems() []*common.OutBoundReq {
 	return items
 }
 
+func (oc *OppyChainInstance) Import(items []*OutboundTx) {
+	for _, el := range items {
+		oc.pendingTx.Store(el.TxID, el)
+	}
+}
+
+func (oc *OppyChainInstance) Export() []*OutboundTx {
+	var exported []*OutboundTx
+	oc.pendingTx.Range(func(key, value any) bool {
+		exported = append(exported, value.(*OutboundTx))
+		return true
+	})
+	return exported
+}
+
 func (oc *OppyChainInstance) AddItem(req *common.OutBoundReq) {
 	oc.RetryOutboundReq.Store(req.Index(), req)
 }
 
 func (oc *OppyChainInstance) PopItem(n int) []*common.OutBoundReq {
-	var allkeys []*big.Int
+	var allkeys []string
 	oc.RetryOutboundReq.Range(func(key, value interface{}) bool {
-		allkeys = append(allkeys, key.(*big.Int))
+		allkeys = append(allkeys, key.(string))
 		return true
 	})
 
 	sort.Slice(allkeys, func(i, j int) bool {
-		return allkeys[i].Cmp(allkeys[j]) == -1
+		a, _ := new(big.Int).SetString(allkeys[i], 10)
+		b, _ := new(big.Int).SetString(allkeys[j], 10)
+		return a.Cmp(b) == -1
 	})
 	indexNum := len(allkeys)
 	if indexNum == 0 {
@@ -75,6 +85,16 @@ func (oc *OppyChainInstance) PopItem(n int) []*common.OutBoundReq {
 	}
 
 	return inboundReqs
+}
+
+func (oc *OppyChainInstance) IsEmpty() bool {
+	empty := true
+	oc.RetryOutboundReq.Range(func(key, value interface{}) bool {
+		empty = false
+		return false
+	})
+	return empty
+
 }
 
 func (oc *OppyChainInstance) Size() int {

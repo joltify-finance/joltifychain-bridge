@@ -2,6 +2,8 @@ package storage
 
 import (
 	"fmt"
+	"github.com/ethereum/go-ethereum/common"
+	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
 	"math/rand"
 	"os"
 	"path"
@@ -12,7 +14,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
-	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
 )
 
 type PendingFileStateMgrTestSuite struct{ suite.Suite }
@@ -21,44 +22,30 @@ func (s *PendingFileStateMgrTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 }
 
-func createdTestPendingTxs(n int) []*pubchain.InboundTx {
+func createdTestPendingTxs(n int) []*oppybridge.OutboundTx {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	accs := simulation.RandomAccounts(r, n)
-	pendingTxs := make([]*pubchain.InboundTx, n)
+	pendingTxs := make([]*oppybridge.OutboundTx, n)
 	for i := 0; i < n; i++ {
 		txid := fmt.Sprintf("testTXID %v", i)
 		testToken := sdk.NewCoin("testToken", sdk.NewInt(32))
 		testFee := sdk.NewCoin("testFee", sdk.NewInt(32))
-		tx := pubchain.InboundTx{
-			TxID:           txid,
-			Address:        accs[i].Address,
-			PubBlockHeight: uint64(i),
-			Token:          testToken,
-			Fee:            testFee,
+		tx := oppybridge.OutboundTx{
+			TxID:               txid,
+			OutReceiverAddress: common.HexToAddress(accs[i].Address.String()),
+			BlockHeight:        uint64(i),
+			Token:              testToken,
+			Fee:                testFee,
+			TokenAddr:          "testAddress",
 		}
 		pendingTxs[i] = &tx
 	}
 	return pendingTxs
 }
 
-func createdTestPendingBnbTxs(n int) []*pubchain.InboundTxBnb {
-	pendingTxs := make([]*pubchain.InboundTxBnb, n)
-	for i := 0; i < n; i++ {
-		txid := fmt.Sprintf("testTXID %v", i)
-		testFee := sdk.NewCoin("testFee", sdk.NewInt(32))
-		bnbtx := pubchain.InboundTxBnb{
-			TxID:        txid,
-			BlockHeight: uint64(i),
-			Fee:         testFee,
-		}
-		pendingTxs[i] = &bnbtx
-	}
-	return pendingTxs
-}
-
 func (s *PendingFileStateMgrTestSuite) TestSavePendingItems() {
 	folder := os.TempDir()
-	fileName := path.Join(folder, "inboundpendingtx.dat")
+	fileName := path.Join(folder, "outboundpendingtx.dat")
 	defer func() {
 		err := os.RemoveAll(fileName)
 		s.Require().NoError(err)
@@ -89,43 +76,6 @@ func (s *PendingFileStateMgrTestSuite) TestSavePendingItems() {
 	for i := 0; i < 50; i++ {
 		loadedTx := loaded[i].TxID
 		expectedTx := pendingTxs[50+i].TxID
-		s.Require().Equal(expectedTx, loadedTx)
-	}
-}
-
-func (s *PendingFileStateMgrTestSuite) TestSavePendingBnbItems() {
-	folder := os.TempDir()
-	fileName := path.Join(folder, "inboundpendingbnbtx.dat")
-	defer func() {
-		err := os.RemoveAll(fileName)
-		s.Require().NoError(err)
-	}()
-	pfsm := NewPendingTxStateMgr(folder)
-	s.Require().NotNil(pfsm)
-
-	pendingBnbTxs := createdTestPendingBnbTxs(100)
-
-	err := pfsm.SavePendingBnbItems(pendingBnbTxs[:50])
-	s.Require().NoError(err)
-
-	loaded, err := pfsm.LoadPendingBnbItems()
-	s.Require().NoError(err)
-
-	for i := 0; i < 50; i++ {
-		loadedTx := loaded[i].TxID
-		expectedTx := pendingBnbTxs[i].TxID
-		s.Require().Equal(expectedTx, loadedTx)
-	}
-
-	err = pfsm.SavePendingBnbItems(pendingBnbTxs[50:])
-	s.Require().NoError(err)
-
-	loaded, err = pfsm.LoadPendingBnbItems()
-	s.Require().NoError(err)
-
-	for i := 0; i < 50; i++ {
-		loadedTx := loaded[i].TxID
-		expectedTx := pendingBnbTxs[50+i].TxID
 		s.Require().Equal(expectedTx, loadedTx)
 	}
 }

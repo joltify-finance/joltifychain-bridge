@@ -3,16 +3,14 @@ package config
 import "time"
 
 const (
-	InBoundDenomFee = "BNB"
+	OutBoundDenomFee = "abnb"
+	NativeSign       = "native"
 
-	OutBoundDenomFee = "pjolt"
-
-	InBoundFeeMin    = "0.00000000000000001"
-	OUTBoundFeeOut   = "0.00000000000000001"
-	TxTimeout        = 300
-	GASFEERATIO      = "1.5"
-	DUSTBNB          = "0.0001"
-	MINCHECKBLOCKGAP = 6
+	TxTimeout                   = 300
+	GASFEERATIO                 = "1.5"
+	PubChainGASFEERATIO         = 3
+	MoveFundPubChainGASFEERATIO = 1.2
+	MINCHECKBLOCKGAP            = 6
 )
 
 var ChainID = "oppyChain-1"
