@@ -16,10 +16,8 @@ const (
 var ChainID = "oppyChain-1"
 
 const (
-	InBound = iota
-	OutBound
 	QueryTimeOut = time.Second * 6
 )
 
-// direction is the direction of the oppy_bridge
+// Direction is the direction of the oppy_bridge
 type Direction int

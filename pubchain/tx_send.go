@@ -24,7 +24,6 @@ import (
 
 // CheckTxStatus check whether the tx has been done successfully
 func (pi *Instance) waitToSend(poolAddress common.Address, targetNonce uint64) error {
-	//bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)\
 	bf := backoff.NewExponentialBackOff()
 	bf.MaxElapsedTime = time.Minute * 2
 	bf.MaxInterval = time.Second * 20
@@ -60,7 +59,6 @@ func (pi *Instance) waitToSend(poolAddress common.Address, targetNonce uint64) e
 
 // SendNativeTokenBatch sends the native token to the public chain
 func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, bool, error) {
-
 	totalFee, gasPrice, adjGas, _, err := pi.GetFeeLimitWithLock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
@@ -106,7 +104,6 @@ func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Addr
 
 // SendNativeTokenForMoveFund sends the native token to the public chain
 func (pi *Instance) SendNativeTokenForMoveFund(signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int) (common.Hash, bool, error) {
-
 	_, price, _, gas, err := pi.GetFeeLimitWithLock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
@@ -203,7 +200,7 @@ func (pi *Instance) SendTokenBatch(index int, sender, receiver common.Address, a
 	}
 	err = pi.sendTransactionWithLock(ctxSend, readyTx)
 	if err != nil {
-		//we reset the ethcliet
+		// we reset the ethcliet
 		pi.logger.Error().Err(err).Msgf("we fail to send the outbound ERC20 tx, have reset the eth client")
 	}
 	return readyTx.Hash(), err
@@ -331,7 +328,8 @@ func (pi *Instance) TssSignBatch(msgs [][]byte, pk string, blockHeight int64) (m
 	}
 	signatureMap := make(map[string][]byte)
 	for _, eachSign := range resp.Signatures {
-		signature, err := misc.SerializeSig(&eachSign, true)
+		s := eachSign
+		signature, err := misc.SerializeSig(&s, true)
 		if err != nil {
 			pi.logger.Error().Msgf("fail to encode the signature")
 			continue

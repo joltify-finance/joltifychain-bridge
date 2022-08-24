@@ -64,7 +64,7 @@ type OppyChainInstance struct {
 	CurrentHeight         int64
 	inBoundGas            *atomic.Int64
 	outBoundFee           *atomic.Int64
-	TokenList             tokenlist.TokenListI
+	TokenList             tokenlist.BridgeTokenListI
 	pendingTx             *sync.Map
 	ChannelQueueNewBlock  chan ctypes.ResultEvent
 	ChannelQueueValidator chan ctypes.ResultEvent
@@ -99,7 +99,7 @@ type OutboundTx struct {
 }
 
 // NewOppyBridge new the instance for the oppy pub_chain
-func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl tokenlist.TokenListI) (*OppyChainInstance, error) {
+func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI) (*OppyChainInstance, error) {
 	var oppyBridge OppyChainInstance
 	var err error
 	oppyBridge.logger = log.With().Str("module", "oppyChain").Logger()

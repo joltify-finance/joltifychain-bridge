@@ -58,7 +58,6 @@ func (pi *Instance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) e
 }
 
 func (pi *Instance) RetryPubChain() error {
-
 	_, err := pi.GetBlockByNumberWithLock(nil)
 	if err != nil {
 		pi.logger.Info().Msgf("all good we do not need to reset")

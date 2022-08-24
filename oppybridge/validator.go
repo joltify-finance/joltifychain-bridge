@@ -72,13 +72,12 @@ func (oc *OppyChainInstance) UpdateLatestValidator(validators []*vaulttypes.Vali
 
 // GetLastValidator get the last validator set
 func (oc *OppyChainInstance) GetLastValidator() ([]*validators.Validator, int64) {
-	validators, blockHeight := oc.validatorSet.GetActiveValidators()
-	return validators, blockHeight
+	allValidators, blockHeight := oc.validatorSet.GetActiveValidators()
+	return allValidators, blockHeight
 }
 
 // QueryLastPoolAddress returns the latest two pool outReceiverAddress
 func (oc *OppyChainInstance) QueryLastPoolAddress(conn grpc1.ClientConn) ([]*vaulttypes.PoolInfo, error) {
-
 	poolInfo, err := queryLastValidatorSet(conn)
 	if err != nil {
 		oc.logger.Error().Err(err).Msg("fail to get the pool info")
@@ -93,7 +92,7 @@ func (oc *OppyChainInstance) CheckWhetherSigner(lastPoolInfo *vaulttypes.PoolInf
 	creator, err := oc.Keyring.Key("operator")
 	if err != nil {
 		oc.logger.Error().Err(err).Msg("fail to get the validator outReceiverAddress")
-		return found, err
+		return false, err
 	}
 	for _, eachValidator := range lastPoolInfo.CreatePool.Nodes {
 		if eachValidator.Equals(creator.GetAddress()) {
@@ -119,11 +118,7 @@ func (oc *OppyChainInstance) CheckWhetherAlreadyExist(conn grpc1.ClientConn, ind
 
 // CheckTxStatus check whether the tx has been done successfully
 func (oc *OppyChainInstance) CheckTxStatus(conn grpc1.ClientConn, index string, retryNum uint64) error {
-	//bf := backoff.NewExponentialBackOff()
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), retryNum)
-	//bf.InitialInterval = time.Second
-	//bf.MaxInterval = time.Second * 3
-	//bf.MaxElapsedTime = time.Minute
 
 	op := func() error {
 		if oc.CheckWhetherAlreadyExist(conn, index) {

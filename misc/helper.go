@@ -116,7 +116,7 @@ func MakeSignature(r, s, v *big.Int) []byte {
 	return sigBytes
 }
 
-// EthSignPubKeytoOppyAddr derives the oppy address from the pubkey derived from the signature
+// EthSignPubKeyToOppyAddr derives the oppy address from the pubkey derived from the signature
 func EthSignPubKeyToOppyAddr(pk []byte) (types.AccAddress, error) {
 	pk2, err := btcec.ParsePubKey(pk, btcec.S256())
 	if err != nil {
@@ -145,11 +145,10 @@ func RecoverRecID(chainID uint64, v *big.Int) *big.Int {
 	if isProtectedV(v) {
 		plainV := new(big.Int).SetUint64(v.Uint64() - 35 - 2*chainID)
 		return plainV
-	} else {
-		// Only EIP-155 signatures can be optionally protected. Since
-		// we determined this v value is not protected, it must be a
-		// raw 27 or 28.
-		plainV := new(big.Int).SetUint64(v.Uint64() - 27)
-		return plainV
 	}
+	// Only EIP-155 signatures can be optionally protected. Since
+	// we determined this v value is not protected, it must be a
+	// raw 27 or 28.
+	plainV := new(big.Int).SetUint64(v.Uint64() - 27)
+	return plainV
 }

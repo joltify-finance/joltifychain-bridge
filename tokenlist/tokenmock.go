@@ -18,7 +18,6 @@ func (mt *MockTokenList) GetTokenInfoByAddress(tokenAddr string) (TokenItem, boo
 		Denom:     strings.ToLower(tokenDenomStr),
 		Decimals:  18,
 	}, exist
-
 }
 
 func (mt *MockTokenList) GetTokenInfoByDenom(tokenDenom string) (TokenItem, bool) {

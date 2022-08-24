@@ -15,7 +15,7 @@ import (
 func main() {
 	misc.SetupBech32Prefix()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	config := config.DefaultConfig()
+	cfg := config.DefaultConfig()
 	err := golog.SetLogLevel("tss-lib", "INFO")
 	go func() {
 		http.ListenAndServe("0.0.0.0:8888", nil)
@@ -24,5 +24,5 @@ func main() {
 		panic(err)
 	}
 	common.InitLog("info", true, "oppyBridge_service")
-	bridge.NewBridgeService(config)
+	bridge.NewBridgeService(cfg)
 }

@@ -15,7 +15,7 @@ import (
 // MoveFound moves the fund for the public chain
 // our strategy is we need to run move fund at least twice to ensure the account is empty, even if
 // we move the fund success this round, we still need to run it again to 100% ensure the old pool is empty
-func (pi *Instance) MoveFound(wg *sync.WaitGroup, height int64, previousPool *bcommon.PoolInfo, ethClient *ethclient.Client) bool {
+func (pi *Instance) MoveFound(height int64, previousPool *bcommon.PoolInfo, ethClient *ethclient.Client) bool {
 	// we get the latest pool address and move funds to the latest pool
 	currentPool := pi.GetPool()
 	emptyERC20Tokens := atomic.NewBool(true)
@@ -112,16 +112,15 @@ func (pi *Instance) MoveFound(wg *sync.WaitGroup, height int64, previousPool *bc
 		// we add this account to "retry" to ensure it is the empty account in the next balance check
 		pi.AddMoveFundItem(previousPool, height+movefundretrygap)
 		return false
-	} else {
-		bnbIsMoved, isEmpty, err := pi.doMoveBNBFunds(previousPool, currentPool[1].EthAddress)
-		if isEmpty {
-			return true
-		}
-		pi.AddMoveFundItem(previousPool, height+movefundretrygap)
-		if err != nil || !bnbIsMoved {
-			zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v for bnb", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
-			return false
-		}
+	}
+	bnbIsMoved, isEmpty, err := pi.doMoveBNBFunds(previousPool, currentPool[1].EthAddress)
+	if isEmpty {
 		return true
 	}
+	pi.AddMoveFundItem(previousPool, height+movefundretrygap)
+	if err != nil || !bnbIsMoved {
+		zlog.Log().Err(err).Msgf("fail to move the fund from %v to %v for bnb", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
+		return false
+	}
+	return true
 }

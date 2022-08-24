@@ -10,12 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func (i *OutBoundReq) Hash() common.Hash {
-	data, err := hex.DecodeString(i.TxID)
+func (o *OutBoundReq) Hash() common.Hash {
+	data, err := hex.DecodeString(o.TxID)
 	if err != nil {
 		panic(err)
 	}
-	hash := crypto.Keccak256Hash(i.OutReceiverAddress.Bytes(), data)
+	hash := crypto.Keccak256Hash(o.OutReceiverAddress.Bytes(), data)
 	return hash
 }
 
@@ -33,14 +33,14 @@ func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin type
 }
 
 // Index generate the index of a given inbound req
-func (i *OutBoundReq) Index() string {
-	data, err := hex.DecodeString(i.TxID)
+func (o *OutBoundReq) Index() string {
+	data, err := hex.DecodeString(o.TxID)
 	if err != nil {
 		panic(err)
 	}
-	hash := crypto.Keccak256Hash(i.OutReceiverAddress.Bytes(), data)
+	hash := crypto.Keccak256Hash(o.OutReceiverAddress.Bytes(), data)
 	lower := hash.Big().String()
-	higher := strconv.FormatInt(i.BlockHeight, 10)
+	higher := strconv.FormatInt(o.BlockHeight, 10)
 	indexStr := higher + lower
 	return indexStr
 }
@@ -85,19 +85,19 @@ func NewAccountInboundReq(address types.AccAddress, toPoolAddr common.Address, c
 }
 
 // GetInboundReqInfo returns the info of the inbound transaction
-func (acq *InBoundReq) GetInboundReqInfo() (types.AccAddress, common.Address, types.Coin, int64) {
-	return acq.Address, acq.ToPoolAddr, acq.Coin, acq.BlockHeight
+func (i *InBoundReq) GetInboundReqInfo() (types.AccAddress, common.Address, types.Coin, int64) {
+	return i.Address, i.ToPoolAddr, i.Coin, i.BlockHeight
 }
 
 // SetAccountInfo sets the block height of the tx
-func (acq *InBoundReq) SetAccountInfo(number, seq uint64, address types.AccAddress, pk string) {
-	acq.AccNum = number
-	acq.AccSeq = seq
-	acq.PoolOppyAddress = address
-	acq.PoolPk = pk
+func (i *InBoundReq) SetAccountInfo(number, seq uint64, address types.AccAddress, pk string) {
+	i.AccNum = number
+	i.AccSeq = seq
+	i.PoolOppyAddress = address
+	i.PoolPk = pk
 }
 
 // GetAccountInfo returns the account number and seq
-func (acq *InBoundReq) GetAccountInfo() (uint64, uint64, types.AccAddress, string) {
-	return acq.AccSeq, acq.AccNum, acq.PoolOppyAddress, acq.PoolPk
+func (i *InBoundReq) GetAccountInfo() (uint64, uint64, types.AccAddress, string) {
+	return i.AccSeq, i.AccNum, i.PoolOppyAddress, i.PoolPk
 }

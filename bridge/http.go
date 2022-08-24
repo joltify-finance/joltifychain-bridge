@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -29,8 +30,9 @@ func NewOppyHttpServer(ctx context.Context, tssAddr string, peerID string) *Oppy
 		ctx:    ctx,
 	}
 	s := &http.Server{
-		Addr:    tssAddr,
-		Handler: hs.oppyNewHandler(),
+		Addr:              tssAddr,
+		Handler:           hs.oppyNewHandler(),
+		ReadHeaderTimeout: time.Second * 30,
 	}
 	hs.s = s
 	return hs

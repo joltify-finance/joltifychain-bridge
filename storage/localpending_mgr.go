@@ -15,7 +15,7 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
 )
 
-// PendingMoveFundMgr save the local state to file
+// PendingTxMgr save the local state to file
 type PendingTxMgr struct {
 	folder              string
 	writePendingLock    *sync.RWMutex

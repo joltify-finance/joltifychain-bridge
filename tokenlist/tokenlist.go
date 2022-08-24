@@ -25,13 +25,13 @@ type TokenList struct {
 	logger        zerolog.Logger
 }
 
-type TokenListI interface {
+type BridgeTokenListI interface {
 	GetTokenInfoByDenom(tokenDenom string) (TokenItem, bool)
 	GetTokenInfoByAddress(tokenAddress string) (TokenItem, bool)
 	GetAllExistedTokenAddresses() []string
 }
 
-// NewTxStateMgr create a new instance of the FileStateMgr which implements LocalStateManager
+// NewTokenList creates a new instance of the FileStateMgr which implements LocalStateManager
 func NewTokenList(filePath string, updateGap int64) (*TokenList, error) {
 	logger := log.With().Str("module", "tokenlist").Logger()
 	// process tokenlist.json file

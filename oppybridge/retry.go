@@ -116,16 +116,16 @@ func (oc *OppyChainInstance) RetryOppyChain() error {
 
 		// we stop the old connection though it may broken
 		// if we stop the channle directly, we do not need to unsubscribe it here
-		//ctx,cancel:=context.WithTimeout(context.Background(),time.Second*3)
-		//err=oc.WsClient.UnsubscribeAll(ctx,"oppyBridgeChurn")
-		//if err!=nil{
+		// ctx,cancel:=context.WithTimeout(context.Background(),time.Second*3)
+		// err=oc.WsClient.UnsubscribeAll(ctx,"oppyBridgeChurn")
+		// if err!=nil{
 		//	oc.logger.Error().Err(err).Msgf("we fail to unsubscribe")
-		//}
+		// }
 		//
-		//err=oc.WsClient.UnsubscribeAll(ctx,"oppyBridgeChurn")
-		//if err!=nil{
+		// err=oc.WsClient.UnsubscribeAll(ctx,"oppyBridgeChurn")
+		// if err!=nil{
 		//	oc.logger.Error().Err(err).Msgf("we fail to unsubscribe")
-		//}
+		// }
 		//
 
 		err = oc.WsClient.Stop()

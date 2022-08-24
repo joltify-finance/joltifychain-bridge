@@ -40,27 +40,27 @@ const (
 	AddrJUSD = "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
 )
 
-func (v *OutBoundTestSuite) SetupSuite() {
+func (o *OutBoundTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
 	cfg.BondDenom = "stake"
 	cfg.MinGasPrices = "0stake"
 	cfg.ChainID = config.ChainID
-	v.cfg = cfg
-	v.validatorky = keyring.NewInMemory()
+	o.cfg = cfg
+	o.validatorky = keyring.NewInMemory()
 	// now we put the mock pool list in the test
 	state := vaulttypes.GenesisState{}
 	stateStaking := stakingtypes.GenesisState{}
 
-	v.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[vaulttypes.ModuleName], &state))
-	v.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[stakingtypes.ModuleName], &stateStaking))
+	o.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[vaulttypes.ModuleName], &state))
+	o.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[stakingtypes.ModuleName], &stateStaking))
 
-	validators, err := genNValidator(3, v.validatorky)
-	v.Require().NoError(err)
+	validators, err := genNValidator(3, o.validatorky)
+	o.Require().NoError(err)
 	for i := 1; i < 5; i++ {
 		randPoolSk := ed25519.GenPrivKey()
 		poolPubKey, err := legacybech32.MarshalPubKey(legacybech32.AccPK, randPoolSk.PubKey()) // nolint
-		v.Require().NoError(err)
+		o.Require().NoError(err)
 
 		var nodes []sdk.AccAddress
 		for _, el := range validators {
@@ -82,25 +82,25 @@ func (v *OutBoundTestSuite) SetupSuite() {
 	state.IssueTokenList = append(state.IssueTokenList, &testToken)
 
 	buf, err := cfg.Codec.MarshalJSON(&state)
-	v.Require().NoError(err)
+	o.Require().NoError(err)
 	cfg.GenesisState[vaulttypes.ModuleName] = buf
 
 	var stateVault stakingtypes.GenesisState
-	v.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[stakingtypes.ModuleName], &stateVault))
+	o.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[stakingtypes.ModuleName], &stateVault))
 	stateVault.Params.MaxValidators = 3
 	state.Params.BlockChurnInterval = 1
 	buf, err = cfg.Codec.MarshalJSON(&stateVault)
-	v.Require().NoError(err)
+	o.Require().NoError(err)
 	cfg.GenesisState[stakingtypes.ModuleName] = buf
 
-	v.network = network.New(v.T(), cfg)
+	o.network = network.New(o.T(), cfg)
 
-	v.Require().NotNil(v.network)
+	o.Require().NotNil(o.network)
 
-	_, err = v.network.WaitForHeight(1)
-	v.Require().Nil(err)
-	v.grpc = v.network.Validators[0].ClientCtx
-	v.queryClient = tmservice.NewServiceClient(v.network.Validators[0].ClientCtx)
+	_, err = o.network.WaitForHeight(1)
+	o.Require().Nil(err)
+	o.grpc = o.network.Validators[0].ClientCtx
+	o.queryClient = tmservice.NewServiceClient(o.network.Validators[0].ClientCtx)
 }
 
 type account struct {

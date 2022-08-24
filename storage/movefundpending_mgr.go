@@ -20,7 +20,7 @@ type PendingMoveFundMgr struct {
 	logger           zerolog.Logger
 }
 
-// NewPendingTxStateMgr create a new instance of the FileStateMgr which implements LocalStateManager
+// NewMoveFundStateMgr creates a new instance of the FileStateMgr which implements LocalStateManager
 func NewMoveFundStateMgr(folder string) *PendingMoveFundMgr {
 	logger := log.With().Str("module", "movefundsave").Logger()
 	return &PendingMoveFundMgr{

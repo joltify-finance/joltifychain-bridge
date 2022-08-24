@@ -503,8 +503,8 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	})
 
 	dataToSign := []byte("hello")
-	hash := crypto.Keccak256Hash(dataToSign)
-	signature, err := crypto.Sign(hash.Bytes(), testKey)
+	hashData := crypto.Keccak256Hash(dataToSign)
+	signature, err := crypto.Sign(hashData.Bytes(), testKey)
 	assert.Nil(t, err)
 	r := signature[:32]
 	s := signature[32:64]

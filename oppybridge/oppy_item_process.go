@@ -94,13 +94,12 @@ func (oc *OppyChainInstance) IsEmpty() bool {
 		return false
 	})
 	return empty
-
 }
 
 func (oc *OppyChainInstance) Size() int {
 	i := 0
 	oc.RetryOutboundReq.Range(func(key, value interface{}) bool {
-		i += 1
+		i++
 		return true
 	})
 	return i

@@ -14,13 +14,12 @@ import (
 	"github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
-func (oc *OppyChainInstance) calculateGas() sdk.Coin {
+func (oc *OppyChainInstance) calculateGas() types.Coin {
 	fee := oc.GetPubChainFee()
 	expectedFee := types.NewCoin(config.OutBoundDenomFee, types.NewIntFromUint64(uint64(fee)))
 	return expectedFee
@@ -59,7 +58,7 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, txBlock
 	}
 	// we need to adjust the decimal as some token may not have 18 decimals
 	// in oppy, we apply 18 decimal
-	delta := tokenItem.Decimals - sdk.Precision
+	delta := tokenItem.Decimals - types.Precision
 	if delta != 0 {
 		adjustedTokenAmount := bcommon.AdjustInt(savedTx.Token.Amount, int64(delta))
 		savedTx.Token.Amount = adjustedTokenAmount
@@ -86,7 +85,7 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 	item := oc.processNativeFee(txID, tokenAddr, txBlockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[0].Amount)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
-		delta := tokenItem.Decimals - sdk.Precision
+		delta := tokenItem.Decimals - types.Precision
 		if delta != 0 {
 			adjustedTokenAmount := bcommon.AdjustInt(item.Token.Amount, int64(delta))
 			item.Token.Amount = adjustedTokenAmount
@@ -97,7 +96,6 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 		return nil
 	}
 	return nil
-
 }
 
 func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID string, txBlockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
@@ -131,7 +129,7 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 	item := oc.processErc20DemonAndFee(txID, tokenAddr, txBlockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
-		delta := tokenItem.Decimals - sdk.Precision
+		delta := tokenItem.Decimals - types.Precision
 		if delta != 0 {
 			adjustedTokenAmount := bcommon.AdjustInt(item.Token.Amount, int64(delta))
 			item.Token.Amount = adjustedTokenAmount
@@ -212,11 +210,9 @@ func (oc *OppyChainInstance) processNativeFee(txID string, tokenAddr string, txB
 		oc.pendingTx.Store(txID, &tx)
 		return nil
 	}
-
 	tx.Token = tx.Token.SubAmount(expectedFee.Amount)
 	oc.logger.Info().Msgf("we add the outbound tokens tx(%v):%v", txID, tx.Token.String())
 	return &tx
-
 }
 
 func (oc *OppyChainInstance) processErc20DemonAndFee(txID string, tokenAddr string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount, feeAmount types.Int) *OutboundTx {

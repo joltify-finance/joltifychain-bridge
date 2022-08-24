@@ -37,7 +37,7 @@ import (
 	zlog "github.com/rs/zerolog/log"
 )
 
-// we may need to increase it as we increase the time for keygen/keysign and join party
+// ROUNDBLOCK we may need to increase it as we increase the time for keygen/keysign and join party
 var (
 	ROUNDBLOCK = 100
 )
@@ -58,7 +58,6 @@ func NewBridgeService(config config.Config) {
 	}
 	if n > passcodeLength {
 		log.Fatalln("the passcode is too long")
-		cancel()
 		return
 	}
 
@@ -81,14 +80,12 @@ func NewBridgeService(config config.Config) {
 	tssServer, _, err := tssclient.StartTssServer(config.HomeDir, config.TssConfig)
 	if err != nil {
 		log.Fatalln("fail to start the tss")
-		cancel()
 		return
 	}
 
 	oppyBridge, err := oppybridge.NewOppyBridge(config.OppyChain.GrpcAddress, config.OppyChain.WsAddress, tssServer, tl)
 	if err != nil {
 		log.Fatalln("fail to create the invoice oppy_bridge", err)
-		cancel()
 		return
 	}
 
@@ -97,7 +94,6 @@ func NewBridgeService(config config.Config) {
 	dat, err := ioutil.ReadFile(keyringPath)
 	if err != nil {
 		log.Fatalln("error in read keyring file")
-		cancel()
 		return
 	}
 
@@ -545,7 +541,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						zlog.Logger.Error().Err(err).Msg("fail to dial the websocket")
 					}
 					if ethClient != nil {
-						isMoveFund = pi.MoveFound(wg, height, previousPool, ethClient)
+						isMoveFund = pi.MoveFound(height, previousPool, ethClient)
 						ethClient.Close()
 					}
 				}
@@ -896,7 +892,6 @@ func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain
 }
 
 func putOnHoldBlockOutBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain *oppybridge.OppyChainInstance) {
-
 	grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")

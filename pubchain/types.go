@@ -32,8 +32,6 @@ const (
 	inboundprosSize     = 512
 	sbchannelsize       = 20000
 	chainQueryTimeout   = time.Second * 15
-	GasLimit            = 2100000
-	GasPrice            = "0.00000001"
 	ROUNDBLOCK          = 50
 	submitBackoff       = time.Second * 4
 	GroupBlockGap       = 8
@@ -83,7 +81,7 @@ type Instance struct {
 	RetryInboundReq      *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq          *sync.Map
 	CurrentHeight        int64
-	TokenList            tokenlist.TokenListI
+	TokenList            tokenlist.BridgeTokenListI
 	wg                   *sync.WaitGroup
 	SubChannelNow        chan *types.Header
 	ChannelQueue         chan *types.Header
@@ -93,7 +91,7 @@ type Instance struct {
 }
 
 // NewChainInstance initialize the oppy_bridge entity
-func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.TokenListI, wg *sync.WaitGroup) (*Instance, error) {
+func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, wg *sync.WaitGroup) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
 
 	ethClient, err := ethclient.Dial(ws)

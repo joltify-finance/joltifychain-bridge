@@ -209,7 +209,6 @@ func (oc *OppyChainInstance) genSendTx(key keyring.Info, sdkMsg []sdk.Msg, accSe
 			},
 			Sequence: accSeq,
 		}
-
 	}
 
 	err = txBuilder.SetSignatures(sigV2)
