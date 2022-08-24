@@ -117,7 +117,7 @@ func NewBridgeService(config config.Config) {
 		cancel()
 		return
 	}
-	tssHTTPServer := NewOppyHttpServer(ctx, config.TssConfig.HTTPAddr, oppyBridge.GetTssNodeID())
+	tssHTTPServer := NewOppyHttpServer(ctx, config.TssConfig.HTTPAddr, oppyBridge.GetTssNodeID(), oppyBridge)
 
 	wg.Add(1)
 	ret := tssHTTPServer.Start(&wg)

@@ -2,8 +2,11 @@ package bridge
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
 	"net/http"
 	"sync"
 	"time"
@@ -16,14 +19,15 @@ import (
 
 // OppyHTTPServer provide http endpoint for tss server
 type OppyHTTPServer struct {
-	logger zerolog.Logger
-	s      *http.Server
-	peerID string
-	ctx    context.Context
+	logger     zerolog.Logger
+	s          *http.Server
+	peerID     string
+	ctx        context.Context
+	oppyBridge *oppybridge.OppyChainInstance
 }
 
 // NewOppyHttpServer should only listen to the loopback
-func NewOppyHttpServer(ctx context.Context, tssAddr string, peerID string) *OppyHTTPServer {
+func NewOppyHttpServer(ctx context.Context, tssAddr string, peerID string, oppyBridge *oppybridge.OppyChainInstance) *OppyHTTPServer {
 	hs := &OppyHTTPServer{
 		logger: log.With().Str("module", "http").Logger(),
 		peerID: peerID,
@@ -35,6 +39,7 @@ func NewOppyHttpServer(ctx context.Context, tssAddr string, peerID string) *Oppy
 		ReadHeaderTimeout: time.Second * 30,
 	}
 	hs.s = s
+	hs.oppyBridge = oppyBridge
 	return hs
 }
 
@@ -59,11 +64,45 @@ func (t *OppyHTTPServer) getP2pIDHandler(w http.ResponseWriter, _ *http.Request)
 	}
 }
 
+func (t *OppyHTTPServer) queryPendingTxHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	address := r.URL.Query().Get("address")
+
+	defer func() {
+		if err := r.Body.Close(); nil != err {
+			t.logger.Error().Err(err).Msg("fail to close request body")
+		}
+	}()
+
+	_, err := sdk.AccAddressFromBech32(address)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	result := t.oppyBridge.QueryPendingTx(address)
+
+	retData, err := json.Marshal(result)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Add("Access-Control-Allow-Origin", "*")
+	_, err = w.Write(retData)
+	if err != nil {
+		t.logger.Error().Err(err).Msg("fail to write to response")
+	}
+}
+
 // NewHandler registers the API routes and returns a new HTTP handler
 func (t *OppyHTTPServer) oppyNewHandler() http.Handler {
 	router := mux.NewRouter()
 	router.Handle("/p2pid", http.HandlerFunc(t.getP2pIDHandler)).Methods(http.MethodGet)
 	router.Handle("/metrics", promhttp.Handler())
+	router.Handle("/pending_tx", http.HandlerFunc(t.queryPendingTxHandler)).Methods(http.MethodGet)
 	router.Use(logMiddleware())
 	return router
 }

@@ -169,7 +169,6 @@ func (pi *Instance) SendNativeTokenForMoveFund(signerPk string, sender, receiver
 
 // SendTokenBatch sends the token to the public chain
 func (pi *Instance) SendTokenBatch(index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
-
 	txo, err := pi.composeTxBatch(index, sender, pi.chainID, tssReqChan, tssRespChan)
 	if err != nil {
 		return common.Hash{}, err

@@ -91,10 +91,13 @@ type info struct {
 
 type OutboundTx struct {
 	OutReceiverAddress common.Address `json:"receiver_address"`
+	FromAddress        string         `json:"from_address"` // this item is used in query pending to to match a given sender
+	ChainID            string         `json:"chain_id"`
 	BlockHeight        uint64         `json:"block_height"`
 	Token              sdk.Coin       `json:"token"`
 	TokenAddr          string         `json:"token_addr"`
 	Fee                sdk.Coin       `json:"fee"`
+	FeeWanted          sdk.Coin       `json:"fee_wanted"`
 	TxID               string         `json:"txid"`
 }
 
