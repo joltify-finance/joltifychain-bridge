@@ -265,11 +265,9 @@ func (pi *Instance) getPendingNonceWithLock(ctx context.Context, poolAddress com
 			err := pi.RetryPubChain()
 			if err != nil {
 				pi.logger.Error().Err(err).Msgf("fail to reset the public chain")
-
 			}
 		}()
 	}
-
 	return nonce, err
 }
 
@@ -291,7 +289,6 @@ func (pi *Instance) sendTransactionWithLock(ctx context.Context, tx *types.Trans
 			err := pi.RetryPubChain()
 			if err != nil {
 				pi.logger.Error().Err(err).Msgf("fail to reset the public chain")
-
 			}
 		}()
 	}

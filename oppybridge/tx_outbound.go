@@ -30,7 +30,6 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, txBlock
 	if !tokenExist || msg.Amount[0].GetDenom() != config.OutBoundDenomFee {
 		return errors.New("token is not on our token list or not fee demon")
 	}
-	tokenAddr := tokenItem.TokenAddr
 
 	dat, ok := oc.pendingTx.LoadAndDelete(memo.TopupID)
 	if !ok {
@@ -40,13 +39,7 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, txBlock
 	expectedFee := savedTx.FeeWanted
 
 	if savedTx.TokenAddr == config.NativeSign {
-		savedTx.Token = savedTx.Token.AddAmount(msg.Amount[0].Amount)
-		if !savedTx.Token.IsGTE(expectedFee) {
-			oc.logger.Error().Msgf("the transaction is invalid,as fee we want is %v, and you have paid %v", expectedFee.String(), savedTx.Fee.String())
-			oc.pendingTx.Store(memo.TopupID, savedTx)
-			return nil
-		}
-		savedTx.Token = savedTx.Token.SubAmount(expectedFee.Amount)
+		oc.logger.Warn().Msgf("topping up native token is not supported")
 	} else {
 		// now we process the erc20 topup
 		savedTx.Fee = savedTx.Fee.AddAmount(msg.Amount[0].Amount)
@@ -64,9 +57,9 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, txBlock
 		savedTx.Token.Amount = adjustedTokenAmount
 	}
 
-	itemReq := bcommon.NewOutboundReq(memo.TopupID, savedTx.OutReceiverAddress, currEthAddr, savedTx.Token, tokenAddr, txBlockHeight)
+	itemReq := bcommon.NewOutboundReq(memo.TopupID, savedTx.OutReceiverAddress, currEthAddr, savedTx.Token, savedTx.TokenAddr, txBlockHeight)
 	oc.AddItem(&itemReq)
-	oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", txBlockHeight, oc.CurrentHeight)
+	oc.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v) to %s with amount %v", txBlockHeight, oc.CurrentHeight, savedTx.OutReceiverAddress, savedTx.Token)
 	return nil
 }
 
@@ -210,8 +203,7 @@ func (oc *OppyChainInstance) processNativeFee(txID, fromAddress string, tokenAdd
 	AmountTransfer := demonAmount.Sub(expectedFee.Amount)
 
 	if AmountTransfer.IsNegative() {
-		oc.logger.Warn().Msgf("The amount to transfer is smaller than the fee")
-		oc.pendingTx.Store(txID, &tx)
+		oc.logger.Warn().Msgf("The amount to transfer is smaller than the fee %v, we drop this tx", expectedFee.String())
 		return nil
 	}
 	tx.Token = tx.Token.SubAmount(expectedFee.Amount)
