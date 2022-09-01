@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	_ "net/http/pprof"
 
 	golog "github.com/ipfs/go-log"
@@ -17,9 +16,6 @@ func main() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	cfg := config.DefaultConfig()
 	err := golog.SetLogLevel("tss-lib", "INFO")
-	go func() {
-		http.ListenAndServe("0.0.0.0:8888", nil)
-	}()
 	if err != nil {
 		panic(err)
 	}

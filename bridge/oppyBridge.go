@@ -13,14 +13,17 @@ import (
 	"path"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/cenkalti/backoff"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/pkg/errors"
 	"github.com/tendermint/tendermint/types"
 	"gitlab.com/oppy-finance/oppy-bridge/storage"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"go.uber.org/atomic"
+	"golang.org/x/crypto/ssh/terminal"
 	"google.golang.org/grpc"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -30,11 +33,10 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/monitor"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
 
+	zlog "github.com/rs/zerolog/log"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
 	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
-
-	zlog "github.com/rs/zerolog/log"
 )
 
 // ROUNDBLOCK we may need to increase it as we increase the time for keygen/keysign and join party
@@ -42,8 +44,30 @@ var (
 	ROUNDBLOCK = 100
 )
 
+func readPassword() ([]byte, error) {
+	var fd int
+	fmt.Printf("please input the password:")
+	if terminal.IsTerminal(syscall.Stdin) {
+		fd = syscall.Stdin
+	} else {
+		tty, err := os.Open("/dev/tty")
+		if err != nil {
+			return nil, errors.Wrap(err, "error allocating terminal")
+		}
+		defer tty.Close()
+		fd = int(tty.Fd())
+	}
+
+	pass, err := terminal.ReadPassword(fd)
+	return pass, err
+}
+
 // NewBridgeService starts the new bridge service
 func NewBridgeService(config config.Config) {
+	pass, err := readPassword()
+	if err != nil {
+		log.Fatalf("fail to read the password with err %v\n", err)
+	}
 	wg := sync.WaitGroup{}
 	ctx, cancel := context.WithCancel(context.Background())
 	c := make(chan os.Signal, 1)
@@ -97,12 +121,13 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	// fixme need to update the passcode
-	err = oppyBridge.Keyring.ImportPrivKey("operator", string(dat), "12345678")
+	err = oppyBridge.Keyring.ImportPrivKey("operator", string(dat), string(pass))
 	if err != nil {
 		cancel()
 		return
 	}
+	pass = []byte{}
+	_ = pass
 
 	defer func() {
 		err := oppyBridge.TerminateBridge()
