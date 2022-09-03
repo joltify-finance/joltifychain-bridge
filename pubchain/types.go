@@ -182,17 +182,18 @@ func (pi *Instance) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, uint64, er
 	pi.ethClientLocker.RLock()
 	gasPrice, err1 := pi.EthClient.SuggestGasPrice(ctx)
 	mockMsg := ethereum.CallMsg{
-		From:     common.HexToAddress("0xbDf7Fb0Ad9b0D722ea54D808b79751608E7AE991"),
+		From:     common.HexToAddress("0x2cDaa3f15f3db73a6E75c462975EBFca9B5A56ce"),
 		To:       nil,
 		GasPrice: gasPrice,
 		Value:    big.NewInt(2),
-		Data:     []byte("hello"),
+		//Data:     []byte("hello"),
 	}
 	gas, err2 := pi.EthClient.EstimateGas(ctx, mockMsg)
 	pi.ethClientLocker.RUnlock()
 	if err1 != nil || err2 != nil {
 		// we reset the ethcliet
-		pi.logger.Error().Err(err1).Msgf("error of the ethclient")
+		pi.logger.Error().Err(err1).Msgf("error of the gas price estimate")
+		pi.logger.Error().Err(err2).Msgf("error of the gas estimate")
 		pi.wg.Add(1)
 		go func() {
 			defer pi.wg.Done()
