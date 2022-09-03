@@ -72,8 +72,8 @@ func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Addr
 	if nonce != nil {
 		txo.Nonce = nonce
 	}
-	pi.logger.Info().Msgf("we have get the signature for native token")
 	sendAmount := new(big.Int).Sub(amount, totalFee)
+	pi.logger.Info().Msgf("we send %v with paid fee %v\n", amount, totalFee)
 	txo.Value = sendAmount
 
 	var data []byte

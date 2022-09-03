@@ -808,7 +808,7 @@ func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstanc
 				err := pi.CheckTxStatus(txHash)
 				if err == nil {
 					failedOutBound.Store(0)
-					tick := html.UnescapeString("&#" + "128228" + ";")
+					tick := html.UnescapeString("&#" + "8599" + ";")
 					zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, fromAddr, toAddr, amount.String())
 					// now we submit our public chain tx to oppychain
 					localSubmitLocker.Lock()
