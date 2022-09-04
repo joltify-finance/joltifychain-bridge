@@ -29,17 +29,18 @@ import (
 )
 
 const (
-	inboundprosSize     = 512
-	sbchannelsize       = 20000
-	chainQueryTimeout   = time.Second * 15
-	ROUNDBLOCK          = 50
-	submitBackoff       = time.Second * 4
-	GroupBlockGap       = 8
-	GroupSign           = 4
-	PRICEUPDATEGAP      = 10
-	OppyContractAddress = "0x94277968dff216265313657425d9d7577ad32dd1"
-	movefundretrygap    = 3
+	inboundprosSize   = 512
+	sbchannelsize     = 20000
+	chainQueryTimeout = time.Second * 15
+	ROUNDBLOCK        = 50
+	submitBackoff     = time.Second * 4
+	GroupBlockGap     = 8
+	GroupSign         = 4
+	PRICEUPDATEGAP    = 10
+	movefundretrygap  = 3
 )
+
+var OppyContractAddress = "0x66fff09f83bfce2ed9240fa6a1f7e96ba166ddf7"
 
 type InboundTx struct {
 	TxID           string         `json:"tx_id"` // this variable is used for locally saving and loading
