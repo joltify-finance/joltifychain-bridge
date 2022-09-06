@@ -428,6 +428,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						continue
 					}
 
+					updateHealthCheck(pi, metric)
+
 					if amISigner {
 						// here we process the outbound tx
 						for _, el := range processableBlock.Data.Txs {
@@ -656,7 +658,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					processEachOutBound(oppyGrpc, oppyChain, pi, itemsRecv, failedOutbound, outBoundWait, &localSubmitLocker)
 				}()
 
-			case <-time.After(time.Second * 15):
+			case <-time.After(time.Second * 5):
 				zlog.Logger.Info().Msgf("we should not reach here")
 				err := pi.RetryPubChain()
 				if err != nil {
@@ -946,4 +948,13 @@ func putOnHoldBlockOutBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChai
 		}(el)
 	}
 	wgDump.Wait()
+}
+
+func updateHealthCheck(pi *pubchain.Instance, metric *monitor.Metric) {
+	err := pi.CheckPubChainHealthWithLock()
+	if err != nil {
+		return
+	}
+	metric.UpdateStatus()
+
 }

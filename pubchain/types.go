@@ -135,6 +135,15 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.B
 	}, nil
 }
 
+func (pi *Instance) CheckPubChainHealthWithLock() error {
+	pi.ethClientLocker.RLock()
+	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
+	defer cancel()
+	_, err := pi.EthClient.BlockByNumber(ctx, nil)
+	pi.ethClientLocker.RUnlock()
+	return err
+}
+
 func (pi *Instance) GetBlockByNumberWithLock(number *big.Int) (*types.Block, error) {
 	pi.ethClientLocker.RLock()
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
