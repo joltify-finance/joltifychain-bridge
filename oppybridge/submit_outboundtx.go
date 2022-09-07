@@ -3,6 +3,7 @@ package oppybridge
 import (
 	"context"
 	"errors"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -14,7 +15,7 @@ import (
 )
 
 // SubmitOutboundTx submit the outbound record to oppy chain
-func (oc *OppyChainInstance) SubmitOutboundTx(conn grpc1.ClientConn, operator keyring.Info, requestID string, blockHeight int64, pubchainTx string) error {
+func (oc *OppyChainInstance) SubmitOutboundTx(conn grpc1.ClientConn, operator keyring.Info, requestID string, blockHeight int64, pubchainTx string, fee sdk.Coins) error {
 	var err error
 	if operator == nil {
 		operator, err = oc.Keyring.Key("operator")
@@ -34,6 +35,7 @@ func (oc *OppyChainInstance) SubmitOutboundTx(conn grpc1.ClientConn, operator ke
 		RequestID:   requestID,
 		OutboundTx:  pubchainTx,
 		BlockHeight: strconv.FormatInt(blockHeight, 10),
+		Feecoin:     fee,
 	}
 
 	ok, _, err := oc.composeAndSend(conn, operator, &outboundMsg, accSeq, accNum, nil, operator.GetAddress())
@@ -62,7 +64,7 @@ func (oc *OppyChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (str
 
 	target := ""
 	for key, value := range resp.OutboundTx.Items {
-		if len(value.Address) >= int(min) {
+		if len(value.Entry) >= int(min) {
 			target = key
 			break
 		}

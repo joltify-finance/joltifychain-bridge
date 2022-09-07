@@ -57,7 +57,7 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, txBlock
 		savedTx.Token.Amount = adjustedTokenAmount
 	}
 
-	itemReq := bcommon.NewOutboundReq(memo.TopupID, savedTx.OutReceiverAddress, currEthAddr, savedTx.Token, savedTx.TokenAddr, txBlockHeight)
+	itemReq := bcommon.NewOutboundReq(memo.TopupID, savedTx.OutReceiverAddress, currEthAddr, savedTx.Token, savedTx.TokenAddr, txBlockHeight, types.Coins{savedTx.Fee})
 	oc.AddItem(&itemReq)
 	oc.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v) to %s with amount %v", txBlockHeight, oc.CurrentHeight, savedTx.OutReceiverAddress, savedTx.Token)
 	return nil
@@ -83,7 +83,7 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 			adjustedTokenAmount := bcommon.AdjustInt(item.Token.Amount, int64(delta))
 			item.Token.Amount = adjustedTokenAmount
 		}
-		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight)
+		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight, types.Coins{item.FeeWanted})
 		oc.AddItem(&itemReq)
 		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", txBlockHeight, oc.CurrentHeight)
 		return nil
@@ -127,7 +127,7 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 			adjustedTokenAmount := bcommon.AdjustInt(item.Token.Amount, int64(delta))
 			item.Token.Amount = adjustedTokenAmount
 		}
-		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight)
+		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight, types.Coins{item.Fee})
 		oc.AddItem(&itemReq)
 		oc.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v)", txBlockHeight, oc.CurrentHeight)
 		return nil

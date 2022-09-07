@@ -40,7 +40,7 @@ const (
 	movefundretrygap  = 3
 )
 
-var OppyContractAddress = "0x66fff09f83bfce2ed9240fa6a1f7e96ba166ddf7"
+var OppyContractAddress = "0x94277968dff216265313657425d9d7577ad32dd1"
 
 type InboundTx struct {
 	TxID           string         `json:"tx_id"` // this variable is used for locally saving and loading

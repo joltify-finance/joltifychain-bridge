@@ -747,7 +747,6 @@ func processInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi
 }
 
 func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, items []*common2.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
-
 	checkWg := sync.WaitGroup{}
 	needToBeProcessed := make([]*common2.OutBoundReq, 0)
 	needToBeProcessedLock := sync.Mutex{}
@@ -831,7 +830,7 @@ func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstanc
 						if err != nil {
 							panic("blockheigh convert should never fail")
 						}
-						errInner := oppyChain.SubmitOutboundTx(grpcClient, nil, item.Hash().Hex(), poolCreateHeight, txHash)
+						errInner := oppyChain.SubmitOutboundTx(grpcClient, nil, item.Hash().Hex(), poolCreateHeight, txHash, item.Fee)
 						return errInner
 					}
 					err := backoff.Retry(op, bf)

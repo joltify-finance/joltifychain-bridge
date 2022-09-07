@@ -74,7 +74,7 @@ func (pi *Instance) ProcessNewBlock(number *big.Int) error {
 		pi.logger.Error().Err(err).Msg("fail to retrieve the block")
 		return err
 	}
-	//we need to put the block height in which we find the tx
+	// we need to put the block height in which we find the tx
 	pi.processEachBlock(block, number.Int64())
 	return nil
 }

@@ -7,11 +7,16 @@ all: lint build
 clear:
 	clear
 
+
+
+
+BUILD_FLAGS := -ldflags '$(ldflags)'
+
 testnet: go.sum
-	go install   -ldflags "-X pubchain.OppyContractAddress=\"0x94277968dff216265313657425d9d7577ad32dd1\""       ./cmd/oppyBridge.go
+	go install   -ldflags "-X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddress=0x94277968dff216265313657425d9d7577ad32dd1"       ./cmd/oppyBridge.go
 
 install: go.sum
-	go install    -ldflags "-X pubchain.OppyContractAddress=\"0x66fff09f83bfce2ed9240fa6a1f7e96ba166ddf7\""   ./cmd/oppyBridge.go
+	go install   -ldflags "-X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddress=0x66fff09f83bfce2ed9240fa6a1f7e96ba166ddf7"       ./cmd/oppyBridge.go
 
 go.sum: go.mod
 	@echo "--> Ensure dependencies have not been modified"
