@@ -529,6 +529,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 				_, err = oppyChain.GetLastBlockHeightWithLock()
 				if err != nil {
 					zlog.Error().Err(err).Msgf("we have reset the oppychain grpc as it is faild to be connected")
+					continue
 				}
 
 				// process block with rollback gap
