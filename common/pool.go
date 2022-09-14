@@ -27,6 +27,7 @@ type OutBoundReq struct {
 	Nonce              uint64         `json:"nonce"`
 	SubmittedTxHash    string         `json:"submitted_tx_hash"` // this item is used for checking whether it is accepted on pubchain
 	Fee                types.Coins    `json:"fee"`
+	FeeToValidator     types.Coins    `json:"fee_to_validator"`
 }
 
 // InBoundReq is the account that top up account info to oppy pub_chain

@@ -8,7 +8,8 @@ const (
 
 	TxTimeout                   = 300
 	GASFEERATIO                 = "1.5"
-	PubChainGASFEERATIO         = 1.5
+	PubChainGASFEERATIO         = 3
+	FeeToValidatorGAP           = "0.3666666"
 	MoveFundPubChainGASFEERATIO = 1.1
 	MINCHECKBLOCKGAP            = 6
 )

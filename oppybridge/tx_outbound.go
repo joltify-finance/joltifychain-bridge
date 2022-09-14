@@ -57,9 +57,13 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, txBlock
 		savedTx.Token.Amount = adjustedTokenAmount
 	}
 
-	itemReq := bcommon.NewOutboundReq(memo.TopupID, savedTx.OutReceiverAddress, currEthAddr, savedTx.Token, savedTx.TokenAddr, txBlockHeight, types.Coins{savedTx.Fee})
+	amount := savedTx.FeeWanted.Amount.ToDec()
+	amount = amount.Mul(types.MustNewDecFromStr(config.FeeToValidatorGAP))
+	feeToValidator := savedTx.Fee.Sub(types.NewCoin(savedTx.FeeWanted.Denom, amount.TruncateInt()))
+
+	itemReq := bcommon.NewOutboundReq(memo.TopupID, savedTx.OutReceiverAddress, currEthAddr, savedTx.Token, savedTx.TokenAddr, txBlockHeight, types.Coins{savedTx.Fee}, types.Coins{feeToValidator})
 	oc.AddItem(&itemReq)
-	oc.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v) to %s with amount %v", txBlockHeight, oc.CurrentHeight, savedTx.OutReceiverAddress, savedTx.Token)
+	oc.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v) with fee %v paid to validators", txBlockHeight, oc.CurrentHeight, feeToValidator.String())
 	return nil
 }
 
@@ -83,9 +87,13 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 			adjustedTokenAmount := bcommon.AdjustInt(item.Token.Amount, int64(delta))
 			item.Token.Amount = adjustedTokenAmount
 		}
-		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight, types.Coins{item.FeeWanted})
+
+		amount := item.FeeWanted.Amount.ToDec()
+		amount = amount.Mul(types.MustNewDecFromStr(config.FeeToValidatorGAP))
+		feeToValidator := item.Fee.Sub(types.NewCoin(item.FeeWanted.Denom, amount.TruncateInt()))
+		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight, types.Coins{item.FeeWanted}, types.Coins{feeToValidator})
 		oc.AddItem(&itemReq)
-		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v)", txBlockHeight, oc.CurrentHeight)
+		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v), with fee %v paid to validators", txBlockHeight, oc.CurrentHeight, feeToValidator.String())
 		return nil
 	}
 	return nil
@@ -127,9 +135,13 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 			adjustedTokenAmount := bcommon.AdjustInt(item.Token.Amount, int64(delta))
 			item.Token.Amount = adjustedTokenAmount
 		}
-		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight, types.Coins{item.Fee})
+		amount := item.FeeWanted.Amount.ToDec()
+		amount = amount.Mul(types.MustNewDecFromStr(config.FeeToValidatorGAP))
+		feeToValidator := item.Fee.Sub(types.NewCoin(item.FeeWanted.Denom, amount.TruncateInt()))
+
+		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight, types.Coins{item.Fee}, types.Coins{feeToValidator})
 		oc.AddItem(&itemReq)
-		oc.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v)", txBlockHeight, oc.CurrentHeight)
+		oc.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v) with fee %v paid to validators", txBlockHeight, oc.CurrentHeight, types.Coins{feeToValidator})
 		return nil
 	}
 	return nil

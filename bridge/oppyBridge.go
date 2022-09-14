@@ -831,7 +831,7 @@ func processEachOutBound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstanc
 						if err != nil {
 							panic("blockheigh convert should never fail")
 						}
-						errInner := oppyChain.SubmitOutboundTx(grpcClient, nil, item.Hash().Hex(), poolCreateHeight, txHash, item.Fee)
+						errInner := oppyChain.SubmitOutboundTx(grpcClient, nil, item.Hash().Hex(), poolCreateHeight, txHash, item.FeeToValidator)
 						return errInner
 					}
 					err := backoff.Retry(op, bf)
