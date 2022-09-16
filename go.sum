@@ -2031,8 +2031,8 @@ github.com/yvasiyarov/gorelic v0.0.0-20141212073537-a9bba5b9ab50/go.mod h1:NUSPS
 github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f/go.mod h1:GlGEuHIJweS1mbCqG+7vt2nvWLzLLnRHbXz5JKd/Qbg=
 github.com/zondax/hid v0.9.0 h1:eiT3P6vNxAEVxXMw66eZUAAnU2zD33JBkfG/EnfAKl8=
 github.com/zondax/hid v0.9.0/go.mod h1:l5wttcP0jwtdLjqjMMWFVEE7d1zO0jvSPA9OPZxWpEM=
-gitlab.com/oppy-finance/oppychain v1.1.7 h1:epN+qGVH1+s9fUYfLbtv/n+DJT7vgASjw+hPTeT4miU=
-gitlab.com/oppy-finance/oppychain v1.1.7/go.mod h1:07L2ebTCCBS2oXL9OMrN/uAE57zNb9/ktYRQbvE7rw0=
+gitlab.com/oppy-finance/oppychain v1.1.8 h1:wQnBMAHD4GabjgUDIhmcZWPknmSrXzxIBiNmtbPoSU0=
+gitlab.com/oppy-finance/oppychain v1.1.8/go.mod h1:07L2ebTCCBS2oXL9OMrN/uAE57zNb9/ktYRQbvE7rw0=
 gitlab.com/thorchain/tss/tss-lib v0.1.2 h1:ZVjr2lKxDCwCEXmacmT4EjChjeDsER4Cv7/RValj20w=
 gitlab.com/thorchain/tss/tss-lib v0.1.2/go.mod h1:pEM3W/1inIzmdQn9IY9pA0MkG1bTGKhsSivxizeyyt4=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=

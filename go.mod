@@ -19,7 +19,7 @@ require (
 	github.com/stretchr/testify v1.7.1
 	github.com/tendermint/btcd v0.1.1
 	github.com/tendermint/tendermint v0.34.19
-	gitlab.com/oppy-finance/oppychain v1.1.7
+	gitlab.com/oppy-finance/oppychain v1.1.8
 	go.uber.org/atomic v1.9.0
 	golang.org/x/crypto v0.0.0-20220518034528-6f7dac969898
 	google.golang.org/grpc v1.48.0
