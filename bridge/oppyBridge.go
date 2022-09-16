@@ -428,8 +428,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						continue
 					}
 
-					updateHealthCheck(pi, metric)
-
 					if amISigner {
 						// here we process the outbound tx
 						for _, el := range processableBlock.Data.Txs {
@@ -531,6 +529,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					zlog.Error().Err(err).Msgf("we have reset the oppychain grpc as it is faild to be connected")
 					continue
 				}
+
+				updateHealthCheck(pi, metric)
 
 				// process block with rollback gap
 				processableBlockHeight := big.NewInt(0).Sub(head.Number, big.NewInt(pubRollbackGap))
