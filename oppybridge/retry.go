@@ -10,9 +10,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-// AddSubscribe add the subscirbe to the chain
+// AddSubscribe add the subscribe to the chain
 func (oc *OppyChainInstance) AddSubscribe(ctx context.Context) error {
-
 	var err error
 	query := "complete_churn.churn = 'oppy_churn'"
 	oc.CurrentNewValidator, err = oc.WsClient.Subscribe(ctx, "oppyBridgeChurn", query, capacity)
@@ -82,7 +81,6 @@ func (oc *OppyChainInstance) UpdateSubscribe(ctx context.Context) error {
 }
 
 func (oc *OppyChainInstance) RetryOppyChain() error {
-
 	_, err1 := GetLastBlockHeight(oc.GrpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
@@ -95,7 +93,6 @@ func (oc *OppyChainInstance) RetryOppyChain() error {
 
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second*10), 3)
 	op := func() error {
-
 		grpcClient, err := grpc.Dial(oc.grpcAddr, grpc.WithInsecure())
 		if err != nil {
 			return err

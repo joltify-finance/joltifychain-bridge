@@ -1,8 +1,9 @@
 package validators
 
 import (
-	"github.com/cosmos/cosmos-sdk/types"
 	"sync"
+
+	"github.com/cosmos/cosmos-sdk/types"
 )
 
 // Validator defines the entities for the validators

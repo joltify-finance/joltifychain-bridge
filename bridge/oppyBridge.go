@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	tetypes "github.com/tendermint/tendermint/types" //nolint:gofumpt,golint,typecheck
 	"html"
 	"io/ioutil"
 	"log"
@@ -19,11 +20,10 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
-	"github.com/tendermint/tendermint/types"
 	"gitlab.com/oppy-finance/oppy-bridge/storage"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	"go.uber.org/atomic"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 	"google.golang.org/grpc"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -47,7 +47,7 @@ var (
 func readPassword() ([]byte, error) {
 	var fd int
 	fmt.Printf("please input the password:")
-	if terminal.IsTerminal(syscall.Stdin) {
+	if term.IsTerminal(syscall.Stdin) {
 		fd = syscall.Stdin
 	} else {
 		tty, err := os.Open("/dev/tty")
@@ -58,7 +58,7 @@ func readPassword() ([]byte, error) {
 		fd = int(tty.Fd())
 	}
 
-	pass, err := terminal.ReadPassword(fd)
+	pass, err := term.ReadPassword(fd)
 	return pass, err
 }
 
@@ -317,7 +317,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					continue
 				}
 
-				_, ok := vals.Data.(types.EventDataNewBlock)
+				_, ok := vals.Data.(tetypes.EventDataNewBlock)
 				if !ok {
 					continue
 				}
@@ -353,7 +353,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					continue
 				}
 
-				currentProcessBlockHeight := block.Data.(types.EventDataNewBlock).Block.Height
+				currentProcessBlockHeight := block.Data.(tetypes.EventDataNewBlock).Block.Height
 
 				ok, _ := oppyChain.CheckAndUpdatePool(grpcClient, latestHeight)
 				if !ok {
@@ -956,5 +956,4 @@ func updateHealthCheck(pi *pubchain.Instance, metric *monitor.Metric) {
 		return
 	}
 	metric.UpdateStatus()
-
 }

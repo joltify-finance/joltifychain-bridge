@@ -9,7 +9,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types"
 )
 
-//NewValidator initialize a validator set
+// NewValidator initialize a validator set
 func NewValidator() *ValidatorSet {
 	return &ValidatorSet{
 		&sync.RWMutex{},
@@ -60,7 +60,7 @@ func (v *ValidatorSet) UpdateValidatorSet(validatorUpdates []*vaulttypes.Validat
 	return nil
 }
 
-//GetActiveValidators get the active validators
+// GetActiveValidators get the active validators
 func (v *ValidatorSet) GetActiveValidators() ([]*Validator, int64) {
 	v.locker.RLock()
 	defer v.locker.RUnlock()

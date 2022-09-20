@@ -3,6 +3,11 @@ package oppybridge
 import (
 	"context"
 	"encoding/base64"
+	"strconv"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -16,10 +21,6 @@ import (
 	"gitlab.com/oppy-finance/oppychain/testutil/network"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 	"go.uber.org/atomic"
-	"strconv"
-	"sync"
-	"testing"
-	"time"
 )
 
 type EventTestSuite struct {

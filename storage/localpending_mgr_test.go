@@ -2,13 +2,14 @@ package storage
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
-	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
 	"math/rand"
 	"os"
 	"path"
 	"testing"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/simulation"

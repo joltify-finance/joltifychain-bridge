@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	zlog "github.com/rs/zerolog/log"
 	"math/big"
 	"sync"
 	"testing"
+
+	zlog "github.com/rs/zerolog/log"
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
@@ -122,12 +123,11 @@ func TestSendToken(t *testing.T) {
 	tss := TssMock{
 		sk: &sk,
 	}
-	websocketTest := "ws://rpc.test.oppy.zone:8456/"
 	tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(websocketTest, &tss, tl, &wg)
+	pubChain, err := NewChainInstance(misc.WebsocketTest, &tss, tl, &wg)
 	assert.Nil(t, err)
 
 	poolInfo := vaulttypes.PoolInfo{
@@ -141,23 +141,6 @@ func TestSendToken(t *testing.T) {
 	err = pubChain.UpdatePool(&poolInfo)
 	assert.NoError(t, err)
 
-	// we firstly test the subscription of the pubchain new block
-	//ctx, cancel := context.WithCancel(context.Background())
-	//err = pubChain.StartSubscription(ctx, &wg)
-	//assert.Nil(t, err)
-	//
-	//counter := 0
-	//for {
-	//	<-pubChain.SubChannelNow
-	//	counter++
-	//	if counter > 2 {
-	//		cancel()
-	//		break
-	//	}
-	//}
-	//cancel()
-	//wg.Wait()
-
 	// now we test send the token with wrong nonce
 	tssWaitGroup := sync.WaitGroup{}
 	needToBeProcessed := 2
@@ -166,6 +149,8 @@ func TestSendToken(t *testing.T) {
 
 	defer close(tssReqChan)
 	tssWaitGroup.Add(2)
+	nonce, err := pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
+	assert.Nil(t, err)
 	for i := 0; i < 2; i++ {
 		go func(index int) {
 			defer tssWaitGroup.Done()
@@ -173,8 +158,6 @@ func TestSendToken(t *testing.T) {
 			assert.Nil(t, err)
 			defer bc.Unsubscribe(int64(index))
 
-			nonce, err := pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
-			assert.Nil(t, err)
 			_, err = pubChain.ProcessOutBound(index, accs[0].commAddr, fromAddrEth, tokenAddrTest, big.NewInt(100), nonce+uint64(index), tssReqChan, tssRespChan)
 			if index == 0 {
 				assert.Nil(t, err)

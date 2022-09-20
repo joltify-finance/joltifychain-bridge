@@ -26,7 +26,7 @@ type TssSignigMsg struct {
 	Version     string
 }
 
-//TssInstance is the bridge tss interface
+// TssInstance is the bridge tss interface
 type TssInstance interface {
 	KeySign(pk string, msgs []string, blockHeight int64, signers []string, version string) (keysign.Response, error)
 	KeyGen(keys []string, blockHeight int64, version string) (keygen.Response, error)
@@ -36,5 +36,4 @@ type TssInstance interface {
 }
 
 // Response key sign response
-type Response interface {
-}
+type Response interface{}

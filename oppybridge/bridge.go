@@ -8,7 +8,7 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	grpc1 "github.com/gogo/protobuf/grpc"
@@ -52,7 +52,7 @@ func (oc *OppyChainInstance) TerminateBridge() error {
 func (oc *OppyChainInstance) batchGenSendTx(sdkMsg []sdk.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (map[uint64]client.TxBuilder, error) {
 	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
 	// following function.
-	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, tssSignMsg.Pk) // nolint
+	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, tssSignMsg.Pk) //nolint
 	if err != nil {
 		oc.logger.Error().Err(err).Msgf("fail to get the pubkey")
 		return nil, err
@@ -78,7 +78,7 @@ func (oc *OppyChainInstance) batchGenSendTx(sdkMsg []sdk.Msg, accSeq, accNum, ga
 		var sigV2 signing.SignatureV2
 
 		pk := tssSignMsg.Pk
-		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) // nolint
+		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) //nolint
 		if err != nil {
 			oc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
 			return nil, err
@@ -136,7 +136,8 @@ func (oc *OppyChainInstance) batchGenSendTx(sdkMsg []sdk.Msg, accSeq, accNum, ga
 	}
 
 	for _, el := range resp.Signatures {
-		thisSignature, err := misc.SerializeSig(&el, false)
+		each := el
+		thisSignature, err := misc.SerializeSig(&each, false)
 		if err != nil {
 			oc.logger.Error().Msgf("fail to encode the signature")
 			continue
@@ -196,7 +197,7 @@ func (oc *OppyChainInstance) genSendTx(key keyring.Info, sdkMsg []sdk.Msg, accSe
 		}
 	} else {
 		pk := tssSignMsg.Pk
-		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) // nolint
+		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) //nolint
 		if err != nil {
 			oc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
 			return nil, err
@@ -276,7 +277,7 @@ func (oc *OppyChainInstance) signTx(txConfig client.TxConfig, txBuilder client.T
 			return signing.SignatureV2{}, err
 		}
 
-		pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, signMsg.Pk) // nolint
+		pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, signMsg.Pk) //nolint
 		if err != nil {
 			oc.logger.Error().Err(err).Msgf("fail to get the pubkey")
 			return signing.SignatureV2{}, err
@@ -345,7 +346,7 @@ func (oc *OppyChainInstance) GasEstimation(conn grpc1.ClientConn, sdkMsg []sdk.M
 		pubKey = key.GetPubKey()
 	} else {
 		pk := tssSignMsg.Pk
-		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) // nolint
+		cPk, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) //nolint
 		if err != nil {
 			oc.logger.Error().Err(err).Msgf("fail to get the public key from bech32 format")
 			return 0, err

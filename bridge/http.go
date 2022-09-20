@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
 	"net/http"
 	"sync"
 	"time"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

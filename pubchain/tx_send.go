@@ -253,7 +253,7 @@ func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, 
 	}
 	err = pi.sendTransactionWithLock(ctxSend, readyTx)
 	if err != nil {
-		//we reset the ethcliet
+		// we reset the ethcliet
 		pi.logger.Error().Err(err).Msgf("we fail to send the outbound ERC20 tx, have reset the eth client")
 	}
 	return readyTx.Hash(), err

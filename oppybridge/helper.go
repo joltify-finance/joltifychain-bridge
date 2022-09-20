@@ -214,6 +214,7 @@ func (oc *OppyChainInstance) batchComposeAndSend(conn grpc1.ClientConn, sendMsg 
 	wg.Wait()
 	return txHashes, errors.New("fail to broadcast one or more txs")
 }
+
 func (oc *OppyChainInstance) composeAndSend(conn grpc1.ClientConn, operator keyring.Info, sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
 	gasWanted := oc.GetGasEstimation()
 	txBuilder, err := oc.genSendTx(operator, []sdk.Msg{sendMsg}, accSeq, accNum, uint64(gasWanted), signMsg)

@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
+	"strconv"
+	"time"
+
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/tendermint/tendermint/crypto"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/storage"
-	"math/rand"
-	"strconv"
-	"time"
 )
 
 func main() {
@@ -16,7 +17,7 @@ func main() {
 	// now we load the existing outbound requests
 
 	// now we load the existing inbound requests
-	var itemsIn, err = fsm.LoadInBoundState()
+	itemsIn, err := fsm.LoadInBoundState()
 	if err != nil {
 		fmt.Printf("we do not need to have the items to be loaded")
 	}

@@ -3,7 +3,7 @@ package tokenlist
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"os"
 	"strings"
 	"sync"
 
@@ -35,7 +35,7 @@ type BridgeTokenListI interface {
 func NewTokenList(filePath string, updateGap int64) (*TokenList, error) {
 	logger := log.With().Str("module", "tokenlist").Logger()
 	// process tokenlist.json file
-	dat, err := ioutil.ReadFile(filePath)
+	dat, err := os.ReadFile(filePath)
 	if err != nil {
 		logger.Error().Err(err).Msgf("error in read with file %v", filePath)
 		return nil, err
@@ -77,7 +77,7 @@ func (tl *TokenList) UpdateTokenList(currentBlockHeight int64) error {
 	}
 
 	// load and process the tokenlist.json file
-	dat, err := ioutil.ReadFile(tl.filePath)
+	dat, err := os.ReadFile(tl.filePath)
 	if err != nil {
 		tl.logger.Error().Err(err).Msgf("error in read token list file")
 		return err

@@ -47,7 +47,7 @@ func TestWriteToken(t *testing.T) {
 
 	out, err := json.Marshal(allItems)
 	assert.NilError(t, err)
-	err = ioutil.WriteFile("../test_data/tokenlist/tokenlist.json", out, 0600)
+	err = ioutil.WriteFile("../test_data/tokenlist/tokenlist.json", out, 0o600)
 	assert.NilError(t, err)
 }
 

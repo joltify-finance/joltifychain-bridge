@@ -1,11 +1,12 @@
 package pubchain
 
 import (
+	"sync"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
-	"sync"
-	"testing"
 )
 
 func TestBroadcast(t *testing.T) {

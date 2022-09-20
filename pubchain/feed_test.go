@@ -17,8 +17,7 @@ import (
 )
 
 const (
-	AddrPUSD      = "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
-	websocketTest = "ws://rpc.test.oppy.zone:8456/"
+	AddrPUSD = "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
 )
 
 func TestFeedTx(t *testing.T) {
@@ -43,7 +42,7 @@ func TestFeedTx(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
 	assert.NilError(t, err)
 	wg := sync.WaitGroup{}
-	pi, err := NewChainInstance(websocketTest, &tssServer, tl, &wg)
+	pi, err := NewChainInstance(misc.WebsocketTest, &tssServer, tl, &wg)
 	assert.NilError(t, err)
 	c := ethclient.NewClient(client)
 	pi.EthClient = c
@@ -57,10 +56,10 @@ func TestFeedTx(t *testing.T) {
 	toAddr, err := misc.PoolPubKeyToEthAddress("oppypub1addwnpepqgknlvjpa7237gnrm2kakjd37xagm7435hmk6zqf5248dnext9cfse7dze7")
 	assert.NilError(t, err)
 
-	a1 := common.NewOutboundReq("test1", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil)
-	a2 := common.NewOutboundReq("test2", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil)
-	a3 := common.NewOutboundReq("test3", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil)
-	a4 := common.NewOutboundReq("test4", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil)
+	a1 := common.NewOutboundReq("test1", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, nil)
+	a2 := common.NewOutboundReq("test2", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, nil)
+	a3 := common.NewOutboundReq("test3", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, nil)
+	a4 := common.NewOutboundReq("test4", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, nil)
 	testOutBoundReqs := []*common.OutBoundReq{&a1, &a2, &a3, &a4}
 
 	err = pi.FeedTx(&poolInfo, testOutBoundReqs)

@@ -17,11 +17,9 @@ type TestRetrySuite struct {
 
 func (tn *TestRetrySuite) SetupSuite() {
 	misc.SetupBech32Prefix()
-	websocketTest := "ws://rpc.test.oppy.zone:8456/"
-	// tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
 
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(websocketTest, nil, nil, &wg)
+	pubChain, err := NewChainInstance(misc.WebsocketTest, nil, nil, &wg)
 	if err != nil {
 		panic(err)
 	}

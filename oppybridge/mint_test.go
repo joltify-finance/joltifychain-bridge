@@ -206,8 +206,8 @@ func (m MintTestSuite) TestProcessInbound() {
 	_, err = m.network.WaitForHeightWithTimeout(10, time.Second*30)
 	m.Require().NoError(err)
 
-	//err = oc.InitValidators(m.network.Validators[0].APIAddress)
-	//m.Require().NoError(err)
+	// err = oc.InitValidators(m.network.Validators[0].APIAddress)
+	// m.Require().NoError(err)
 
 	info, _ := m.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()

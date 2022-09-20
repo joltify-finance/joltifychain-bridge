@@ -196,7 +196,7 @@ func (pi *Instance) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, uint64, er
 		To:       nil,
 		GasPrice: gasPrice,
 		Value:    big.NewInt(2),
-		//Data:     []byte("hello"),
+		// Data:     []byte("hello"),
 	}
 	gas, err2 := pi.EthClient.EstimateGas(ctx, mockMsg)
 	pi.ethClientLocker.RUnlock()

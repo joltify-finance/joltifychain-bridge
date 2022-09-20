@@ -152,14 +152,13 @@ func TestCheckToBridge(t *testing.T) {
 }
 
 func TestProcessInBound(t *testing.T) {
-	websocketTest := "ws://rpc.test.oppy.zone:8456"
 	acc, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 	tssServer := TssMock{acc[0].sk}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pi, err := NewChainInstance(websocketTest, &tssServer, tl, &wg)
+	pi, err := NewChainInstance(misc.WebsocketTest, &tssServer, tl, &wg)
 	assert.Nil(t, err)
 
 	toStr := "FFcf8FDEE72ac11b5c542428B35EEF5769C409f0"
@@ -602,41 +601,43 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	expected := []sdk.Coin{{Denom: "testtoken", Amount: sdk.NewInt(10)}, {Denom: "abnb", Amount: sdk.NewInt(101)}}
 	assert.True(t, storedToken.IsEqual(expected))
 }
+
 func TestProcessERC20InBoundOnBSC(t *testing.T) {
 	misc.SetupBech32Prefix()
-	websocketTest := "ws://rpc.test.oppy.zone:8456"
+	OppyContractAddress = "0x94277968dff216265313657425d9d7577ad32dd1"
 	acc, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 	tssServer := TssMock{acc[0].sk}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pi, err := NewChainInstance(websocketTest, &tssServer, tl, &wg)
+	pi, err := NewChainInstance(misc.WebsocketTest, &tssServer, tl, &wg)
 	assert.Nil(t, err)
 
-	txid := common.HexToHash("0xec80b9209979cb24c7d41fa6165082c67c587d648fd2ad8165175d0ed86a3281")
-	tx, _, err := pi.EthClient.TransactionByHash(context.Background(), txid)
+	// TODO since our bsc testnet is the pruned node, it can only store the latest tx
+	txid := common.HexToHash("0x6a8effcfd4a01e3e6f09e1a026da28914d49d4adc20a84ad331f70fd4302e4b1")
+	tx, isPending, err := pi.EthClient.TransactionByHash(context.Background(), txid)
 	assert.Nil(t, err)
+	assert.False(t, isPending)
 
 	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
 	assert.Nil(t, err)
 	pi.tokenAbi = &tAbi
 	txInfo, err := pi.checkErc20(tx.Data(), tx.To().Hex())
 	assert.Nil(t, err)
-	assert.Equal(t, txInfo.fromAddr.String(), "oppy12gflne2dadajtzn5h7x8z4udfpd7f22dvly0zg")
+	assert.Equal(t, txInfo.fromAddr.String(), "oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7")
 	wg.Wait()
 }
 
 func TestProcessNativeInBoundOnBSC(t *testing.T) {
 	misc.SetupBech32Prefix()
-	websocketTest := "ws://rpc.test.oppy.zone:8456"
 	acc, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 	tssServer := TssMock{acc[0].sk}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"native"}, []string{"abnb"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pi, err := NewChainInstance(websocketTest, &tssServer, tl, &wg)
+	pi, err := NewChainInstance(misc.WebsocketTest, &tssServer, tl, &wg)
 
 	poolInfo := common2.PoolInfo{
 		EthAddress: common.HexToAddress("0x1f65cc33558b6825db119e9fe4c73b436211667e"),
@@ -645,7 +646,8 @@ func TestProcessNativeInBoundOnBSC(t *testing.T) {
 	pi.lastTwoPools = []*common2.PoolInfo{&poolInfo, &poolInfo}
 	assert.Nil(t, err)
 
-	b, err := pi.EthClient.BlockByNumber(context.Background(), big.NewInt(20989266))
+	// TODO need to update the hight as our bsc testnode is the pruned one
+	b, err := pi.EthClient.BlockByNumber(context.Background(), big.NewInt(22997528))
 	assert.Nil(t, err)
 
 	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))

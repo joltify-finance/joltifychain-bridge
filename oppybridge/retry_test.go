@@ -134,7 +134,6 @@ func (s *subscribeTestSuite) TestSubscribe() {
 	// 11=4+5+2
 	s.Require().Equal(11, len(oc.ChannelQueueNewBlock))
 	s.Require().Equal(3, len(oc.CurrentNewBlockChan))
-
 }
 
 func TestSubscribeAndRetry(t *testing.T) {

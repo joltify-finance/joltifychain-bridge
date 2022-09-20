@@ -1,13 +1,14 @@
 package validators
 
 import (
+	"testing"
+
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	cryptoenc "github.com/tendermint/tendermint/crypto/encoding"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
-	"testing"
 )
 
 func TestNewValidator(t *testing.T) {
@@ -74,5 +75,4 @@ func TestNewValidator(t *testing.T) {
 	// the new validator is in the set
 	_, ok = validatorSet.activeValidators[addr4.String()]
 	require.True(t, ok)
-
 }

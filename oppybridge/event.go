@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
+	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	"github.com/oppyfinance/tss/keygen"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
 	"go.uber.org/atomic"
@@ -18,8 +18,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 )
 
-const capacity = 10000
-const maxretry = 5
+const (
+	capacity = 10000
+	maxretry = 5
+)
 
 // HandleUpdateValidators check whether we need to generate the new tss pool message
 func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitGroup, inKeygenProcess *atomic.Bool) error {
@@ -35,8 +37,6 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 	}
 	lastValidators, blockHeight := oc.GetLastValidator()
 
-	oc.logger.Info().Msgf(">>>>>>>>>>>>>>>>at block height %v system do keygen>>>>>>>>>>>>>>>\n", blockHeight)
-
 	pubKeys := make([]string, len(lastValidators))
 	doKeyGen := false
 	for i, el := range lastValidators {
@@ -45,7 +45,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 		}
 		ret := &key
 
-		pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, ret) // nolint
+		pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, ret) //nolint
 		if err != nil {
 			return err
 		}
@@ -67,6 +67,11 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 	if !doKeyGen {
 		return nil
 	}
+
+	oc.logger.Info().Msgf(">>>>>>>>>>>>>>>>at block height %v system do keygen>>>>>>>>>>>>>>>\n", blockHeight)
+	oc.logger.Info().Msgf("publick keys: %v>>>>>>>>>>>>>>>\n", pubKeys)
+	oc.logger.Info().Msgf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+
 	var errKeygen error
 	var keygenResponse *keygen.Response
 	wg.Add(1)

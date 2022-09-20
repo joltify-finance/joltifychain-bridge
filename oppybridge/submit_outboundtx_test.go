@@ -3,10 +3,11 @@ package oppybridge
 import (
 	"context"
 	"encoding/hex"
-	"go.uber.org/atomic"
 	"sync"
 	"testing"
 	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -155,7 +156,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 		OutReceiverAddress: accs[0].commAddr,
 	}
 	s.Require().NoError(err)
-	err = oc.SubmitOutboundTx(s.grpc, info, req.Hash().Hex(), 10, hex.EncodeToString([]byte("testpubtx")), sdk.NewCoins(sdk.NewCoin("a", sdk.NewInt(32))))
+	err = oc.SubmitOutboundTx(s.grpc, info, req.Hash().Hex(), 10, hex.EncodeToString([]byte("testpubtx")), sdk.NewCoins(sdk.NewCoin("abc", sdk.NewInt(32))))
 	s.Require().NoError(err)
 	_, err = oc.GetPubChainSubmittedTx(req)
 	s.Require().NoError(err)

@@ -6,11 +6,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
-	"sync"
 
 	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
 )
@@ -44,7 +43,7 @@ func (fsm *PendingTxMgr) SavePendingItems(pendingTxs []*oppybridge.OutboundTx) e
 		fsm.logger.Error().Err(err).Msgf("fail to marshal the inbound pending tx")
 		return err
 	}
-	return ioutil.WriteFile(filePathName, buf, 0600)
+	return ioutil.WriteFile(filePathName, buf, 0o600)
 }
 
 func (fsm *PendingTxMgr) LoadPendingItems() ([]*oppybridge.OutboundTx, error) {

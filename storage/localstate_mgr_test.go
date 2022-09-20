@@ -33,14 +33,13 @@ func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewOutboundReq(txid, addr, addr, testCoin, "testTokenAddr", int64(i), nil)
+		item := common.NewOutboundReq(txid, addr, addr, testCoin, "testTokenAddr", int64(i), nil, nil)
 		retReq[i] = &item
 	}
 	return retReq
 }
 
 func createdTestInBoundReqs(n int) []*common.InBoundReq {
-
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	accs := simulation.RandomAccounts(r, n)
 	retReq := make([]*common.InBoundReq, n)
@@ -93,7 +92,6 @@ func (s *FileStateMgrTestSuite) TestSaveOutBoundState() {
 		expectedTx := testReqs[50+i].TxID
 		s.Require().Equal(expectedTx, loadedTx)
 	}
-
 }
 
 func (s *FileStateMgrTestSuite) TestSaveInBoundState() {
@@ -131,7 +129,6 @@ func (s *FileStateMgrTestSuite) TestSaveInBoundState() {
 		expectedTx := testReqs[50+i].TxID
 		s.Require().True(bytes.Equal(loadedTx, expectedTx))
 	}
-
 }
 
 func TestEvent(t *testing.T) {

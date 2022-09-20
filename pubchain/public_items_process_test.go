@@ -2,14 +2,15 @@ package pubchain
 
 import (
 	"fmt"
+	"math/big"
+	"sync"
+	"testing"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
-	"math/big"
-	"sync"
-	"testing"
 )
 
 func createdTestOutBoundReqs(n int) []*common.InBoundReq {

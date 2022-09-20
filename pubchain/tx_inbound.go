@@ -28,6 +28,8 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
+const alreadyKnown = "already known"
+
 func (pi *Instance) retrieveAddrfromRawTx(tx *ethTypes.Transaction) (types.AccAddress, error) { //nolint
 	v, r, s := tx.RawSignatureValues()
 	signer := ethTypes.LatestSignerForChainID(tx.ChainId())
@@ -326,7 +328,7 @@ func (pi *Instance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommo
 	return nil, 0
 }
 
-//func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *big.Int, nonce uint64, blockHeight int64) (string, error) {
+// func (pi *Instance) moveBnb(senderPk string, receiver common.Address, amount *big.Int, nonce uint64, blockHeight int64) (string, error) {
 //	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 //	defer cancel()
 //	chainID, err := pi.EthClient.NetworkID(ctx)
@@ -407,7 +409,7 @@ func (pi *Instance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommo
 func (pi *Instance) moveERC20Token(index int, sender, receiver common.Address, balance *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
 	txHash, err := pi.SendTokenBatch(index, sender, receiver, balance, nil, tokenAddr, tssReqChan, tssRespChan)
 	if err != nil {
-		if err.Error() == "already known" {
+		if err.Error() == alreadyKnown {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")
 			return txHash, nil
 		}
@@ -477,7 +479,7 @@ func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver comm
 	}
 
 	bnbTxHash, emptyAccount, err := pi.SendNativeTokenForMoveFund(previousPool.Pk, previousPool.EthAddress, receiver, balanceBnB, new(big.Int).SetUint64(nonce))
-	//bnbTxHash, err = pi.moveBnb(previousPool.Pk, receiver, balanceBnB, nonce, blockHeight)
+	// bnbTxHash, err = pi.moveBnb(previousPool.Pk, receiver, balanceBnB, nonce, blockHeight)
 	if err != nil {
 		return false, false, err
 	}

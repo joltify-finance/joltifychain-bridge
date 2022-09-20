@@ -298,7 +298,7 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, memo, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "fail to process the outbound erc20 request")
 
-	//test ERC20 token
+	// test ERC20 token
 	txID := "5d3a86ed8923343038a6c847d6b71c8dfe8e507fdda748223a28e860756f6afe"
 	txIDByte, err := hex.DecodeString(txID)
 	o.Require().NoError(err)
@@ -334,7 +334,7 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 		return true
 	})
 
-	//test native token
+	// test native token
 	txID = "d03fb2b6ae7690afa037ecc44a24e67de2676777b75efcbd1a9bea9e6cc16581"
 	txIDByte, err = hex.DecodeString(txID)
 	o.Require().NoError(err)
@@ -343,22 +343,6 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, memo, &msg, txIDByte)
 	o.Require().NoError(err)
 
-	// in reality, we will not have two tx with same txID
-	msg.Amount = sdk.Coins{fee}
-	memo.TopupID = txID
-	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, memo, &msg, []byte("any"))
-	o.Require().NoError(err)
-
-	dat, ok = oc.pendingTx.Load(txID)
-	o.Require().True(ok)
-	FeeWeGet = dat.(*OutboundTx).Token.Amount
-	o.Require().Equal(FeeWeGet, sdk.NewInt(200))
-
-	delta = expectedFee.SubAmount(FeeWeGet)
-	memo.TopupID = txID
-	msg.Amount = []sdk.Coin{delta}
-	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, memo, &msg, []byte("any"))
-	o.Require().NoError(err)
 	_, ok = oc.pendingTx.Load(txID)
 	o.Require().False(ok)
 
@@ -472,7 +456,6 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 	o.Require().Equal(items[0].OutReceiverAddress.String(), accs[2].commAddr.String())
 	o.Require().Equal(items[0].Coin.Denom, coin1.Denom)
 	o.Require().Equal(items[0].Coin.Amount.Int64(), int64(100))
-
 }
 
 func (o OutBoundTestSuite) TestProcessNativeToken() {
@@ -527,13 +510,7 @@ func (o OutBoundTestSuite) TestProcessNativeToken() {
 		return true
 	})
 
-	o.Require().Equal(counter, 1)
-
-	items := oc.PopItem(1)
-	o.Require().Equal(items[0].TxID, txID)
-	o.Require().Equal(items[0].OutReceiverAddress.String(), accs[2].commAddr.String())
-	o.Require().Equal(items[0].Coin.Denom, "abnb")
-	o.Require().Equal(items[0].Coin.Amount.Int64(), int64(0))
+	o.Require().Equal(counter, 0)
 }
 
 func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
@@ -568,72 +545,17 @@ func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
 	fee := sdk.NewCoin("abnb", sdk.NewInt(100))
 	msg.Amount = sdk.Coins{fee}
 
-	expectedFee := oc.calculateGas()
 	err = oc.processNativeRequest(&msg, txIDNotEnoughFee, int64(blockHeight), receiverAddr, memo)
 	o.Require().NoError(err)
 
-	val, ok := oc.pendingTx.Load(txIDNotEnoughFee)
-	o.Require().True(ok)
-	o.Require().Equal(val.(*OutboundTx).OutReceiverAddress.String(), accs[2].commAddr.String())
-	o.Require().True(val.(*OutboundTx).Token.Amount.Equal(fee.Amount))
-
-	msg = banktypes.MsgSend{
-		FromAddress: "test",
-		ToAddress:   "testto",
-		Amount:      []sdk.Coin{fee},
-	}
-	memo = common2.BridgeMemo{
-		Dest:    "aa",
-		TopupID: txIDNotEnoughFee,
-	}
-	err = oc.processTopUpRequest(&msg, int64(101), receiverAddr, memo)
-	o.Require().NoError(err)
-	val, ok = oc.pendingTx.Load(txIDNotEnoughFee)
-	o.Require().True(ok)
-	o.Require().Equal(val.(*OutboundTx).OutReceiverAddress.String(), accs[2].commAddr.String())
-	o.Require().True(val.(*OutboundTx).Token.Amount.Equal(fee.Amount.MulRaw(2)))
-
-	// we top up incorrect token
-
-	msg = banktypes.MsgSend{
-		FromAddress: "test",
-		ToAddress:   "testto",
-		Amount:      []sdk.Coin{sdk.NewCoin("testToken", sdk.NewInt(100))},
-	}
-	memo = common2.BridgeMemo{
-		Dest:    "aa",
-		TopupID: txIDNotEnoughFee,
-	}
-	err = oc.processTopUpRequest(&msg, int64(101), receiverAddr, memo)
-	o.Require().EqualError(err, "token is not on our token list or not fee demon")
-
-	// we top up exact the required amount
-	topupcoin := sdk.NewCoin("abnb", sdk.NewInt(100))
-	exactFee := expectedFee.Sub(topupcoin).Sub(topupcoin)
-
-	msg = banktypes.MsgSend{
-		FromAddress: "test",
-		ToAddress:   "testto",
-		Amount:      []sdk.Coin{exactFee},
-	}
-	memo = common2.BridgeMemo{
-		Dest:    "aa",
-		TopupID: txIDNotEnoughFee,
-	}
-	err = oc.processTopUpRequest(&msg, int64(101), receiverAddr, memo)
-	o.Require().NoError(err)
-	_, ok = oc.pendingTx.Load(txIDNotEnoughFee)
+	//we drop the native token if it is not enough for the fee
+	_, ok := oc.pendingTx.Load(txIDNotEnoughFee)
 	o.Require().False(ok)
-	items := oc.PopItem(1)
 
 	oc.pendingTx.Range(func(key, value any) bool {
 		panic("it should be empty")
 	})
 
-	o.Require().Equal(items[0].TxID, txIDNotEnoughFee)
-	o.Require().Equal(items[0].OutReceiverAddress.String(), accs[2].commAddr.String())
-	o.Require().Equal(items[0].Coin.Denom, exactFee.Denom)
-	o.Require().Equal(items[0].Coin.Amount.Int64(), int64(0))
 }
 
 func TestTxOutBound(t *testing.T) {

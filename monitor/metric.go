@@ -33,7 +33,6 @@ func (m *Metric) Enable() {
 
 func NewMetric() *Metric {
 	metrics := Metric{
-
 		inboundTxNum: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Namespace: "Oppy",

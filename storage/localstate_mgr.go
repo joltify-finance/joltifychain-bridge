@@ -51,7 +51,7 @@ func (fsm *TxStateMgr) SaveOutBoundState(reqs []*common.OutBoundReq) error {
 		fsm.logger.Error().Err(err).Msgf("fail to marshal the outbound tx")
 		return err
 	}
-	return ioutil.WriteFile(filePathName, buf, 0600)
+	return ioutil.WriteFile(filePathName, buf, 0o600)
 }
 
 func (fsm *TxStateMgr) LoadOutBoundState() ([]*common.OutBoundReq, error) {
@@ -77,6 +77,7 @@ func (fsm *TxStateMgr) LoadOutBoundState() ([]*common.OutBoundReq, error) {
 	}
 	return outboundReq, err
 }
+
 func (fsm *TxStateMgr) SaveInBoundState(reqs []*common.InBoundReq) error {
 	fsm.writeInBoundLock.Lock()
 	defer fsm.writeInBoundLock.Unlock()
@@ -87,7 +88,7 @@ func (fsm *TxStateMgr) SaveInBoundState(reqs []*common.InBoundReq) error {
 		fsm.logger.Error().Err(err).Msgf("fail to marshal the outbound tx")
 		return err
 	}
-	return ioutil.WriteFile(filePathName, buf, 0600)
+	return ioutil.WriteFile(filePathName, buf, 0o600)
 }
 
 func (fsm *TxStateMgr) LoadInBoundState() ([]*common.InBoundReq, error) {
