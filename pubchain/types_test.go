@@ -23,35 +23,39 @@ type TssMock struct {
 }
 
 func (tm *TssMock) KeySign(pk string, msgs []string, blockHeight int64, signers []string, version string) (keysign.Response, error) {
-	msg, err := base64.StdEncoding.DecodeString(msgs[0])
-	if err != nil {
-		return keysign.Response{}, err
-	}
+	var sigs []keysign.Signature
+	for i, el := range msgs {
+		msg, err := base64.StdEncoding.DecodeString(el)
+		if err != nil {
+			return keysign.Response{}, err
+		}
 
-	sk, err := crypto.ToECDSA(tm.sk.Bytes())
-	if err != nil {
-		return keysign.Response{}, err
-	}
-	signature, err := crypto.Sign(msg, sk)
-	if err != nil {
-		return keysign.Response{}, err
-	}
-	r := signature[:32]
-	s := signature[32:64]
-	v := signature[64:65]
+		sk, err := crypto.ToECDSA(tm.sk.Bytes())
+		if err != nil {
+			return keysign.Response{}, err
+		}
+		signature, err := crypto.Sign(msg, sk)
 
-	rEncoded := base64.StdEncoding.EncodeToString(r)
-	sEncoded := base64.StdEncoding.EncodeToString(s)
-	vEncoded := base64.StdEncoding.EncodeToString(v)
+		if err != nil {
+			return keysign.Response{}, err
+		}
+		r := signature[:32]
+		s := signature[32:64]
+		v := signature[64:65]
 
-	sig := keysign.Signature{
-		Msg:        msgs[0],
-		R:          rEncoded,
-		S:          sEncoded,
-		RecoveryID: vEncoded,
+		rEncoded := base64.StdEncoding.EncodeToString(r)
+		sEncoded := base64.StdEncoding.EncodeToString(s)
+		vEncoded := base64.StdEncoding.EncodeToString(v)
+
+		sig := keysign.Signature{
+			Msg:        msgs[i],
+			R:          rEncoded,
+			S:          sEncoded,
+			RecoveryID: vEncoded,
+		}
+		sigs = append(sigs, sig)
 	}
-
-	return keysign.Response{Signatures: []keysign.Signature{sig}, Status: common.Success}, nil
+	return keysign.Response{Signatures: sigs, Status: common.Success}, nil
 }
 
 func (tm *TssMock) KeyGen(keys []string, blockHeight int64, version string) (keygen.Response, error) {

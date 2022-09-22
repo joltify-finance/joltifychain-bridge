@@ -29,6 +29,23 @@ func (oc *OppyChainInstance) AddSubscribe(ctx context.Context) error {
 	return nil
 }
 
+func (oc *OppyChainInstance) ProcessNewBlockChainMoreThanOne() {
+	if len(oc.CurrentNewValidator) > 0 {
+		for {
+			quite := false
+			select {
+			case b := <-oc.CurrentNewValidator:
+				oc.ChannelQueueValidator <- b
+			default:
+				quite = true
+			}
+			if quite {
+				break
+			}
+		}
+	}
+}
+
 // UpdateSubscribe add the subscribe to the chain
 func (oc *OppyChainInstance) UpdateSubscribe(ctx context.Context) error {
 	query := "complete_churn.churn = 'oppy_churn'"
@@ -59,21 +76,7 @@ func (oc *OppyChainInstance) UpdateSubscribe(ctx context.Context) error {
 			}
 		}
 	}
-
-	if len(oc.CurrentNewValidator) > 0 {
-		for {
-			quite := false
-			select {
-			case b := <-oc.CurrentNewValidator:
-				oc.ChannelQueueValidator <- b
-			default:
-				quite = true
-			}
-			if quite {
-				break
-			}
-		}
-	}
+	oc.ProcessNewBlockChainMoreThanOne()
 
 	oc.CurrentNewBlockChan = newOppyBlock
 	oc.CurrentNewValidator = validator
@@ -110,20 +113,6 @@ func (oc *OppyChainInstance) RetryOppyChain() error {
 		oc.retryLock.Lock()
 		defer oc.retryLock.Unlock()
 		oc.logger.Warn().Msgf("we renewed the oppy client")
-
-		// we stop the old connection though it may broken
-		// if we stop the channle directly, we do not need to unsubscribe it here
-		// ctx,cancel:=context.WithTimeout(context.Background(),time.Second*3)
-		// err=oc.WsClient.UnsubscribeAll(ctx,"oppyBridgeChurn")
-		// if err!=nil{
-		//	oc.logger.Error().Err(err).Msgf("we fail to unsubscribe")
-		// }
-		//
-		// err=oc.WsClient.UnsubscribeAll(ctx,"oppyBridgeChurn")
-		// if err!=nil{
-		//	oc.logger.Error().Err(err).Msgf("we fail to unsubscribe")
-		// }
-		//
 
 		err = oc.WsClient.Stop()
 		if err != nil {

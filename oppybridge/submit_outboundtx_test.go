@@ -40,6 +40,8 @@ func (v *SubmitOutBoundTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
 	cfg.BondDenom = "stake"
+	cfg.BondedTokens = sdk.NewInt(10000000000000000)
+	cfg.StakingTokens = sdk.NewInt(100000000000000000)
 	cfg.MinGasPrices = "0stake"
 	cfg.ChainID = config.ChainID
 	v.cfg = cfg
@@ -128,7 +130,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	oc.validatorSet = validators.NewValidator()
 	wg := sync.WaitGroup{}
 	inkeygen := atomic.NewBool(true)
-	err = oc.HandleUpdateValidators(20, &wg, inkeygen)
+	err = oc.HandleUpdateValidators(20, &wg, inkeygen, true)
 	s.Require().NoError(err)
 	info, _ := s.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()
@@ -143,7 +145,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 
 	send := banktypes.NewMsgSend(valAddr, operatorInfo.GetAddress(), sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100))})
 
-	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), s.network.Validators[0].ClientCtx.Keyring)
+	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), s.network.Validators[0].ClientCtx.Keyring, "")
 	s.Require().NoError(err)
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	s.Require().NoError(err)

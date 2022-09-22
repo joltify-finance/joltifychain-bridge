@@ -60,6 +60,8 @@ func (v *ValidatorTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
 	cfg.BondDenom = "stake"
+	cfg.BondedTokens = sdk.NewInt(10000000000000000)
+	cfg.StakingTokens = sdk.NewInt(100000000000000000)
 	v.cfg = cfg
 	v.validatorky = keyring.NewInMemory()
 	// now we put the mock pool list in the test
@@ -87,10 +89,12 @@ func (v *ValidatorTestSuite) SetupSuite() {
 		}
 		pro := vaulttypes.PoolProposal{
 			PoolPubKey: poolPubKey,
+			PoolAddr:   randPoolSk.PubKey().Address().Bytes(),
 			Nodes:      nodes,
 		}
 		stateVaule.CreatePoolList = append(stateVaule.CreatePoolList, &vaulttypes.CreatePool{BlockHeight: strconv.Itoa(height[i-1]), Validators: validators, Proposal: []*vaulttypes.PoolProposal{&pro}})
 	}
+	stateVaule.LatestTwoPool = stateVaule.CreatePoolList[:2]
 	testToken := vaulttypes.IssueToken{
 		Index: "testindex",
 	}
@@ -129,22 +133,6 @@ func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
 
 	validators, _ := oc.GetLastValidator()
 	v.Require().Equal(len(validators), len(v.network.Validators))
-
-	//sk := secp256k1.GenPrivKey()
-	//remoteValidator := tmtypes.NewValidator(sk.PubKey(), 100)
-	//err = oc.UpdateLatestValidator([]*tmtypes.Validator{remoteValidator}, 10)
-	//v.Require().Nil(err)
-	//validators, height := oc.GetLastValidator()
-	//v.Require().Equal(len(v.network.Validators)+1, len(validators))
-	//v.Require().Equal(int64(10), height)
-	//// now we remote the last added
-	//
-	//remoteValidator = tmtypes.NewValidator(sk.PubKey(), 0)
-	//err = oc.UpdateLatestValidator([]*vaulttypes.Validators{remoteValidator}, 10)
-	//v.Require().Nil(err)
-	//validators, height = oc.GetLastValidator()
-	//v.Require().Equal(len(v.network.Validators), len(validators))
-	//v.Require().Equal(int64(10), height)
 }
 
 func (v ValidatorTestSuite) TestQueryPool() {
@@ -192,4 +180,13 @@ func (v ValidatorTestSuite) TestOppyChainBridge_CheckWhetherAlreadyExist() {
 
 	ret = oc.CheckWhetherAlreadyExist(v.grpc, "testindexnoexist")
 	v.Require().False(ret)
+}
+
+func (v ValidatorTestSuite) TestCheckTxStatus() {
+	oc := new(OppyChainInstance)
+	oc.GrpcClient = v.network.Validators[0].ClientCtx
+	err := oc.CheckTxStatus(oc.GrpcClient, "testindex", 1)
+	v.Require().NoError(err)
+	err = oc.CheckTxStatus(oc.GrpcClient, "testindexnoexist", 1)
+	v.Require().Error(err)
 }

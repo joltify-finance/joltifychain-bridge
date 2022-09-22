@@ -106,7 +106,6 @@ func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, t
 	var oppyBridge OppyChainInstance
 	var err error
 	oppyBridge.logger = log.With().Str("module", "oppyChain").Logger()
-
 	oppyBridge.GrpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
 	if err != nil {
 		return nil, err

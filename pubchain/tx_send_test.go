@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"math/big"
 	"sync"
 	"testing"
+	"time"
 
 	zlog "github.com/rs/zerolog/log"
 
@@ -98,9 +100,7 @@ func TestPubChainInstance_composeTx(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
-func TestSendToken(t *testing.T) {
-	accs, err := generateRandomPrivKey(2)
-	assert.Nil(t, err)
+func TestProcessOutBound(t *testing.T) {
 	acc991 := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
 
 	data, err := hex.DecodeString(acc991)
@@ -151,17 +151,21 @@ func TestSendToken(t *testing.T) {
 	tssWaitGroup.Add(2)
 	nonce, err := pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
 	assert.Nil(t, err)
+	v2, ret := new(big.Int).SetString("10000000000000000000000", 10)
+	assert.True(t, ret)
+	testAmounts := []*big.Int{big.NewInt(100), v2}
 	for i := 0; i < 2; i++ {
 		go func(index int) {
 			defer tssWaitGroup.Done()
 			tssRespChan, err := bc.Subscribe(int64(index))
 			assert.Nil(t, err)
 			defer bc.Unsubscribe(int64(index))
-
-			_, err = pubChain.ProcessOutBound(index, accs[0].commAddr, fromAddrEth, tokenAddrTest, big.NewInt(100), nonce+uint64(index), tssReqChan, tssRespChan)
 			if index == 0 {
+				_, err = pubChain.ProcessOutBound(index, fromAddrEth, fromAddrEth, tokenAddrTest, testAmounts[index], nonce+uint64(index), tssReqChan, tssRespChan)
 				assert.Nil(t, err)
+
 			} else {
+				_, err = pubChain.ProcessOutBound(index, fromAddrEth, fromAddrEth, "native", testAmounts[index], nonce+uint64(index), tssReqChan, tssRespChan)
 				assert.NotNil(t, err)
 			}
 		}(i)
@@ -200,6 +204,186 @@ func TestSendToken(t *testing.T) {
 
 		blockHeight := int64(latest.NumberU64()) / ROUNDBLOCK
 		signature, err := pubChain.TssSignBatch(allsignMSgs, lastPool.Pk, blockHeight)
+		if err != nil {
+			zlog.Info().Msgf("fail to run batch keysign")
+		}
+		bc.Broadcast(signature)
+	}()
+	tssWaitGroup.Wait()
+
+	pubChain.tssServer.Stop()
+}
+
+func TestSendToken(t *testing.T) {
+
+	justForTest := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
+
+	data, err := hex.DecodeString(justForTest)
+	if err != nil {
+		panic(err)
+	}
+	sk := secp256k1.PrivKey{Key: data}
+	pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, sk.PubKey()) //nolint
+	if err != nil {
+		panic(err)
+	}
+
+	tss := TssMock{
+		sk: &sk,
+	}
+	tokenAddrTest := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	assert.Nil(t, err)
+	wg := sync.WaitGroup{}
+	pubChain, err := NewChainInstance(misc.WebsocketTest, &tss, tl, &wg)
+	assert.Nil(t, err)
+
+	// incorrect address
+	receiver := ethcommon.BytesToAddress(sk.PubKey().Address().Bytes())
+	_, err = pubChain.SendToken(pk, receiver, receiver, big.NewInt(100), nil, tokenAddrTest)
+	assert.Error(t, err)
+
+	// we send token to myself for testing
+	receiver, err = misc.PoolPubKeyToEthAddress(pk)
+	assert.Nil(t, err)
+	jusdAddr := "0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"
+	_, err = pubChain.SendToken(pk, receiver, receiver, big.NewInt(100), nil, jusdAddr)
+	assert.NoError(t, err)
+}
+
+func TestSendNativeToken(t *testing.T) {
+	justForTest := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
+	data, err := hex.DecodeString(justForTest)
+	if err != nil {
+		panic(err)
+	}
+	sk := secp256k1.PrivKey{Key: data}
+	pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, sk.PubKey()) //nolint
+	if err != nil {
+		panic(err)
+	}
+
+	tss := TssMock{
+		sk: &sk,
+	}
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	assert.Nil(t, err)
+	wg := sync.WaitGroup{}
+	pubChain, err := NewChainInstance(misc.WebsocketTest, &tss, tl, &wg)
+	assert.Nil(t, err)
+
+	// incorrect address,thus it is clear to move fund
+	receiver := ethcommon.BytesToAddress(sk.PubKey().Address().Bytes())
+	_, ret, err := pubChain.SendNativeTokenForMoveFund(pk, receiver, receiver, big.NewInt(100), big.NewInt(1))
+	assert.True(t, ret)
+
+	//assert.Error(t, err)
+
+	// we send token to myself for testing
+	receiver, err = misc.PoolPubKeyToEthAddress(pk)
+	assert.NoError(t, err)
+	// not enough amount pay the gas, returned
+	_, ret, err = pubChain.SendNativeTokenForMoveFund(pk, receiver, receiver, big.NewInt(100), big.NewInt(1))
+	assert.True(t, ret)
+	assert.NoError(t, err)
+
+	// we move the bnb
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	nonce, err := pubChain.getPendingNonceWithLock(ctx, receiver)
+	assert.NoError(t, err)
+	_, ret, err = pubChain.SendNativeTokenForMoveFund(pk, receiver, receiver, big.NewInt(7830000000000000), big.NewInt(int64(nonce)))
+	assert.False(t, ret)
+	assert.NoError(t, err)
+}
+
+func TestSendNativeTokenBatch(t *testing.T) {
+
+	acc991 := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
+	data, err := hex.DecodeString(acc991)
+	if err != nil {
+		panic(err)
+	}
+	sk := secp256k1.PrivKey{Key: data}
+	pk, err := legacybech32.MarshalPubKey(legacybech32.AccPK, sk.PubKey()) //nolint
+	if err != nil {
+		panic(err)
+	}
+
+	fromAddrEth, err := misc.PoolPubKeyToEthAddress(pk)
+	assert.Nil(t, err)
+
+	tss := TssMock{
+		sk: &sk,
+	}
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	assert.Nil(t, err)
+	wg := sync.WaitGroup{}
+	pubChain, err := NewChainInstance(misc.WebsocketTest, &tss, tl, &wg)
+	assert.Nil(t, err)
+
+	// now we test send the token with wrong nonce
+	tssWaitGroup := sync.WaitGroup{}
+	needToBeProcessed := 2
+	tssReqChan := make(chan *TssReq, needToBeProcessed)
+	bc := NewBroadcaster()
+
+	defer close(tssReqChan)
+	tssWaitGroup.Add(2)
+	nonce, err := pubChain.EthClient.PendingNonceAt(context.Background(), fromAddrEth)
+	assert.Nil(t, err)
+	v2, ok := new(big.Int).SetString("2283000000000000000000", 10)
+	assert.True(t, ok)
+	amounts := []*big.Int{big.NewInt(22830000000000000), v2}
+	for i := 0; i < 2; i++ {
+		go func(index int) {
+			defer tssWaitGroup.Done()
+			tssRespChan, err := bc.Subscribe(int64(index))
+			assert.Nil(t, err)
+			defer bc.Unsubscribe(int64(index))
+			indexSend := int64(nonce) + int64(index)
+			_, _, err = pubChain.SendNativeTokenBatch(index, fromAddrEth, fromAddrEth, amounts[index], big.NewInt(indexSend), tssReqChan, tssRespChan)
+			if index == 0 {
+				assert.Nil(t, err)
+			} else {
+				assert.NotNil(t, err)
+			}
+		}(i)
+	}
+
+	tssWaitGroup.Add(1)
+	go func() {
+		defer tssWaitGroup.Done()
+		var allsignMSgs [][]byte
+		received := make(map[int][]byte)
+		collected := false
+		for {
+			msg := <-tssReqChan
+			received[msg.Index] = msg.Data
+			if len(received) >= needToBeProcessed {
+				collected = true
+			}
+			if collected {
+				break
+			}
+		}
+		for _, val := range received {
+			if bytes.Equal([]byte("none"), val) {
+				continue
+			}
+			allsignMSgs = append(allsignMSgs, val)
+		}
+
+		latest, err := pubChain.GetBlockByNumberWithLock(nil)
+		if err != nil {
+			zlog.Logger.Error().Err(err).Msgf("fail to get the latest height")
+			bc.Broadcast(nil)
+			return
+		}
+
+		blockHeight := int64(latest.NumberU64()) / ROUNDBLOCK
+		signature, err := pubChain.TssSignBatch(allsignMSgs, pk, blockHeight)
 		if err != nil {
 			zlog.Info().Msgf("fail to run batch keysign")
 		}

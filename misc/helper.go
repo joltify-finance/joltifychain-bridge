@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	"github.com/ethereum/go-ethereum/common"
@@ -15,6 +14,8 @@ import (
 )
 
 const WebsocketTest = "ws://152.69.189.218:8456"
+
+//const WebsocketTest = "ws://localhost:8456"
 
 // SetupBech32Prefix sets up the prefix of the oppy chain
 func SetupBech32Prefix() {
@@ -45,16 +46,6 @@ func PoolPubKeyToEthAddress(pk string) (common.Address, error) {
 		return common.Address{}, err
 	}
 	addr := crypto.PubkeyToAddress(*pk2)
-	return addr, nil
-}
-
-// AccountPubKeyToEthAddress export the oppy pubkey to the ETH format address
-func AccountPubKeyToEthAddress(pk cryptotypes.PubKey) (common.Address, error) {
-	pubkey, err := crypto.DecompressPubkey(pk.Bytes())
-	if err != nil {
-		return common.Address{}, err
-	}
-	addr := crypto.PubkeyToAddress(*pubkey)
 	return addr, nil
 }
 

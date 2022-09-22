@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"hash"
 	"math/big"
 	"strings"
@@ -12,7 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/rawdb"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -243,27 +244,47 @@ var genesis = &core.Genesis{
 	BaseFee:   big.NewInt(1),
 }
 
-func generateTestChain(testTx []*ethTypes.Transaction) []*ethTypes.Block {
+//
+//func generateTestChain(testTx []*ethTypes.Transaction) []*ethTypes.Block {
+//	db := rawdb.NewMemoryDatabase()
+//	generate := func(i int, g *core.BlockGen) {
+//		g.OffsetTime(5)
+//		g.SetExtra([]byte("test"))
+//		if i == 1 {
+//			for _, el := range testTx {
+//				g.AddTx(el)
+//			}
+//		}
+//	}
+//	gblock := genesis.ToBlock(db)
+//	engine := ethash.NewFaker()
+//	blocks, _ := core.GenerateChain(genesis.Config, gblock, engine, db, len(testTx), generate)
+//	blocks = append([]*ethTypes.Block{gblock}, blocks...)
+//	return blocks
+//}
+
+func generateTestChain(txs []*ethtypes.Transaction) []*ethtypes.Block {
 	db := rawdb.NewMemoryDatabase()
 	generate := func(i int, g *core.BlockGen) {
 		g.OffsetTime(5)
 		g.SetExtra([]byte("test"))
 		if i == 1 {
-			for _, el := range testTx {
+			// Test transactions are included in block #2.
+			for _, el := range txs {
 				g.AddTx(el)
 			}
 		}
 	}
-	gblock := genesis.ToBlock(db)
+
+	gblock := genesis.MustCommit(db)
 	engine := ethash.NewFaker()
-	blocks, _ := core.GenerateChain(genesis.Config, gblock, engine, db, len(testTx), generate)
-	blocks = append([]*ethTypes.Block{gblock}, blocks...)
+	blocks, _ := core.GenerateChain(genesis.Config, gblock, engine, db, 2, generate)
+	blocks = append([]*ethtypes.Block{gblock}, blocks...)
 	return blocks
 }
 
-func newTestBackend(t *testing.T, txs []*ethTypes.Transaction) (*node.Node, []*ethTypes.Block) {
+func newTestBackend(t *testing.T, txs []*ethTypes.Transaction) (*node.Node, []*ethtypes.Block) {
 	// Generate test chain.
-
 	blocks := generateTestChain(txs)
 
 	// Create node

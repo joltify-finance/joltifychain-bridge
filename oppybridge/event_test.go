@@ -3,6 +3,7 @@ package oppybridge
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"strconv"
 	"sync"
 	"testing"
@@ -37,6 +38,8 @@ func (v *EventTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
 	cfg.BondDenom = "stake"
+	cfg.BondedTokens = sdk.NewInt(10000000000000000)
+	cfg.StakingTokens = sdk.NewInt(100000000000000000)
 	v.cfg = cfg
 	v.validatorKey = keyring.NewInMemory()
 	// now we put the mock pool list in the test
@@ -63,10 +66,12 @@ func (v *EventTestSuite) SetupSuite() {
 		}
 		pro := vaulttypes.PoolProposal{
 			PoolPubKey: poolPubKey,
+			PoolAddr:   randPoolSk.PubKey().Address().Bytes(),
 			Nodes:      nodes,
 		}
 		state.CreatePoolList = append(state.CreatePoolList, &vaulttypes.CreatePool{BlockHeight: strconv.Itoa(i), Validators: validators, Proposal: []*vaulttypes.PoolProposal{&pro}})
 	}
+	state.LatestTwoPool = state.CreatePoolList[:2]
 	// add the validators
 	var allV []*vaulttypes.Validator
 	for i := 0; i < 4; i++ {
@@ -162,7 +167,7 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 
 	wg := sync.WaitGroup{}
 	inKeyGen := atomic.NewBool(true)
-	err = oc.HandleUpdateValidators(100, &wg, inKeyGen)
+	err = oc.HandleUpdateValidators(100, &wg, inKeyGen, true)
 	e.Require().NoError(err)
 	e.Require().Equal(len(oc.keyGenCache), 0)
 	tss.keygenSuccess = true
@@ -171,10 +176,54 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 	// we set the validator key, it should run the keygen successfully
 	data := base64.StdEncoding.EncodeToString(e.validators[0].GetPubkey())
 	oc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value = data
-	err = oc.HandleUpdateValidators(100, &wg, inKeyGen)
+	sleepTime = 2
+	err = oc.HandleUpdateValidators(100, &wg, inKeyGen, true)
 	wg.Wait()
 	e.Require().NoError(err)
 	e.Require().Equal(1, len(oc.keyGenCache))
+}
+
+func (e EventTestSuite) TestHandleUpdateEventKeyGenFail() {
+	accs, err := generateRandomPrivKey(2)
+	e.Assert().NoError(err)
+	tss := TssMock{
+		accs[0].sk,
+		nil,
+		false,
+		true,
+	}
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	e.Require().NoError(err)
+	oc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
+	e.Require().NoError(err)
+	defer func() {
+		err := oc.TerminateBridge()
+		if err != nil {
+			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
+		}
+	}()
+
+	_, err = e.network.WaitForHeightWithTimeout(10, time.Second*30)
+	e.Require().NoError(err)
+
+	oc.GrpcClient = e.network.Validators[0].ClientCtx
+	err = oc.InitValidators(e.network.Validators[0].APIAddress)
+	e.Require().NoError(err)
+
+	wg := sync.WaitGroup{}
+	inKeyGen := atomic.NewBool(true)
+	//err = oc.HandleUpdateValidators(100, &wg, inKeyGen)
+	//e.Require().NoError(err)
+	//e.Require().Equal(len(oc.keyGenCache), 0)
+	tss.keygenSuccess = false
+	oc.Keyring = e.validatorKey
+	// we set the validator key, it should run the keygen successfully
+	data := base64.StdEncoding.EncodeToString(e.validators[0].GetPubkey())
+	oc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value = data
+	err = oc.HandleUpdateValidators(100, &wg, inKeyGen, true)
+	wg.Wait()
+	e.Require().Error(errors.New("fail to get the valid key"))
+
 }
 
 func TestEvent(t *testing.T) {

@@ -106,6 +106,29 @@ func TestConfig(t *testing.T) {
 	}
 }
 
+func TestAddAndDumpQueue(t *testing.T) {
+	reqs := createdTestOutBoundReqs(100)
+
+	oc := OppyChainInstance{
+		RetryOutboundReq:     &sync.Map{},
+		OutboundReqChan:      make(chan []*common.OutBoundReq, 10),
+		pendingTx:            &sync.Map{},
+		onHoldRetryQueue:     []*common.OutBoundReq{},
+		onHoldRetryQueueLock: &sync.Mutex{},
+	}
+
+	for _, el := range reqs {
+		oc.AddOnHoldQueue(el)
+	}
+
+	outputQueue := oc.DumpQueue()
+	assert.Equal(t, len(outputQueue), 100)
+	assert.Equal(t, len(oc.onHoldRetryQueue), 0)
+	outputQueue = oc.DumpQueue()
+	assert.Equal(t, len(outputQueue), 0)
+
+}
+
 func createdTestPendingTxs(n int) []*OutboundTx {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	accs := simulation.RandomAccounts(r, n)

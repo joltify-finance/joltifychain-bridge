@@ -40,6 +40,8 @@ func (f *FeedtransactionTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
 	cfg.BondDenom = "stake"
+	cfg.BondedTokens = sdk.NewInt(10000000000000000)
+	cfg.StakingTokens = sdk.NewInt(100000000000000000)
 	f.cfg = cfg
 	f.validatorky = keyring.NewInMemory()
 	// now we put the mock pool list in the test
@@ -66,10 +68,12 @@ func (f *FeedtransactionTestSuite) SetupSuite() {
 		}
 		pro := vaulttypes.PoolProposal{
 			PoolPubKey: poolPubKey,
+			PoolAddr:   randPoolSk.PubKey().Address().Bytes(),
 			Nodes:      nodes,
 		}
 		state.CreatePoolList = append(state.CreatePoolList, &vaulttypes.CreatePool{BlockHeight: strconv.Itoa(i), Validators: validators, Proposal: []*vaulttypes.PoolProposal{&pro}})
 	}
+	state.LatestTwoPool = state.CreatePoolList[:2]
 	testToken := vaulttypes.IssueToken{
 		Index: "testindex",
 	}

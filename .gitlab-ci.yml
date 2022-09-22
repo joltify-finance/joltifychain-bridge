@@ -6,13 +6,30 @@ before_script:
   - mkdir -p .cache
   - export GOPATH="$CI_PROJECT_DIR/.cache"
   - PATH="$GOPATH/bin:$PATH"
-  - go get -v -d ./...
 
 stages:
+  - build
   - test
-  #- build
-#  - smoke-test
-#  - release
+  - upload
+  - release
+
+
+variables:
+  #  DARWIN_AMD64_BINARY: "oppyBridge-darwin-amd64-${CI_COMMIT_TAG}"
+  LINUX_AMD64_BINARY: "oppyBridge-linux-amd64-${CI_COMMIT_TAG}"
+
+build-job:       # This job runs in the build stage, which runs first.
+  stage: build
+  image: golang:1.18
+  script:
+    - make build
+    - sha256sum oppyBridge> checksum.txt
+    - mkdir release_files
+    - cp oppyBridge release_files/oppyBridge
+    - cp checksum.txt release_files/${LINUX_AMD64_BINARY}-checksum.txt
+  artifacts:
+    paths:
+      - release_files/
 
 unit_tests:
   stage: test
@@ -21,7 +38,7 @@ unit_tests:
   script:
     - go install gotest.tools/gotestsum@latest
     - gotestsum  --junitfile report.xml --format testname  -- -coverprofile=coverage.out -timeout 15m ./...
-    - cat coverage.out | grep -v ".pb.go"|grep -v ".gw.go"|grep -v "erc20.go"|grep -v "oppy_transfer.go" > cover.out
+    - cat coverage.out |grep -v "erc20.go"|grep -v "oppy_transfer.go" > cover.out
     - go tool cover -func=cover.out
 
   artifacts:
@@ -37,3 +54,32 @@ lint_code:
     - go get mvdan.cc/gofumpt
   script:
     - golangci-lint run -v --timeout 3600s -c ./.golangci.yml
+
+
+
+upload-job:
+  stage: upload
+  image: curlimages/curl:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file release_files/oppyBridge "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${LINUX_AMD64_BINARY}/${CI_COMMIT_TAG}/oppyBridge"'
+    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file release_files/${LINUX_AMD64_BINARY}-checksum.txt  "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${LINUX_AMD64_BINARY}/${CI_COMMIT_TAG}/${LINUX_AMD64_BINARY}-checksum.txt"'
+
+release-job:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo 'running release_job'
+  release:
+    name: '$CI_COMMIT_TAG'
+    tag_name: '$CI_COMMIT_TAG'
+    description: '$CI_COMMIT_TAG'
+    assets:
+      links:
+        - name: '$LINUX_AMD64_BINARY'
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${LINUX_AMD64_BINARY}/${CI_COMMIT_TAG}/oppyBridge"
+        - name: '${LINUX_AMD64_BINARY}-checksum.txt'
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${LINUX_AMD64_BINARY}/${CI_COMMIT_TAG}/${LINUX_AMD64_BINARY}-checksum.txt"

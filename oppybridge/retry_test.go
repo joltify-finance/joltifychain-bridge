@@ -13,6 +13,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/suite"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"github.com/tendermint/tendermint/types"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 	"gitlab.com/oppy-finance/oppychain/testutil/network"
@@ -31,6 +32,8 @@ func (f *subscribeTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
 	cfg.BondDenom = "stake"
+	cfg.BondedTokens = sdk.NewInt(10000000000000000)
+	cfg.StakingTokens = sdk.NewInt(100000000000000000)
 	f.cfg = cfg
 	f.validatorky = keyring.NewInMemory()
 	// now we put the mock pool list in the test
@@ -57,10 +60,12 @@ func (f *subscribeTestSuite) SetupSuite() {
 		}
 		pro := vaulttypes.PoolProposal{
 			PoolPubKey: poolPubKey,
+			PoolAddr:   randPoolSk.PubKey().Address().Bytes(),
 			Nodes:      nodes,
 		}
 		state.CreatePoolList = append(state.CreatePoolList, &vaulttypes.CreatePool{BlockHeight: strconv.Itoa(i), Validators: validators, Proposal: []*vaulttypes.PoolProposal{&pro}})
 	}
+	state.LatestTwoPool = state.CreatePoolList[:2]
 	testToken := vaulttypes.IssueToken{
 		Index: "testindex",
 	}
@@ -84,7 +89,6 @@ func (f *subscribeTestSuite) SetupSuite() {
 
 	_, err = f.network.WaitForHeight(1)
 	f.Require().Nil(err)
-
 	f.queryClient = tmservice.NewServiceClient(f.network.Validators[0].ClientCtx)
 }
 
@@ -99,6 +103,9 @@ func (s *subscribeTestSuite) TestSubscribe() {
 
 	block := <-oc.CurrentNewBlockChan
 	currentBlockHeight1 := block.Data.(types.EventDataNewBlock).Block.Height
+
+	err = s.network.WaitForNextBlock()
+	s.Require().NoError(err)
 
 	block = <-oc.CurrentNewBlockChan
 	currentBlockHeight2 := block.Data.(types.EventDataNewBlock).Block.Height
@@ -115,7 +122,6 @@ func (s *subscribeTestSuite) TestSubscribe() {
 	current += 2
 	_, err = s.network.WaitForHeight(current)
 	s.Require().NoError(err)
-	time.Sleep(time.Second)
 	s.Require().Equal(4, len(oc.ChannelQueueNewBlock))
 	s.Require().Equal(2, len(oc.CurrentNewBlockChan))
 
@@ -130,10 +136,28 @@ func (s *subscribeTestSuite) TestSubscribe() {
 	_, err = s.network.WaitForHeight(current)
 	s.Require().NoError(err)
 
-	time.Sleep(time.Second)
 	// 11=4+5+2
 	s.Require().Equal(11, len(oc.ChannelQueueNewBlock))
 	s.Require().Equal(3, len(oc.CurrentNewBlockChan))
+}
+
+func (s *subscribeTestSuite) createMockChan() <-chan coretypes.ResultEvent {
+	e1 := coretypes.ResultEvent{Query: "mocekquery1"}
+	e2 := coretypes.ResultEvent{Query: "mocekquery2"}
+	mockChan := make(chan coretypes.ResultEvent, 2)
+	mockChan <- e1
+	mockChan <- e2
+	return mockChan
+}
+
+func (s *subscribeTestSuite) TestProcess() {
+	oc, err := NewOppyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, nil, nil)
+	s.Require().NoError(err)
+
+	mockChan := s.createMockChan()
+	oc.CurrentNewValidator = mockChan
+	oc.ProcessNewBlockChainMoreThanOne()
+	s.Require().Equal(len(oc.ChannelQueueValidator), 2)
 }
 
 func TestSubscribeAndRetry(t *testing.T) {

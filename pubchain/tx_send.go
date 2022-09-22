@@ -104,6 +104,9 @@ func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Addr
 
 // SendNativeTokenForMoveFund sends the native token to the public chain
 func (pi *Instance) SendNativeTokenForMoveFund(signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int) (common.Hash, bool, error) {
+	if nonce == nil {
+		return common.Hash{}, false, errors.New("invalid nonce")
+	}
 	_, price, _, gas, err := pi.GetFeeLimitWithLock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
@@ -112,7 +115,7 @@ func (pi *Instance) SendNativeTokenForMoveFund(signerPk string, sender, receiver
 
 	adjGas := int64(float32(gas) * config.MoveFundPubChainGASFEERATIO)
 	fee := new(big.Int).Mul(price, big.NewInt(adjGas))
-	// this statement is useful in
+	// this statement is useful in processing the tiny leftover
 	if amount.Cmp(fee) != 1 {
 		return common.Hash{}, true, nil
 	}
@@ -134,9 +137,7 @@ func (pi *Instance) SendNativeTokenForMoveFund(signerPk string, sender, receiver
 	if err != nil {
 		return common.Hash{}, false, err
 	}
-	if nonce != nil {
-		txo.Nonce = nonce
-	}
+	txo.Nonce = nonce
 	pi.logger.Info().Msgf("we have get the signature for native token")
 	sendAmount := new(big.Int).Sub(amount, fee)
 	txo.Value = sendAmount
@@ -177,6 +178,7 @@ func (pi *Instance) SendTokenBatch(index int, sender, receiver common.Address, a
 		txo.Nonce = nonce
 	}
 	txo.NoSend = true
+
 	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), pi.EthClient)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to generate token instance for %v while processing outbound tx", tokenAddr)
@@ -188,15 +190,15 @@ func (pi *Instance) SendTokenBatch(index int, sender, receiver common.Address, a
 		return common.Hash{}, err
 	}
 
-	ctxSend, cancelSend := context.WithTimeout(context.Background(), chainQueryTimeout)
-	defer cancelSend()
-
 	if nonce != nil {
 		err = pi.waitToSend(sender, nonce.Uint64())
 		if err != nil {
 			return readyTx.Hash(), err
 		}
 	}
+
+	ctxSend, cancelSend := context.WithTimeout(context.Background(), chainQueryTimeout)
+	defer cancelSend()
 	err = pi.sendTransactionWithLock(ctxSend, readyTx)
 	if err != nil {
 		// we reset the ethcliet

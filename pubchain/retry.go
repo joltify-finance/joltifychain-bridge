@@ -58,8 +58,8 @@ func (pi *Instance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) e
 }
 
 func (pi *Instance) RetryPubChain() error {
-	_, err := pi.GetBlockByNumberWithLock(nil)
-	if err != nil {
+	err := pi.CheckPubChainHealthWithLock()
+	if err == nil {
 		pi.logger.Info().Msgf("all good we do not need to reset")
 		return nil
 	}
@@ -82,17 +82,4 @@ func (pi *Instance) RetryPubChain() error {
 
 	pi.logger.Warn().Msgf("we renewed the ethclient")
 	return nil
-}
-
-func (pi *Instance) HealthCheckAndReset() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-	defer cancel()
-	_, err := pi.EthClient.BlockNumber(ctx)
-	if err != nil {
-		pi.logger.Error().Err(err).Msgf("public chain connnection seems stopped we reset")
-		err2 := pi.RetryPubChain()
-		if err2 != nil {
-			pi.logger.Error().Err(err).Msgf("pubchain fail to restart")
-		}
-	}
 }

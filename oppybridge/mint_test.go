@@ -40,6 +40,8 @@ func (v *MintTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 	cfg := network.DefaultConfig()
 	cfg.BondDenom = "stake"
+	cfg.BondedTokens = sdk.NewInt(10000000000000000)
+	cfg.StakingTokens = sdk.NewInt(100000000000000000)
 	config.ChainID = cfg.ChainID
 	cfg.MinGasPrices = "0stake"
 	v.validatorky = keyring.NewInMemory()
@@ -67,10 +69,12 @@ func (v *MintTestSuite) SetupSuite() {
 		}
 		pro := vaulttypes.PoolProposal{
 			PoolPubKey: poolPubKey,
+			PoolAddr:   randPoolSk.PubKey().Address().Bytes(),
 			Nodes:      nodes,
 		}
 		state.CreatePoolList = append(state.CreatePoolList, &vaulttypes.CreatePool{BlockHeight: strconv.Itoa(i), Validators: validators, Proposal: []*vaulttypes.PoolProposal{&pro}})
 	}
+	state.LatestTwoPool = state.CreatePoolList[:2]
 	testToken := vaulttypes.IssueToken{
 		Index: "testindex",
 	}
@@ -111,7 +115,7 @@ func (m MintTestSuite) TestPrepareIssueTokenRequest() {
 	m.Require().NoError(err)
 }
 
-func Gensigntx(oc *OppyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum, accSeq uint64, signkeyring keyring.Keyring) (client.TxBuilder, error) {
+func Gensigntx(oc *OppyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum, accSeq uint64, signkeyring keyring.Keyring, memo string) (client.TxBuilder, error) {
 	encCfg := *oc.encoding
 	// Create a new TxBuilder.
 	txBuilder := encCfg.TxConfig.NewTxBuilder()
@@ -123,6 +127,7 @@ func Gensigntx(oc *OppyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum
 
 	// we use the default here
 	txBuilder.SetGasLimit(500000)
+	txBuilder.SetMemo(memo)
 
 	var sigV2 signing.SignatureV2
 
@@ -223,7 +228,7 @@ func (m MintTestSuite) TestProcessInbound() {
 
 	send := banktypes.NewMsgSend(valAddr, accs[0].oppyAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
-	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), m.network.Validators[0].ClientCtx.Keyring)
+	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), m.network.Validators[0].ClientCtx.Keyring, "")
 	m.Require().NoError(err)
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	m.Require().NoError(err)

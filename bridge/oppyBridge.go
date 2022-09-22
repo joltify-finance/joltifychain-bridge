@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	tetypes "github.com/tendermint/tendermint/types" //nolint:gofumpt,golint,typecheck
 	"html"
 	"io/ioutil"
 	"log"
@@ -16,6 +15,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	testypes "github.com/tendermint/tendermint/types" //nolint:gofumpt,golint,typecheck
 
 	"github.com/cenkalti/backoff"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -317,12 +318,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					continue
 				}
 
-				_, ok := vals.Data.(tetypes.EventDataNewBlock)
+				_, ok := vals.Data.(testypes.EventDataNewBlock)
 				if !ok {
 					continue
 				}
 
-				err = oppyChain.HandleUpdateValidators(height, wg, inKeygenInProgress)
+				err = oppyChain.HandleUpdateValidators(height, wg, inKeygenInProgress, false)
 				if err != nil {
 					zlog.Logger.Info().Msgf("error in handle update validator")
 					continue
@@ -353,7 +354,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					continue
 				}
 
-				currentProcessBlockHeight := block.Data.(tetypes.EventDataNewBlock).Block.Height
+				currentProcessBlockHeight := block.Data.(testypes.EventDataNewBlock).Block.Height
 
 				ok, _ := oppyChain.CheckAndUpdatePool(grpcClient, latestHeight)
 				if !ok {

@@ -23,8 +23,10 @@ const (
 	maxretry = 5
 )
 
+var sleepTime = 60
+
 // HandleUpdateValidators check whether we need to generate the new tss pool message
-func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitGroup, inKeygenProcess *atomic.Bool) error {
+func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitGroup, inKeygenProcess *atomic.Bool, mock bool) error {
 	v, err := oc.getValidators(strconv.FormatInt(height, 10))
 	if err != nil {
 		return err
@@ -69,7 +71,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 	}
 
 	oc.logger.Info().Msgf(">>>>>>>>>>>>>>>>at block height %v system do keygen>>>>>>>>>>>>>>>\n", blockHeight)
-	oc.logger.Info().Msgf("publick keys: %v>>>>>>>>>>>>>>>\n", pubKeys)
+	oc.logger.Info().Msgf("public keys: %v>>>>>>>>>>>>>>>\n", pubKeys)
 	oc.logger.Info().Msgf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
 
 	var errKeygen error
@@ -85,13 +87,19 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 			resp, err := oc.tssServer.KeyGen(pubKeys, blockHeight, tssclient.TssVersion)
 			if err != nil {
 				oc.logger.Error().Err(err).Msgf("fail to do the keygen with retry %v", retry)
-				time.Sleep(time.Minute * 2)
+				if mock {
+					sleepTime = 1
+				}
+				time.Sleep(time.Second * time.Duration(sleepTime))
 				continue
 			}
 			if resp.Status != common.Success {
 				// todo we need to put our blame on pub_chain as well
 				oc.logger.Error().Msgf("we fail to ge the valid key")
-				time.Sleep(time.Minute * 2)
+				if mock {
+					sleepTime = 1
+				}
+				time.Sleep(time.Second * time.Duration(sleepTime))
 				continue
 			}
 			keygenResponse = &resp

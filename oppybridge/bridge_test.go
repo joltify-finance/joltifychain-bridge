@@ -3,6 +3,7 @@ package oppybridge
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"os"
 	"path"
 	"strconv"
@@ -46,6 +47,8 @@ func (b *BridgeTestSuite) SetupSuite() {
 	cfg := network.DefaultConfig()
 	cfg.BondDenom = "stake"
 	cfg.MinGasPrices = "0stake"
+	cfg.BondedTokens = sdk.NewInt(10000000000000000)
+	cfg.StakingTokens = sdk.NewInt(100000000000000000)
 	config.ChainID = cfg.ChainID
 	b.validatorKey = keyring.NewInMemory()
 	current, err := os.Getwd()
@@ -78,10 +81,12 @@ func (b *BridgeTestSuite) SetupSuite() {
 		}
 		pro := vaulttypes.PoolProposal{
 			PoolPubKey: poolPubKey,
+			PoolAddr:   randPoolSk.PubKey().Address().Bytes(),
 			Nodes:      nodes,
 		}
 		state.CreatePoolList = append(state.CreatePoolList, &vaulttypes.CreatePool{BlockHeight: strconv.Itoa(i), Validators: validators, Proposal: []*vaulttypes.PoolProposal{&pro}})
 	}
+	state.LatestTwoPool = state.CreatePoolList[:2]
 	testToken := vaulttypes.IssueToken{
 		Index: "testindex",
 	}
@@ -260,9 +265,15 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	acc, err := queryAccount(b.grpc, valAddr.String(), "")
 	b.Require().NoError(err)
 
-	// txBuilder, err := oc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
-	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), b.network.Validators[0].ClientCtx.Keyring)
+	memo := common.BridgeMemo{
+		Dest: oc.lastTwoPools[1].EthAddress.String(),
+	}
+
+	memoByte, err := json.Marshal(memo)
+	//txBuilder, err := oc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
+	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), b.network.Validators[0].ClientCtx.Keyring, string(memoByte))
 	b.Require().NoError(err)
+
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	b.Require().NoError(err)
 	ret, txHash, err := oc.BroadcastTx(context.Background(), b.grpc, txBytes, false)
@@ -278,6 +289,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	b.Require().NoError(err)
 	tx := block.Data.Txs[0]
 	oc.CheckOutBoundTx(b.grpc, 1, tx)
+
 }
 
 func TestBridge(t *testing.T) {

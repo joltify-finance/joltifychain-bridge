@@ -39,11 +39,16 @@ lint: lint-pre
 lint-verbose: lint-pre
 	@golangci-lint run -v
 
-protob:
-	protoc --go_out=module=$(module):. ./messages/*.proto
+#protob:
+#	protoc --go_out=module=$(module):. ./messages/*.proto
 
-build: protob
-	go build ./...
+
+
+build: go.sum
+	go build   -ldflags "-X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddress=0x66fff09f83bfce2ed9240fa6a1f7e96ba166ddf7"       ./cmd/oppyBridge.go
+
+format:
+	@gofumpt -l -w .
 
 # ------------------------------- GitLab ------------------------------- #
 docker-gitlab-login:

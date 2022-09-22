@@ -38,9 +38,11 @@ func TestConfig(t *testing.T) {
 	misc.SetupBech32Prefix()
 	reqs := createdTestOutBoundReqs(100)
 	oc := Instance{
-		RetryInboundReq: &sync.Map{},
-		InboundReqChan:  make(chan []*common.InBoundReq, 10),
-		moveFundReq:     &sync.Map{},
+		RetryInboundReq:      &sync.Map{},
+		InboundReqChan:       make(chan []*common.InBoundReq, 10),
+		moveFundReq:          &sync.Map{},
+		onHoldRetryQueueLock: &sync.Mutex{},
+		onHoldRetryQueue:     []*common.InBoundReq{},
 	}
 
 	for _, el := range reqs {
@@ -71,6 +73,9 @@ func TestConfig(t *testing.T) {
 	item := oc.ExportItems()
 	assert.Equal(t, len(item), 100)
 
+	ret := oc.IsEmpty()
+	assert.False(t, ret)
+
 	accs, err := generateRandomPrivKey(2)
 	assert.Nil(t, err)
 	pool := common.PoolInfo{
@@ -91,4 +96,16 @@ func TestConfig(t *testing.T) {
 	assert.Nil(t, popedItem)
 	popedItem, _ = oc.PopMoveFundItemAfterBlock(20)
 	assert.Equal(t, popedItem.Pk, accs[0].pk)
+
+	for _, el := range reqs {
+		oc.AddOnHoldQueue(el)
+	}
+	assert.Equal(t, len(oc.onHoldRetryQueue), len(reqs))
+	exported := oc.ExportMoveFundItems()
+	assert.Equal(t, len(exported), 1)
+
+	dumpped := oc.DumpQueue()
+	assert.Equal(t, len(dumpped), len(reqs))
+	assert.Equal(t, len(oc.onHoldRetryQueue), 0)
+
 }

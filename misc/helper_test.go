@@ -1,13 +1,16 @@
 package misc
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"encoding/base64"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/oppyfinance/tss/keysign"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types"
@@ -113,4 +116,37 @@ func TestMakeSignature(t *testing.T) {
 	transferFrom, err := EthSignPubKeyToOppyAddr(sigPublicKey)
 	assert.Nil(t, err)
 	assert.Equal(t, "oppy1q039ggfhyfmx4nrxsl256p2806g8vmg003ht9y", transferFrom.String())
+
+	// now we test serialize the signature
+
+	rEncode := base64.StdEncoding.EncodeToString(r.Bytes())
+	sEncode := base64.StdEncoding.EncodeToString(s.Bytes())
+	vEncode := base64.StdEncoding.EncodeToString(plainV.Bytes())
+
+	sig := keysign.Signature{
+		Msg:        "non_sense_msg",
+		R:          rEncode,
+		S:          sEncode,
+		RecoveryID: vEncode,
+	}
+
+	out, err := SerializeSig(&sig, false)
+	assert.NoError(t, err)
+
+	assert.True(t, bytes.Equal(out, sigBytes[:len(out)]))
+
+	out, err = SerializeSig(&sig, true)
+	assert.NoError(t, err)
+	assert.True(t, bytes.Equal(out, sigBytes))
+}
+
+func TestPubkeyToOppyAddress(t *testing.T) {
+	poolkey := "oppypub1addwnpepqgqd9v2x3axlkkmv5zj8hr6z7pl4fyt8xmhdmfx5kzql2uu6xfdwcahd8ah"
+	addr, err := PoolPubKeyToOppyAddress(poolkey)
+	assert.NoError(t, err)
+	assert.Equal(t, addr.String(), "oppy106q2q2k37jum8zua08yp7lr6llygl3m8933692")
+
+	poolkeyWrong := "oppypub1addwnpepqgqd9v2x3axlkkmv5zj8hr6z7pl4fyt8xmhdxfx5kzql2uu6xfdwcahd8ah"
+	_, err = PoolPubKeyToOppyAddress(poolkeyWrong)
+	assert.Error(t, err)
 }

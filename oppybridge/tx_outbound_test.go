@@ -45,6 +45,8 @@ func (o *OutBoundTestSuite) SetupSuite() {
 	cfg := network.DefaultConfig()
 	cfg.BondDenom = "stake"
 	cfg.MinGasPrices = "0stake"
+	cfg.BondedTokens = sdk.NewInt(10000000000000000)
+	cfg.StakingTokens = sdk.NewInt(100000000000000000)
 	cfg.ChainID = config.ChainID
 	o.cfg = cfg
 	o.validatorky = keyring.NewInMemory()
@@ -72,10 +74,12 @@ func (o *OutBoundTestSuite) SetupSuite() {
 		}
 		pro := vaulttypes.PoolProposal{
 			PoolPubKey: poolPubKey,
+			PoolAddr:   randPoolSk.PubKey().Address().Bytes(),
 			Nodes:      nodes,
 		}
 		state.CreatePoolList = append(state.CreatePoolList, &vaulttypes.CreatePool{BlockHeight: strconv.Itoa(i), Validators: validators, Proposal: []*vaulttypes.PoolProposal{&pro}})
 	}
+	state.LatestTwoPool = state.CreatePoolList[:2]
 	testToken := vaulttypes.IssueToken{
 		Index: "testindex",
 	}
@@ -456,6 +460,16 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 	o.Require().Equal(items[0].OutReceiverAddress.String(), accs[2].commAddr.String())
 	o.Require().Equal(items[0].Coin.Denom, coin1.Denom)
 	o.Require().Equal(items[0].Coin.Amount.Int64(), int64(100))
+
+	// we now pay enough fee and token to be transferred in one tx
+	coinFeeEnough := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewInt(100000000000000000))
+	msg.Amount = sdk.Coins{coin1, coinFeeEnough}
+	txEnoughFee := hex.EncodeToString([]byte("txhasenoughfee"))
+	err = oc.processErc20Request(&msg, txEnoughFee, int64(blockHeight), receiverAddr, memo)
+	items = oc.PopItem(1)
+	o.Require().Nil(err)
+	o.Require().Equal(items[0].Coin.Denom, coin1.Denom)
+	o.Require().Equal(items[0].Coin.Amount.Int64(), coin1.Amount.Int64())
 }
 
 func (o OutBoundTestSuite) TestProcessNativeToken() {
@@ -548,14 +562,51 @@ func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
 	err = oc.processNativeRequest(&msg, txIDNotEnoughFee, int64(blockHeight), receiverAddr, memo)
 	o.Require().NoError(err)
 
-	//we drop the native token if it is not enough for the fee
+	// we drop the native token if it is not enough for the fee
 	_, ok := oc.pendingTx.Load(txIDNotEnoughFee)
 	o.Require().False(ok)
 
 	oc.pendingTx.Range(func(key, value any) bool {
 		panic("it should be empty")
 	})
+}
 
+func (o OutBoundTestSuite) TestDropExpired() {
+
+	accs, err := generateRandomPrivKey(4)
+	o.Assert().NoError(err)
+	tss := TssMock{
+		accs[0].sk,
+		nil,
+		true,
+		true,
+	}
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr", "native"}, []string{"testToken", "abnb"})
+	o.Require().NoError(err)
+	oc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
+	o.Require().NoError(err)
+	defer func() {
+		err2 := oc.TerminateBridge()
+		if err2 != nil {
+			oc.logger.Error().Err(err2).Msgf("fail to terminate the bridge")
+		}
+	}()
+
+	for i := 0; i < 100; i++ {
+		ot := OutboundTx{
+			BlockHeight: uint64(0 + i),
+		}
+		oc.pendingTx.Store(strconv.Itoa(i), &ot)
+	}
+
+	oc.DeleteExpired(config.TxTimeout + 20)
+
+	counter := 0
+	oc.pendingTx.Range(func(key, value any) bool {
+		counter++
+		return true
+	})
+	o.Require().Equal(counter, 80)
 }
 
 func TestTxOutBound(t *testing.T) {
