@@ -35,7 +35,6 @@ func (tm *TssMock) KeySign(pk string, msgs []string, blockHeight int64, signers 
 			return keysign.Response{}, err
 		}
 		signature, err := crypto.Sign(msg, sk)
-
 		if err != nil {
 			return keysign.Response{}, err
 		}

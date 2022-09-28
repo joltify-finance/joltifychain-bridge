@@ -75,6 +75,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 	oc.logger.Info().Msgf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
 
 	var errKeygen error
+	errWriteLock := sync.Mutex{}
 	var keygenResponse *keygen.Response
 	wg.Add(1)
 	go func() {
@@ -107,7 +108,9 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 		}
 
 		if retry >= maxretry {
+			errWriteLock.Lock()
 			errKeygen = errors.New("fail to get the valid key")
+			errWriteLock.Unlock()
 			return
 		}
 
@@ -130,5 +133,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 		}
 		oc.logger.Info().Msgf("successfully prepared the tss key info on pub_chain")
 	}()
+	errWriteLock.Lock()
+	defer errWriteLock.Unlock()
 	return errKeygen
 }

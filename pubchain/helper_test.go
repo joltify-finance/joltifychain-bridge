@@ -2,13 +2,14 @@ package pubchain
 
 import (
 	"context"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
-	"sync"
-	"testing"
-	"time"
 )
 
 type TestHelperSuite struct {

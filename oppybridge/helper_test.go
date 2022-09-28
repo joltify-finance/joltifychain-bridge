@@ -1,6 +1,9 @@
 package oppybridge
 
 import (
+	"strconv"
+	"testing"
+
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -13,8 +16,6 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 	"gitlab.com/oppy-finance/oppychain/testutil/network"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
-	"strconv"
-	"testing"
 )
 
 type helperTestSuite struct {
@@ -105,7 +106,6 @@ func (h *helperTestSuite) TestQueryAccountAndBalance() {
 	balance, err := queryBalance("oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7", oc.GrpcClient)
 	h.Require().NoError(err)
 	h.Require().Equal(balance, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100000))})
-
 }
 
 func TestHelper(t *testing.T) {

@@ -3,6 +3,11 @@ package pubchain
 import (
 	"context"
 	"encoding/hex"
+	"math/big"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	"github.com/stretchr/testify/suite"
@@ -11,10 +16,6 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
 	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
-	"math/big"
-	"sync"
-	"testing"
-	"time"
 )
 
 type TestNetTestSuite struct {
@@ -79,7 +80,6 @@ func (tn TestNetTestSuite) TestProcessNewBlock() {
 }
 
 func (tn TestNetTestSuite) TestDoMoveFund() {
-
 	addr1, err := misc.PoolPubKeyToEthAddress(tn.pk1)
 	tn.Require().NoError(err)
 	addr2, err := misc.PoolPubKeyToEthAddress(tn.pk2)
@@ -126,7 +126,7 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	err = tn.pubChain.UpdatePool(&poolInfo2)
 	tn.Require().NoError(err)
 
-	ret := tn.pubChain.MoveFound(100, &previous, tn.pubChain.EthClient)
+	ret := tn.pubChain.MoveFound(100, misc.WebsocketTest, &previous, tn.pubChain.EthClient)
 
 	if !ret {
 		item, height := tn.pubChain.PopMoveFundItemAfterBlock(101)
@@ -134,10 +134,9 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 		tn.Require().Nil(item)
 		item, _ = tn.pubChain.PopMoveFundItemAfterBlock(100 + config.MINCHECKBLOCKGAP + 100)
 		tn.Require().NotNil(item)
-		ret2 := tn.pubChain.MoveFound(100, item, tn.pubChain.EthClient)
+		ret2 := tn.pubChain.MoveFound(100, misc.WebsocketTest, item, tn.pubChain.EthClient)
 		tn.Require().True(ret2)
 	}
-
 }
 
 func TestEvent(t *testing.T) {

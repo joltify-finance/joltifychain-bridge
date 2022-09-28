@@ -94,7 +94,7 @@ func TestConfig(t *testing.T) {
 	oc.AddMoveFundItem(&pool1, 11)
 	popedItem, _ := oc.PopMoveFundItemAfterBlock(15)
 	assert.Nil(t, popedItem)
-	popedItem, _ = oc.PopMoveFundItemAfterBlock(20)
+	popedItem, _ = oc.PopMoveFundItemAfterBlock(2000)
 	assert.Equal(t, popedItem.Pk, accs[0].pk)
 
 	for _, el := range reqs {
@@ -107,5 +107,4 @@ func TestConfig(t *testing.T) {
 	dumpped := oc.DumpQueue()
 	assert.Equal(t, len(dumpped), len(reqs))
 	assert.Equal(t, len(oc.onHoldRetryQueue), 0)
-
 }

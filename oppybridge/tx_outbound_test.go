@@ -572,7 +572,6 @@ func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
 }
 
 func (o OutBoundTestSuite) TestDropExpired() {
-
 	accs, err := generateRandomPrivKey(4)
 	o.Assert().NoError(err)
 	tss := TssMock{

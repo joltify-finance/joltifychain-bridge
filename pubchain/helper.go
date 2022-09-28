@@ -3,6 +3,9 @@ package pubchain
 import (
 	"context"
 	"errors"
+	"math/big"
+	"time"
+
 	"github.com/cenkalti/backoff"
 	types2 "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum"
@@ -12,8 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
-	"math/big"
-	"time"
 )
 
 func (pi *Instance) CheckPubChainHealthWithLock() error {

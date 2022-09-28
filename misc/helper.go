@@ -15,7 +15,7 @@ import (
 
 const WebsocketTest = "ws://152.69.189.218:8456"
 
-//const WebsocketTest = "ws://localhost:8456"
+// const WebsocketTest = "ws://localhost:8456"
 
 // SetupBech32Prefix sets up the prefix of the oppy chain
 func SetupBech32Prefix() {

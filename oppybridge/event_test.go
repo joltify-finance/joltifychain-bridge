@@ -212,9 +212,9 @@ func (e EventTestSuite) TestHandleUpdateEventKeyGenFail() {
 
 	wg := sync.WaitGroup{}
 	inKeyGen := atomic.NewBool(true)
-	//err = oc.HandleUpdateValidators(100, &wg, inKeyGen)
-	//e.Require().NoError(err)
-	//e.Require().Equal(len(oc.keyGenCache), 0)
+	// err = oc.HandleUpdateValidators(100, &wg, inKeyGen)
+	// e.Require().NoError(err)
+	// e.Require().Equal(len(oc.keyGenCache), 0)
 	tss.keygenSuccess = false
 	oc.Keyring = e.validatorKey
 	// we set the validator key, it should run the keygen successfully
@@ -223,7 +223,6 @@ func (e EventTestSuite) TestHandleUpdateEventKeyGenFail() {
 	err = oc.HandleUpdateValidators(100, &wg, inKeyGen, true)
 	wg.Wait()
 	e.Require().Error(errors.New("fail to get the valid key"))
-
 }
 
 func TestEvent(t *testing.T) {

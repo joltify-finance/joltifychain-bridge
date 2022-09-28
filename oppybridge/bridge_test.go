@@ -270,7 +270,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	}
 
 	memoByte, err := json.Marshal(memo)
-	//txBuilder, err := oc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
+	// txBuilder, err := oc.genSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 200000, &signMsg)
 	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), b.network.Validators[0].ClientCtx.Keyring, string(memoByte))
 	b.Require().NoError(err)
 
@@ -289,7 +289,6 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	b.Require().NoError(err)
 	tx := block.Data.Txs[0]
 	oc.CheckOutBoundTx(b.grpc, 1, tx)
-
 }
 
 func TestBridge(t *testing.T) {

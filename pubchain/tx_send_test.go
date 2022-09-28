@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 	"math/big"
 	"sync"
 	"testing"
 	"time"
+
+	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	zlog "github.com/rs/zerolog/log"
 
@@ -215,7 +216,6 @@ func TestProcessOutBound(t *testing.T) {
 }
 
 func TestSendToken(t *testing.T) {
-
 	justForTest := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
 
 	data, err := hex.DecodeString(justForTest)
@@ -277,7 +277,7 @@ func TestSendNativeToken(t *testing.T) {
 	_, ret, err := pubChain.SendNativeTokenForMoveFund(pk, receiver, receiver, big.NewInt(100), big.NewInt(1))
 	assert.True(t, ret)
 
-	//assert.Error(t, err)
+	// assert.Error(t, err)
 
 	// we send token to myself for testing
 	receiver, err = misc.PoolPubKeyToEthAddress(pk)
@@ -299,7 +299,6 @@ func TestSendNativeToken(t *testing.T) {
 }
 
 func TestSendNativeTokenBatch(t *testing.T) {
-
 	acc991 := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
 	data, err := hex.DecodeString(acc991)
 	if err != nil {

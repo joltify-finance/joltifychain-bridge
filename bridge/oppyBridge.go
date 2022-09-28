@@ -570,7 +570,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 						zlog.Logger.Error().Err(err).Msg("fail to dial the websocket")
 					}
 					if ethClient != nil {
-						isMoveFund = pi.MoveFound(height, previousPool, ethClient)
+						isMoveFund = pi.MoveFound(height, pubChainWsAddress, previousPool, ethClient)
 						ethClient.Close()
 					}
 				}
@@ -660,7 +660,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					processEachOutBound(oppyGrpc, oppyChain, pi, itemsRecv, failedOutbound, outBoundWait, &localSubmitLocker)
 				}()
 
-			case <-time.After(time.Second * 5):
+			case <-time.After(time.Second * 20):
 				zlog.Logger.Info().Msgf("we should not reach here")
 				err := pi.RetryPubChain()
 				if err != nil {

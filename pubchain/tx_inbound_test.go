@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"hash"
 	"math/big"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/core/rawdb"
 
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"

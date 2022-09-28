@@ -126,7 +126,6 @@ func TestAddAndDumpQueue(t *testing.T) {
 	assert.Equal(t, len(oc.onHoldRetryQueue), 0)
 	outputQueue = oc.DumpQueue()
 	assert.Equal(t, len(outputQueue), 0)
-
 }
 
 func createdTestPendingTxs(n int) []*OutboundTx {
