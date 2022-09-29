@@ -69,12 +69,14 @@ type Config struct {
 	KeyringAddress     string
 	HomeDir            string
 	TokenListPath      string
+	Version            bool
 	TokenListUpdateGap int
 	EnableMonitor      bool
 }
 
 func DefaultConfig() Config {
 	var config Config
+	flag.BoolVar(&config.Version, "v", false, "version of the oppyChain")
 	flag.StringVar(&config.OppyChain.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for oppy pub_chain")
 	flag.StringVar(&config.OppyChain.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for oppy pub_chain")
 	flag.StringVar(&config.OppyChain.HTTPAddress, "http-port", "http://localhost:26657", "ws address for oppy pub_chain")
