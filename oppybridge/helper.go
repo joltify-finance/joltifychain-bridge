@@ -166,8 +166,13 @@ func (oc *OppyChainInstance) waitAndSend(conn grpc1.ClientConn, poolAddress sdk.
 }
 
 func (oc *OppyChainInstance) batchComposeAndSend(conn grpc1.ClientConn, sendMsg []sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (map[uint64]string, error) {
-	gasWanted := oc.GetGasEstimation()
-	txBuilderSeqMap, err := oc.batchGenSendTx(sendMsg, accSeq, accNum, uint64(gasWanted), signMsg)
+	gasWanted, err := oc.GasEstimation(conn, sendMsg, accSeq, nil)
+	if err != nil {
+		oc.logger.Error().Err(err).Msg("Fail to get the gas estimation")
+		return nil, err
+	}
+
+	txBuilderSeqMap, err := oc.batchGenSendTx(sendMsg, accSeq, accNum, gasWanted, signMsg)
 	if err != nil {
 		oc.logger.Error().Err(err).Msg("fail to generate the tx")
 		return nil, err
@@ -216,8 +221,13 @@ func (oc *OppyChainInstance) batchComposeAndSend(conn grpc1.ClientConn, sendMsg 
 }
 
 func (oc *OppyChainInstance) composeAndSend(conn grpc1.ClientConn, operator keyring.Info, sendMsg sdk.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress sdk.AccAddress) (bool, string, error) {
-	gasWanted := oc.GetGasEstimation()
-	txBuilder, err := oc.genSendTx(operator, []sdk.Msg{sendMsg}, accSeq, accNum, uint64(gasWanted), signMsg)
+	gasWanted, err := oc.GasEstimation(conn, []sdk.Msg{sendMsg}, accSeq, nil)
+	if err != nil {
+		oc.logger.Error().Err(err).Msg("Fail to get the gas estimation")
+		return false, "", err
+	}
+
+	txBuilder, err := oc.genSendTx(operator, []sdk.Msg{sendMsg}, accSeq, accNum, gasWanted, signMsg)
 	if err != nil {
 		oc.logger.Error().Err(err).Msg("fail to generate the tx")
 		return false, "", err

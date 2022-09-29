@@ -439,7 +439,7 @@ func (oc *OppyChainInstance) CheckAndUpdatePool(conn grpc1.ClientConn, blockHeig
 	el := oc.keyGenCache[0]
 	oc.poolUpdateLocker.Unlock()
 	if el.blockHeight <= blockHeight {
-		oc.logger.Info().Msgf("we are submitting the block at height>>>>>>>>%v\n", el.blockHeight)
+		oc.logger.Info().Msgf("we are submitting the create pool message at height>>>>>>>>%v\n", el.blockHeight)
 		ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 		defer cancel()
 
