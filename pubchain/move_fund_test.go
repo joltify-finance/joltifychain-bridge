@@ -75,7 +75,13 @@ func (tn *TestNetTestSuite) SetupSuite() {
 }
 
 func (tn TestNetTestSuite) TestProcessNewBlock() {
-	err := tn.pubChain.ProcessNewBlock(big.NewInt(22998501))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	tn.pubChain.ethClientLocker.Lock()
+	number, err := tn.pubChain.EthClient.BlockNumber(ctx)
+	tn.Require().NoError(err)
+	tn.pubChain.ethClientLocker.Unlock()
+	err = tn.pubChain.ProcessNewBlock(big.NewInt(int64(number)))
 	tn.Require().NoError(err)
 }
 

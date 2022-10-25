@@ -1,9 +1,10 @@
 
 <a name="v1.0.4"></a>
-## [v1.0.4](https://gitlab.com/oppy-finance/oppy-bridge/compare/v1.0.3...v1.0.4) (2022-09-28)
+## [v1.0.4](https://gitlab.com/oppy-finance/oppy-bridge/compare/v1.0.3...v1.0.4) (2022-09-29)
 
 ### Fix
 
+* update the gas estimation to fix the failure in submit the pool info to oppychain
 * 1. increase the oppychain gas ration to avoid the out-of-gas error 2. skip the token address once it has none balance 3. optimize the move fund to pre-allocate the nonce for batch move fund
 * add more tests and bump the tss-lib and go-ethereum version
 * fix the bug that health check failed if no inbound tx is processed

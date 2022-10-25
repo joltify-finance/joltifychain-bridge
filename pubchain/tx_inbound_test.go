@@ -637,7 +637,7 @@ func TestProcessERC20InBoundOnBSC(t *testing.T) {
 	assert.Nil(t, err)
 
 	// TODO since our bsc testnet is the pruned node, it can only store the latest tx
-	txid := common.HexToHash("0x6a8effcfd4a01e3e6f09e1a026da28914d49d4adc20a84ad331f70fd4302e4b1")
+	txid := common.HexToHash("0x6677fc5a3974c96a0545fde704de5d87f22ffe1b6779039ec8849629c352a581")
 	tx, isPending, err := pi.EthClient.TransactionByHash(context.Background(), txid)
 	assert.Nil(t, err)
 	assert.False(t, isPending)
