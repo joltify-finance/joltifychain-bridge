@@ -72,12 +72,11 @@ func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Addr
 	if nonce != nil {
 		txo.Nonce = nonce
 	}
-	sendAmount := new(big.Int).Sub(amount, totalFee)
 	pi.logger.Info().Msgf("we send %v with paid fee %v\n", amount, totalFee)
-	txo.Value = sendAmount
+	txo.Value = amount
 
 	var data []byte
-	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: uint64(adjGas), To: &receiver, Value: sendAmount, Data: data})
+	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: uint64(adjGas), To: &receiver, Value: txo.Value, Data: data})
 
 	signedTx, err := txo.Signer(sender, tx)
 	if err != nil {
