@@ -402,6 +402,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					if previousPool.Pk != poolInfo[0].CreatePool.PoolPubKey {
 						// we force the first try of the tx to be run without blocking by the block wait
 						pi.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5)
+						theSecondPool := currentPool[1]
+						pi.AddMoveFundItem(theSecondPool, latestHeight-config.MINCHECKBLOCKGAP+10)
 					}
 				}
 

@@ -40,7 +40,7 @@ lint-pre:
 	@go mod verify
 
 lint: lint-pre
-	@golangci-lint run
+		@golangci-lint run --out-format=tab  -v --timeout 3600s -c ./.golangci.yml
 
 lint-verbose: lint-pre
 	@golangci-lint run -v

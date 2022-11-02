@@ -40,7 +40,6 @@ func (pi *Instance) MoveFound(height int64, pubChainWsAddress string, previousPo
 	// movefund according to the history tokenlist
 	existedTokenAddresses := pi.TokenList.GetAllExistedTokenAddresses()
 	sort.Strings(existedTokenAddresses)
-
 	var needToMove []string
 	waitForFinish := &sync.WaitGroup{}
 	for _, tokenAddr := range existedTokenAddresses {

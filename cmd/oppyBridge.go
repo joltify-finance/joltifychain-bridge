@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"gitlab.com/oppy-finance/oppy-bridge/bridge"
 
 	"gitlab.com/oppy-finance/oppy-bridge/version"
