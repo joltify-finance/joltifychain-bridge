@@ -51,7 +51,7 @@ lint_code:
   image: golangci/golangci-lint
   stage: test
   before_script:
-    - go get mvdan.cc/gofumpt
+    - go install mvdan.cc/gofumpt@latest
   script:
     - golangci-lint run -v --timeout 3600s -c ./.golangci.yml
 

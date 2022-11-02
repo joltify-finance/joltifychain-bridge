@@ -7,7 +7,7 @@ import (
 )
 
 func NeedUpdate(qcPools []*vaulttypes.PoolInfo, curPools []*common.PoolInfo) bool {
-	// in the cached address, the latest is at index 1 while the query pool has the latest at index 0
+	// in the cached address, the latest is at index 1 while the query latest pool has the latest at index 0
 	if curPools[0] == nil || curPools[1] == nil {
 		return true
 	}
