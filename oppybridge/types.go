@@ -63,7 +63,7 @@ type OppyChainInstance struct {
 	RetryOutboundReq      *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	CurrentHeight         int64
 	inBoundGas            *atomic.Int64
-	outBoundFee           *atomic.Int64
+	outBoundFeeMap        map[string]*atomic.Int64
 	TokenList             tokenlist.BridgeTokenListI
 	pendingTx             *sync.Map
 	ChannelQueueNewBlock  chan ctypes.ResultEvent
@@ -92,13 +92,13 @@ type info struct {
 type OutboundTx struct {
 	OutReceiverAddress common.Address `json:"receiver_address"`
 	FromAddress        string         `json:"from_address"` // this item is used in query pending to to match a given sender
-	ChainID            string         `json:"chain_id"`
 	BlockHeight        uint64         `json:"block_height"`
 	Token              sdk.Coin       `json:"token"`
 	TokenAddr          string         `json:"token_addr"`
 	Fee                sdk.Coin       `json:"fee"`
 	FeeWanted          sdk.Coin       `json:"fee_wanted"`
 	TxID               string         `json:"txid"`
+	ChainType          string         `json:"chain_type"`
 }
 
 // NewOppyBridge new the instance for the oppy pub_chain
@@ -130,7 +130,9 @@ func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, t
 	oppyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
 	oppyBridge.poolUpdateLocker = &sync.RWMutex{}
 	oppyBridge.inBoundGas = atomic.NewInt64(250000)
-	oppyBridge.outBoundFee = atomic.NewInt64(5000000000)
+	oppyBridge.outBoundFeeMap = make(map[string]*atomic.Int64)
+	oppyBridge.outBoundFeeMap["BSC"] = atomic.NewInt64(5000000000)
+	oppyBridge.outBoundFeeMap["ETH"] = atomic.NewInt64(5000000000)
 
 	encode := MakeEncodingConfig()
 	oppyBridge.encoding = &encode

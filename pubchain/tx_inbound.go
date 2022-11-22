@@ -22,8 +22,8 @@ import (
 const alreadyKnown = "already known"
 
 // ProcessInBoundERC20 process the inbound contract token top-up
-func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, txInfo *Erc20TxInfo, txBlockHeight uint64) error {
-	err := pi.processInboundERC20Tx(tx.Hash().Hex()[2:], txBlockHeight, txInfo.fromAddr, txInfo.tokenAddress, txInfo.Amount, txInfo.tokenAddress)
+func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, chainType string, txInfo *Erc20TxInfo, txBlockHeight uint64) error {
+	err := pi.processInboundERC20Tx(tx.Hash().Hex()[2:], chainType, txBlockHeight, txInfo.fromAddr, txInfo.tokenAddress, txInfo.Amount, txInfo.tokenAddress)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
 		return err
@@ -32,20 +32,20 @@ func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, txInfo *Erc20T
 }
 
 // ProcessNewBlock process the blocks received from the public pub_chain
-func (pi *Instance) ProcessNewBlock(number *big.Int) error {
-	block, err := pi.GetBlockByNumberWithLock(number)
+func (pi *Instance) ProcessNewBlock(chainType string, chainInfo *ChainInfo, number *big.Int) error {
+	block, err := chainInfo.GetBlockByNumberWithLock(number)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to retrieve the block")
 		return err
 	}
 	// we need to put the block height in which we find the tx
-	pi.processEachBlock(block, number.Int64())
+	pi.processEachBlock(chainType, chainInfo, block, number.Int64())
 	return nil
 }
 
-func (pi *Instance) processInboundERC20Tx(txID string, txBlockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
+func (pi *Instance) processInboundERC20Tx(txID, chainType string, txBlockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
 	// this is repeated check for tokenAddr which is cheked at function 'processEachBlock'
-	tokenItem, exit := pi.TokenList.GetTokenInfoByAddress(strings.ToLower(addr.Hex()))
+	tokenItem, exit := pi.TokenList.GetTokenInfoByAddressAndChainType(strings.ToLower(addr.Hex()), chainType)
 	if !exit {
 		pi.logger.Error().Msgf("Token is not on our token list")
 		return errors.New("token is not on our token list")
@@ -80,11 +80,11 @@ func (pi *Instance) processInboundERC20Tx(txID string, txBlockHeight uint64, fro
 	return nil
 }
 
-func (pi *Instance) checkErc20(data []byte, to string) (*Erc20TxInfo, error) {
+func (pi *Instance) checkErc20(data []byte, to, contractAddress string) (*Erc20TxInfo, error) {
 	// address toAddress, uint256 amount, address contractAddress, bytes memo
 
 	// check it is from our smart contract
-	if !strings.EqualFold(to, OppyContractAddress) {
+	if !strings.EqualFold(to, contractAddress) {
 		return nil, errors.New("not our smart contract")
 	}
 
@@ -137,19 +137,18 @@ func (pi *Instance) checkErc20(data []byte, to string) (*Erc20TxInfo, error) {
 	return nil, errors.New("invalid method for decode")
 }
 
-func (pi *Instance) processEachBlock(block *ethTypes.Block, txBlockHeight int64) {
+func (pi *Instance) processEachBlock(chainType string, chainInfo *ChainInfo, block *ethTypes.Block, txBlockHeight int64) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
 			continue
 		}
-		status, err := pi.checkEachTx(tx.Hash())
+		status, err := chainInfo.checkEachTx(tx.Hash())
 		if err != nil || status != 1 {
 			continue
 		}
-
-		txInfo, err := pi.checkErc20(tx.Data(), tx.To().Hex())
+		txInfo, err := pi.checkErc20(tx.Data(), tx.To().Hex(), chainInfo.contractAddress)
 		if err == nil {
-			_, exit := pi.TokenList.GetTokenInfoByAddress(txInfo.tokenAddress.String())
+			_, exit := pi.TokenList.GetTokenInfoByAddressAndChainType(txInfo.tokenAddress.String(), chainType)
 			if !exit {
 				// this indicates it is not to our smart contract
 				continue
@@ -160,7 +159,7 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, txBlockHeight int64)
 				continue
 			}
 
-			err := pi.ProcessInBoundERC20(tx, txInfo, block.NumberU64())
+			err := pi.ProcessInBoundERC20(tx, chainType, txInfo, block.NumberU64())
 			if err != nil {
 				zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
 				continue
@@ -181,14 +180,14 @@ func (pi *Instance) processEachBlock(block *ethTypes.Block, txBlockHeight int64)
 				continue
 			}
 
-			// this indicates it is a native bnb transfer
-			balance, err := pi.getBalance(tx.Value())
-			if err != nil {
-				continue
-			}
-			tokenItem, exist := pi.TokenList.GetTokenInfoByAddress("native")
+			tokenItem, exist := pi.TokenList.GetTokenInfoByAddressAndChainType("native", chainType)
 			if !exist {
 				panic("native token is not set")
+			}
+			// this indicates it is a native bnb transfer
+			balance, err := pi.getBalance(tx.Value(), tokenItem.Denom)
+			if err != nil {
+				continue
 			}
 			delta := types.Precision - tokenItem.Decimals
 			if delta != 0 {

@@ -19,7 +19,7 @@ func (o *OutBoundReq) Hash() common.Hash {
 	return hash
 }
 
-func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin types.Coin, coinAddr string, txBlockHeight int64, feeCoins, feeToValidator types.Coins) OutBoundReq {
+func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin types.Coin, coinAddr string, txBlockHeight int64, feeCoins, feeToValidator types.Coins, chainType string) OutBoundReq {
 	return OutBoundReq{
 		txID,
 		address,
@@ -31,6 +31,7 @@ func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin type
 		common.Hash{}.Hex(),
 		feeCoins,
 		feeToValidator,
+		chainType,
 	}
 }
 

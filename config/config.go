@@ -17,8 +17,9 @@ type OppyChainConfig struct {
 }
 
 type PubChainConfig struct {
-	WsAddress   string
-	RollbackGap int
+	WsAddressBSC string
+	WsAddressETH string
+	RollbackGap  int
 }
 
 type (
@@ -82,7 +83,8 @@ func DefaultConfig() Config {
 	flag.StringVar(&config.OppyChain.HTTPAddress, "http-port", "http://localhost:26657", "ws address for oppy pub_chain")
 	flag.StringVar(&config.OppyChain.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for oppy pub_chain")
 	flag.IntVar(&config.OppyChain.RollbackGap, "oppy-rollback-gap", 1, "delay the transaction process to prevent chain rollback")
-	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://rpc.test.oppy.zone:8456/", "endpoint for public pub_chain listener")
+	flag.StringVar(&config.PubChainConfig.WsAddressBSC, "pub-ws-endpoint", "ws://rpc.test.oppy.zone:8456/", "endpoint for public pub_chain listener")
+	flag.StringVar(&config.PubChainConfig.WsAddressETH, "pub-ws-ETHendpoint", "ws://104.238.136.146:8453/", "endpoint for public pub_chain listener")
 	flag.IntVar(&config.PubChainConfig.RollbackGap, "pubchain-rollback-gap", 1, "delay the transaction process to prevent chain rollback")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
 	flag.StringVar(&config.HomeDir, "home", "/root/.oppyChain/config", "home director for oppy_bridge")

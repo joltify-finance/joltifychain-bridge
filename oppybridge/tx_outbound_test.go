@@ -150,7 +150,7 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 		true,
 	}
 	//
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	o.Require().NoError(err)
 	oc, err := NewOppyBridge(o.network.Validators[0].APIAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
@@ -234,7 +234,7 @@ func (o OutBoundTestSuite) TestOutBoundReq() {
 	accs, err := generateRandomPrivKey(2)
 
 	o.Require().NoError(err)
-	boundReq := common2.NewOutboundReq("testID", accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("JUSD", sdk.NewInt(1)), AddrJUSD, 101, nil, nil)
+	boundReq := common2.NewOutboundReq("testID", accs[0].commAddr, accs[1].commAddr, sdk.NewCoin("JUSD", sdk.NewInt(1)), AddrJUSD, 101, nil, nil, "BSC")
 	boundReq.SetItemNonce(accs[1].commAddr, 100)
 	a, b, _, amount, h := boundReq.GetOutBoundInfo()
 	o.Require().Equal(a.String(), accs[0].commAddr.String())
@@ -252,7 +252,7 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 		true,
 		true,
 	}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr", "native"}, []string{"testToken", config.OutBoundDenomFee})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr", "native"}, []string{"testToken", config.OutBoundDenomFeeBSC}, []string{"BSC", "BSC"})
 	o.Require().NoError(err)
 	oc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
@@ -268,7 +268,8 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	baseBlockHeight := int64(100)
 	msg := banktypes.MsgSend{}
 	memo := common2.BridgeMemo{
-		Dest: accs[0].commAddr.String(),
+		Dest:      accs[0].commAddr.String(),
+		ChainType: "BSC",
 	}
 
 	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, memo, &msg, []byte("msg1"))
@@ -289,7 +290,7 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, memo, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "incorrect msg format")
 
-	fee := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewInt(100))
+	fee := sdk.NewCoin(config.OutBoundDenomFeeBSC, sdk.NewInt(100))
 	coin2 := sdk.NewCoin("invalidToken", sdk.NewInt(1))
 	coin3 := sdk.NewCoin("invalidToken2", sdk.NewInt(100))
 	topUptoken := sdk.NewCoin("testToken", sdk.NewInt(100))
@@ -300,10 +301,10 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 
 	msg.Amount = sdk.Coins{fee, coin2}
 	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].oppyAddr, accs[2].oppyAddr}, accs[3].commAddr, memo, &msg, []byte("msg1"))
-	o.Require().EqualError(err, "fail to process the outbound erc20 request")
+	o.Require().EqualError(err, "fail to process the outbound erc20 request invalid fee pair")
 
 	// test ERC20 token
-	txID := "5d3a86ed8923343038a6c847d6b71c8dfe8e507fdda748223a28e860756f6afe"
+	txID := "5dd520d7ebcd1fc1c070d0c595839991c544cc45dcdbfa43aa86370daa258676"
 	txIDByte, err := hex.DecodeString(txID)
 	o.Require().NoError(err)
 	msg.Amount = sdk.Coins{fee, topUptoken}
@@ -321,7 +322,8 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	FeeWeGet := dat.(*OutboundTx).Fee.Amount
 	o.Require().Equal(FeeWeGet, sdk.NewInt(200))
 
-	expectedFee := oc.calculateGas()
+	expectedFee, err := oc.calculateGas("BSC")
+	o.Require().NoError(err)
 
 	delta := expectedFee.SubAmount(FeeWeGet)
 	memo.TopupID = txID
@@ -366,7 +368,8 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 		true,
 		true,
 	}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"native", "testAddr2"}, []string{config.OutBoundDenomFee, "testToken"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"native", "testAddr2"}, []string{config.OutBoundDenomFeeBSC, "testToken"}, []string{"BSC", "BSC"})
+
 	o.Require().NoError(err)
 	oc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
@@ -387,9 +390,18 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 	}
 
 	coin1 := sdk.NewCoin("testToken", sdk.NewInt(100))
-	coinFee := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewInt(100))
+	coinFee := sdk.NewCoin(config.OutBoundDenomFeeBSC, sdk.NewInt(100))
 	invalidFee := sdk.NewCoin("invalidFee", sdk.NewInt(100000000000000000))
 	msg.Amount = sdk.Coins{coin1, invalidFee}
+	err = oc.processErc20Request(&msg, txID, int64(blockHeight), receiverAddr, memo)
+	o.Require().EqualError(err, "invalid chain type")
+
+	memo.ChainType = "ETH"
+	msg.Amount = sdk.Coins{coin1, invalidFee}
+	err = oc.processErc20Request(&msg, txID, int64(blockHeight), receiverAddr, memo)
+	o.Require().EqualError(err, "invalid fee pair")
+
+	memo.ChainType = "BSC"
 	err = oc.processErc20Request(&msg, txID, int64(blockHeight), receiverAddr, memo)
 	o.Require().EqualError(err, "invalid fee pair")
 
@@ -424,6 +436,7 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 	// the pending tx does not exit
 	msg.Amount = []sdk.Coin{coin1}
 	memo.TopupID = txIDNotEnoughFee
+	memo.ChainType = "BSC"
 	err = oc.processTopUpRequest(&msg, int64(101), receiverAddr, memo)
 	o.Require().NotNil(err)
 	val, ok = oc.pendingTx.Load(txIDNotEnoughFee)
@@ -441,7 +454,8 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 	o.Require().True(val.(*OutboundTx).Fee.Amount.Equal(coinFee.Amount.MulRaw(2)))
 
 	// now we pay enough fee
-	expectedFee := oc.calculateGas()
+	expectedFee, err := oc.calculateGas("BSC")
+	o.Require().NoError(err)
 
 	delta := expectedFee.Sub(val.(*OutboundTx).Fee)
 	msg.Amount = []sdk.Coin{delta}
@@ -450,7 +464,7 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 
 	_, ok = oc.pendingTx.Load(txIDNotEnoughFee)
 	o.Require().False(ok)
-	items := oc.PopItem(1)
+	items := oc.PopItem(1, "BSC")
 
 	oc.pendingTx.Range(func(key, value any) bool {
 		panic("it should be empty")
@@ -462,11 +476,11 @@ func (o OutBoundTestSuite) TestProcessErc20Token() {
 	o.Require().Equal(items[0].Coin.Amount.Int64(), int64(100))
 
 	// we now pay enough fee and token to be transferred in one tx
-	coinFeeEnough := sdk.NewCoin(config.OutBoundDenomFee, sdk.NewInt(100000000000000000))
+	coinFeeEnough := sdk.NewCoin(config.OutBoundDenomFeeBSC, sdk.NewInt(100000000000000000))
 	msg.Amount = sdk.Coins{coin1, coinFeeEnough}
 	txEnoughFee := hex.EncodeToString([]byte("txhasenoughfee"))
 	err = oc.processErc20Request(&msg, txEnoughFee, int64(blockHeight), receiverAddr, memo)
-	items = oc.PopItem(1)
+	items = oc.PopItem(1, "BSC")
 	o.Require().Nil(err)
 	o.Require().Equal(items[0].Coin.Denom, coin1.Denom)
 	o.Require().Equal(items[0].Coin.Amount.Int64(), coin1.Amount.Int64())
@@ -481,7 +495,8 @@ func (o OutBoundTestSuite) TestProcessNativeToken() {
 		true,
 		true,
 	}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr", "native"}, []string{"testToken", "abnb"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr", "native", "native"}, []string{"testToken", "abnb", "aeth"}, []string{"BSC", "BSC", "ETH"})
+
 	o.Require().NoError(err)
 	oc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
@@ -506,12 +521,20 @@ func (o OutBoundTestSuite) TestProcessNativeToken() {
 	err = oc.processNativeRequest(&msg, txID, int64(blockHeight), receiverAddr, memo)
 	o.Require().EqualError(err, "token is not on our token list")
 
+	memo.ChainType = "unknwon"
 	coin4 := sdk.NewCoin("abnb", sdk.NewInt(100))
 	msg.Amount = sdk.Coins{coin4}
 	err = oc.processNativeRequest(&msg, txID, int64(blockHeight), receiverAddr, memo)
-	o.Require().NoError(err)
+	o.Require().EqualError(err, "token is not on our token list")
 
-	expectedFee := oc.calculateGas()
+	memo.ChainType = "ETH"
+	err = oc.processNativeRequest(&msg, txID, int64(blockHeight), receiverAddr, memo)
+	o.Require().EqualError(err, "token is not on our token list")
+
+	memo.ChainType = "BSC"
+
+	expectedFee, err := oc.calculateGas("BSC")
+	o.Require().NoError(err)
 
 	coin4 = sdk.NewCoin("abnb", expectedFee.Amount)
 	msg.Amount = sdk.Coins{coin4}
@@ -536,7 +559,7 @@ func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
 		true,
 		true,
 	}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr", "native"}, []string{"testToken", "abnb"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr", "native", "native"}, []string{"testToken", "abnb", "aeth"}, []string{"BSC", "BSC", "ETH"})
 	o.Require().NoError(err)
 	oc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)
@@ -553,7 +576,8 @@ func (o OutBoundTestSuite) TestProcessNativeTokenTopUp() {
 	receiverAddr := accs[0].commAddr
 
 	memo := common2.BridgeMemo{
-		Dest: accs[2].commAddr.String(),
+		Dest:      accs[2].commAddr.String(),
+		ChainType: "BSC",
 	}
 
 	fee := sdk.NewCoin("abnb", sdk.NewInt(100))
@@ -580,7 +604,7 @@ func (o OutBoundTestSuite) TestDropExpired() {
 		true,
 		true,
 	}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr", "native"}, []string{"testToken", "abnb"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr", "native", "native"}, []string{"testToken", "abnb", "aeth"}, []string{"BSC", "BSC", "ETH"})
 	o.Require().NoError(err)
 	oc, err := NewOppyBridge(o.network.Validators[0].RPCAddress, o.network.Validators[0].RPCAddress, &tss, tl)
 	o.Require().NoError(err)

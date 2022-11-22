@@ -29,7 +29,7 @@ func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewOutboundReq(hex.EncodeToString([]byte(txid)), addr, addr, testCoin, "testAddr", int64(i), nil, nil)
+		item := common.NewOutboundReq(hex.EncodeToString([]byte(txid)), addr, addr, testCoin, "testAddr", int64(i), nil, nil, "BSC")
 		retReq[i] = &item
 	}
 	return retReq
@@ -49,7 +49,7 @@ func TestConfig(t *testing.T) {
 	}
 	assert.Equal(t, oc.Size(), 100)
 
-	poped := oc.PopItem(1000)
+	poped := oc.PopItem(1000, "BSC")
 	assert.Equal(t, 100, len(poped))
 	allIndex := make([]string, len(poped))
 	for i, el := range poped {

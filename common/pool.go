@@ -28,6 +28,7 @@ type OutBoundReq struct {
 	SubmittedTxHash    string         `json:"submitted_tx_hash"` // this item is used for checking whether it is accepted on pubchain
 	Fee                types.Coins    `json:"fee"`
 	FeeToValidator     types.Coins    `json:"fee_to_validator"`
+	ChainType          string         `json:"chain_type"`
 }
 
 // InBoundReq is the account that top up account info to oppy pub_chain
@@ -44,7 +45,8 @@ type InBoundReq struct {
 }
 
 type BridgeMemo struct {
-	Dest     string `json:"dest"`
-	TopupID  string `json:"topup_id"`
-	USerData string `json:"user_data"`
+	Dest      string `json:"dest"`
+	TopupID   string `json:"topup_id"`
+	USerData  string `json:"user_data"`
+	ChainType string `json:"chain_type"`
 }

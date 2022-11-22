@@ -61,12 +61,12 @@ func (tn *TestNetTestSuite) SetupSuite() {
 
 	tss := TssMock{sk: &sk}
 	tn.tss = &tss
-	tl, err := tokenlist.CreateMockTokenlist([]string{"0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"}, []string{"JUSD"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"0xeB42ff4cA651c91EB248f8923358b6144c6B4b79"}, []string{"JUSD"}, []string{"BSC"})
 	if err != nil {
 		panic(err)
 	}
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, &tss, tl, &wg)
+	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg)
 	if err != nil {
 		panic(err)
 	}
@@ -77,11 +77,11 @@ func (tn *TestNetTestSuite) SetupSuite() {
 func (tn TestNetTestSuite) TestProcessNewBlock() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
-	tn.pubChain.ethClientLocker.Lock()
-	number, err := tn.pubChain.EthClient.BlockNumber(ctx)
+	tn.pubChain.BSCChain.ChainLocker.Lock()
+	number, err := tn.pubChain.BSCChain.Client.BlockNumber(ctx)
 	tn.Require().NoError(err)
-	tn.pubChain.ethClientLocker.Unlock()
-	err = tn.pubChain.ProcessNewBlock(big.NewInt(int64(number)))
+	tn.pubChain.BSCChain.ChainLocker.Unlock()
+	err = tn.pubChain.ProcessNewBlock("BSC", tn.pubChain.BSCChain, big.NewInt(int64(number)))
 	tn.Require().NoError(err)
 }
 
@@ -93,9 +93,9 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
-	balance1, err := tn.pubChain.getBalanceWithLock(ctx, addr1)
+	balance1, err := tn.pubChain.BSCChain.getBalanceWithLock(ctx, addr1)
 	tn.Require().NoError(err)
-	balance2, err := tn.pubChain.getBalanceWithLock(ctx, addr2)
+	balance2, err := tn.pubChain.BSCChain.getBalanceWithLock(ctx, addr2)
 	tn.Require().NoError(err)
 
 	tn.tss.sk = tn.sk2
@@ -132,7 +132,7 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	err = tn.pubChain.UpdatePool(&poolInfo2)
 	tn.Require().NoError(err)
 
-	ret := tn.pubChain.MoveFound(100, misc.WebsocketTest, &previous, tn.pubChain.EthClient)
+	ret := tn.pubChain.MoveFound(100, tn.pubChain.BSCChain, &previous, tn.pubChain.BSCChain.Client)
 
 	if !ret {
 		item, height := tn.pubChain.PopMoveFundItemAfterBlock(101)
@@ -140,7 +140,7 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 		tn.Require().Nil(item)
 		item, _ = tn.pubChain.PopMoveFundItemAfterBlock(100 + config.MINCHECKBLOCKGAP + 100)
 		tn.Require().NotNil(item)
-		ret2 := tn.pubChain.MoveFound(100, misc.WebsocketTest, item, tn.pubChain.EthClient)
+		ret2 := tn.pubChain.MoveFound(100, tn.pubChain.BSCChain, item, tn.pubChain.BSCChain.Client)
 		tn.Require().True(ret2)
 	}
 }

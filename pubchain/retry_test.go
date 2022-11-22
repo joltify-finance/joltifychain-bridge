@@ -19,7 +19,7 @@ func (tn *TestRetrySuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, nil, nil, &wg)
+	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, nil, nil, &wg)
 	if err != nil {
 		panic(err)
 	}
@@ -28,17 +28,17 @@ func (tn *TestRetrySuite) SetupSuite() {
 
 func (tn TestRetrySuite) TestRetry() {
 	ctx, cancel := context.WithCancel(context.Background())
-	err := tn.pubChain.StartSubscription(ctx, tn.pubChain.wg)
+	err := tn.pubChain.BSCChain.StartSubscription(ctx, tn.pubChain.wg)
 	tn.Require().NoError(err)
-	b := <-tn.pubChain.SubChannelNow
+	b := <-tn.pubChain.BSCChain.SubChannelNow
 	currentBlock := b.Number.Uint64()
 
 	time.Sleep(time.Second * 10)
 
-	err = tn.pubChain.RetryPubChain()
+	err = tn.pubChain.BSCChain.RetryPubChain()
 	tn.Require().NoError(err)
 	blockInNew := currentBlock + uint64(len(tn.pubChain.ChannelQueue))
-	latest := <-tn.pubChain.SubChannelNow
+	latest := <-tn.pubChain.BSCChain.SubChannelNow
 	tn.Require().Equal(blockInNew+1, latest.Number.Uint64())
 	cancel()
 	tn.pubChain.wg.Wait()

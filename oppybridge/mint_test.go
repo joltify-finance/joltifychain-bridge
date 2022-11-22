@@ -193,7 +193,7 @@ func (m MintTestSuite) TestProcessInbound() {
 		true,
 		true,
 	}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	m.Require().NoError(err)
 	oc, err := NewOppyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, &tss, tl)
 	m.Require().NoError(err)

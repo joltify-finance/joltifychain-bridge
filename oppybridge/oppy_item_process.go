@@ -52,9 +52,13 @@ func (oc *OppyChainInstance) AddItem(req *common.OutBoundReq) {
 	oc.RetryOutboundReq.Store(req.Index(), req)
 }
 
-func (oc *OppyChainInstance) PopItem(n int) []*common.OutBoundReq {
+func (oc *OppyChainInstance) PopItem(n int, chainType string) []*common.OutBoundReq {
 	var allkeys []string
 	oc.RetryOutboundReq.Range(func(key, value interface{}) bool {
+		req := value.(*common.OutBoundReq)
+		if req.ChainType != chainType {
+			return true
+		}
 		allkeys = append(allkeys, key.(string))
 		return true
 	})

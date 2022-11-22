@@ -15,6 +15,7 @@ type TokenItem struct {
 	TokenAddr string `json:"token_addr"`
 	Denom     string `json:"denom"`
 	Decimals  int    `json:"decimals"`
+	ChainType string `json:"chain_type"`
 }
 
 type TokenList struct {
@@ -26,9 +27,9 @@ type TokenList struct {
 }
 
 type BridgeTokenListI interface {
-	GetTokenInfoByDenom(tokenDenom string) (TokenItem, bool)
-	GetTokenInfoByAddress(tokenAddress string) (TokenItem, bool)
-	GetAllExistedTokenAddresses() []string
+	GetTokenInfoByDenomAndChainType(tokenDenom, chainType string) (TokenItem, bool)
+	GetTokenInfoByAddressAndChainType(tokenAddress, chainType string) (TokenItem, bool)
+	GetAllExistedTokenAddresses(chainType string) []string
 }
 
 // NewTokenList creates a new instance of the FileStateMgr which implements LocalStateManager
@@ -63,8 +64,8 @@ func NewTokenList(filePath string, updateGap int64) (*TokenList, error) {
 
 	// load token list
 	for _, item := range tokensItems {
-		tl.pubTokenList.Store(strings.ToLower(item.TokenAddr), item)
-		tl.oppyTokenList.Store(strings.ToLower(item.Denom), item)
+		tl.pubTokenList.Store(strings.ToLower(item.TokenAddr+":"+item.ChainType), item)
+		tl.oppyTokenList.Store(strings.ToLower(item.Denom+":"+item.ChainType), item)
 	}
 	tl.logger.Info().Msgf("token list is created from %v", tl.filePath)
 	return tl, nil
@@ -100,8 +101,8 @@ func (tl *TokenList) UpdateTokenList(currentBlockHeight int64) error {
 	newPubTokenlist := &sync.Map{}
 
 	for _, item := range tokensItems {
-		newPubTokenlist.Store(strings.ToLower(item.TokenAddr), item)
-		newOppyTokenlist.Store(strings.ToLower(item.Denom), item)
+		newPubTokenlist.Store(strings.ToLower(item.TokenAddr+":"+item.ChainType), item)
+		newOppyTokenlist.Store(strings.ToLower(item.Denom+":"+item.ChainType), item)
 	}
 
 	// update the token list
@@ -111,23 +112,26 @@ func (tl *TokenList) UpdateTokenList(currentBlockHeight int64) error {
 	return nil
 }
 
-func (tl *TokenList) GetTokenInfoByDenom(denom string) (TokenItem, bool) {
-	tokenItem, exist := tl.oppyTokenList.Load(strings.ToLower(denom))
+func (tl *TokenList) GetTokenInfoByDenomAndChainType(denom, chainType string) (TokenItem, bool) {
+	tokenItem, exist := tl.oppyTokenList.Load(strings.ToLower(denom + ":" + chainType))
 	item, _ := tokenItem.(TokenItem)
 	return item, exist
 }
 
-func (tl *TokenList) GetTokenInfoByAddress(addr string) (TokenItem, bool) {
-	tokenItem, exist := tl.pubTokenList.Load(strings.ToLower(addr))
+func (tl *TokenList) GetTokenInfoByAddressAndChainType(addr, chainType string) (TokenItem, bool) {
+	tokenItem, exist := tl.pubTokenList.Load(strings.ToLower(addr + ":" + chainType))
 	item, _ := tokenItem.(TokenItem)
 	return item, exist
 }
 
-func (tl *TokenList) GetAllExistedTokenAddresses() []string {
+func (tl *TokenList) GetAllExistedTokenAddresses(chainType string) []string {
 	var tokenAddresses []string
-	tl.pubTokenList.Range(func(tokenAddr, _ interface{}) bool {
-		item, _ := tokenAddr.(string)
-		tokenAddresses = append(tokenAddresses, strings.ToLower(item))
+	tl.pubTokenList.Range(func(tokenAddrWithType, _ interface{}) bool {
+		it, _ := tokenAddrWithType.(string)
+		items := strings.Split(it, ":")
+		if items[1] == strings.ToLower(chainType) {
+			tokenAddresses = append(tokenAddresses, strings.ToLower(items[0]))
+		}
 		return true
 	})
 	return tokenAddresses

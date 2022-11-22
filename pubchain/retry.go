@@ -12,19 +12,23 @@ import (
 )
 
 // UpdateSubscription start the subscription of the token
-func (pi *Instance) UpdateSubscription(ctx context.Context) error {
+func (c *ChainInfo) UpdateSubscription(ctx context.Context) error {
 	blockEvent := make(chan *types.Header, sbchannelsize)
-	handler, err := pi.EthClient.SubscribeNewHead(ctx, blockEvent)
+	handler, err := c.Client.SubscribeNewHead(ctx, blockEvent)
 	if err != nil {
 		fmt.Printf("fail to subscribe the block event with err %v\n", err)
 		return err
 	}
-	if len(pi.SubChannelNow) > 0 {
+	if len(c.SubChannelNow) > 0 {
 		quite := false
 		for {
 			select {
-			case b := <-pi.SubChannelNow:
-				pi.ChannelQueue <- b
+			case b := <-c.SubChannelNow:
+				bHead := BlockHead{
+					Head:      b,
+					ChainType: c.ChainType,
+				}
+				c.ChannelQueue <- &bHead
 			default:
 				quite = true
 			}
@@ -33,53 +37,53 @@ func (pi *Instance) UpdateSubscription(ctx context.Context) error {
 			}
 		}
 	}
-	pi.SubChannelNow = blockEvent
-	pi.SubHandler = handler
+	c.SubChannelNow = blockEvent
+	c.SubHandler = handler
 	return nil
 }
 
 // StartSubscription start the subscription of the token
-func (pi *Instance) StartSubscription(ctx context.Context, wg *sync.WaitGroup) error {
-	pi.SubChannelNow = make(chan *types.Header, sbchannelsize)
-	handler, err := pi.EthClient.SubscribeNewHead(ctx, pi.SubChannelNow)
+func (c *ChainInfo) StartSubscription(ctx context.Context, wg *sync.WaitGroup) error {
+	c.SubChannelNow = make(chan *types.Header, sbchannelsize)
+	handler, err := c.Client.SubscribeNewHead(ctx, c.SubChannelNow)
 	if err != nil {
 		fmt.Printf("fail to subscribe the block event with err %v\n", err)
 		return err
 	}
-	pi.SubHandler = handler
+	c.SubHandler = handler
 	wg.Add(1)
 	go func() {
 		<-ctx.Done()
-		pi.SubHandler.Unsubscribe()
-		pi.logger.Info().Msgf("shutdown the public pub_chain subscription channel")
+		c.SubHandler.Unsubscribe()
+		c.logger.Info().Msgf("shutdown the public pub_chain subscription channel")
 		wg.Done()
 	}()
 	return nil
 }
 
-func (pi *Instance) RetryPubChain() error {
-	err := pi.CheckPubChainHealthWithLock()
+func (c *ChainInfo) RetryPubChain() error {
+	err := c.CheckChainHealthWithLock()
 	if err == nil {
-		pi.logger.Info().Msgf("all good we do not need to reset")
+		c.logger.Info().Msgf("all good we do not need to reset")
 		return nil
 	}
 
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second*10), 3)
 	op := func() error {
-		ethClient, err := ethclient.Dial(pi.configAddr)
+		ethClient, err := ethclient.Dial(c.WsAddr)
 		if err != nil {
-			pi.logger.Error().Err(err).Msg("fail to dial the websocket")
+			c.logger.Error().Err(err).Msg("fail to dial the websocket")
 			return err
 		}
-		err = pi.renewEthClientWithLock(ethClient)
+		err = c.renewEthClientWithLock(ethClient)
 		return err
 	}
 	err = backoff.Retry(op, bf)
 	if err != nil {
-		pi.logger.Error().Err(err).Msgf("we fail to reconnect the pubchain interface with retries")
+		c.logger.Error().Err(err).Msgf("we fail to reconnect the pubchain interface with retries")
 		return err
 	}
 
-	pi.logger.Warn().Msgf("we renewed the ethclient")
+	c.logger.Warn().Msgf("we renewed the ethclient")
 	return nil
 }

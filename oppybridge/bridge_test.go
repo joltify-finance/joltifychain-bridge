@@ -122,7 +122,7 @@ func (b BridgeTestSuite) TestBridgeTx() {
 		true,
 		true,
 	}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	b.Require().NoError(err)
 	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
@@ -198,7 +198,7 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 		true,
 		true,
 	}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	b.Require().NoError(err)
 	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)
@@ -232,7 +232,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 		true,
 		true,
 	}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	b.Require().NoError(err)
 	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
 	b.Require().NoError(err)

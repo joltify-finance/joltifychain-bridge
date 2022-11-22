@@ -130,7 +130,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		true,
 		true,
 	}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	f.Require().NoError(err)
 	oc, err := NewOppyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl)
 	f.Require().NoError(err)

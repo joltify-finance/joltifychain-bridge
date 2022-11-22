@@ -100,8 +100,8 @@ func TestGetOppyAddressFromETHSignature(t *testing.T) {
 func TestMakeSignature(t *testing.T) {
 	SetupBech32Prefix()
 	client, err := ethclient.Dial(WebsocketTest)
-	assert.Nil(t, err)
-	h := common.HexToHash("0x1ec2e9021b0e6d288d61d8d7447493409017174c63c33b95bf9882785fefd944")
+	assert.NoError(t, err)
+	h := common.HexToHash("0x5dd520d7ebcd1fc1c070d0c595839991c544cc45dcdbfa43aa86370daa258676")
 	tx, _, err := client.TransactionByHash(context.Background(), h)
 	assert.Nil(t, err)
 
@@ -115,7 +115,7 @@ func TestMakeSignature(t *testing.T) {
 
 	transferFrom, err := EthSignPubKeyToOppyAddr(sigPublicKey)
 	assert.Nil(t, err)
-	assert.Equal(t, "oppy1q039ggfhyfmx4nrxsl256p2806g8vmg003ht9y", transferFrom.String())
+	assert.Equal(t, "oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7", transferFrom.String())
 
 	// now we test serialize the signature
 

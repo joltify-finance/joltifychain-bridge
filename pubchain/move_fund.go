@@ -26,7 +26,7 @@ import (
 // MoveFound moves the fund for the public chain
 // our strategy is we need to run move fund at least twice to ensure the account is empty, even if
 // we move the fund success this round, we still need to run it again to 100% ensure the old pool is empty
-func (pi *Instance) MoveFound(height int64, pubChainWsAddress string, previousPool *bcommon.PoolInfo, ethClient *ethclient.Client) bool {
+func (pi *Instance) MoveFound(height int64, chainInfo *ChainInfo, previousPool *bcommon.PoolInfo, ethClient *ethclient.Client) bool {
 	// we get the latest pool address and move funds to the latest pool
 	currentPool := pi.GetPool()
 	emptyERC20Tokens := atomic.NewBool(true)
@@ -38,7 +38,7 @@ func (pi *Instance) MoveFound(height int64, pubChainWsAddress string, previousPo
 	}
 
 	// movefund according to the history tokenlist
-	existedTokenAddresses := pi.TokenList.GetAllExistedTokenAddresses()
+	existedTokenAddresses := pi.TokenList.GetAllExistedTokenAddresses(chainInfo.ChainType)
 	sort.Strings(existedTokenAddresses)
 	var needToMove []string
 	waitForFinish := &sync.WaitGroup{}
@@ -57,7 +57,7 @@ func (pi *Instance) MoveFound(height int64, pubChainWsAddress string, previousPo
 	}
 
 	if len(needToMove) == 0 {
-		_, isEmpty, err := pi.doMoveBNBFunds(previousPool, currentPool[1].EthAddress)
+		_, isEmpty, err := pi.doMoveBNBFunds(chainInfo, previousPool, currentPool[1].EthAddress)
 		if isEmpty {
 			return true
 		}
@@ -70,7 +70,7 @@ func (pi *Instance) MoveFound(height int64, pubChainWsAddress string, previousPo
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
-	nonce, err := pi.getPendingNonceWithLock(ctx, previousPool.EthAddress)
+	nonce, err := chainInfo.getPendingNonceWithLock(ctx, previousPool.EthAddress)
 	if err != nil {
 		pi.AddMoveFundItem(previousPool, height+movefundretrygap)
 		return false
@@ -87,14 +87,14 @@ func (pi *Instance) MoveFound(height int64, pubChainWsAddress string, previousPo
 				panic("should not been subscribed!!")
 			}
 			defer bc.Unsubscribe(int64(index))
-			ethClientLocal, err := ethclient.Dial(pubChainWsAddress)
+			ethClientLocal, err := ethclient.Dial(chainInfo.WsAddr)
 			if err != nil {
 				pi.AddMoveFundItem(previousPool, height)
 				zlog.Logger.Error().Err(err).Msg("fail to dial the websocket")
 			}
 
 			myNonce := nonce + uint64(index)
-			tokenIsEmpty, err := pi.doMoveTokenFunds(index, myNonce, previousPool, currentPool[1].EthAddress, thisTokenAddr, ethClientLocal, tssReqChan, tssRespChan)
+			tokenIsEmpty, err := pi.doMoveTokenFunds(chainInfo, index, myNonce, previousPool, currentPool[1].EthAddress, thisTokenAddr, ethClientLocal, tssReqChan, tssRespChan)
 			tssReqChan <- &TssReq{Index: index, Data: []byte("done")}
 			// once there exists one token in the current pool, then we need to addMoveFundItem
 			if err != nil {
@@ -133,7 +133,7 @@ func (pi *Instance) MoveFound(height int64, pubChainWsAddress string, previousPo
 			allsignMSgs = append(allsignMSgs, val)
 		}
 		var err error
-		latest, err := pi.GetBlockByNumberWithLock(nil)
+		latest, err := chainInfo.GetBlockByNumberWithLock(nil)
 		if err != nil {
 			zlog.Logger.Error().Err(err).Msgf("fail to get the latest height")
 			bc.Broadcast(nil)
@@ -156,7 +156,7 @@ func (pi *Instance) MoveFound(height int64, pubChainWsAddress string, previousPo
 		pi.AddMoveFundItem(previousPool, height+movefundretrygap)
 		return false
 	}
-	bnbIsMoved, isEmpty, errMoveBnb := pi.doMoveBNBFunds(previousPool, currentPool[1].EthAddress)
+	bnbIsMoved, isEmpty, errMoveBnb := pi.doMoveBNBFunds(chainInfo, previousPool, currentPool[1].EthAddress)
 	if isEmpty {
 		return true
 	}
@@ -168,8 +168,8 @@ func (pi *Instance) MoveFound(height int64, pubChainWsAddress string, previousPo
 	return true
 }
 
-func (pi *Instance) moveERC20Token(index int, nonce uint64, sender, receiver common.Address, balance *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
-	txHash, err := pi.SendTokenBatch(index, sender, receiver, balance, big.NewInt(int64(nonce)), tokenAddr, tssReqChan, tssRespChan)
+func (pi *Instance) moveERC20Token(chainInfo *ChainInfo, index int, nonce uint64, sender, receiver common.Address, balance *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
+	txHash, err := pi.SendTokenBatch(chainInfo, index, sender, receiver, balance, big.NewInt(int64(nonce)), tokenAddr, tssReqChan, tssRespChan)
 	if err != nil {
 		if err.Error() == alreadyKnown {
 			pi.logger.Warn().Msgf("the tx has been submitted by others")
@@ -199,7 +199,7 @@ func (pi *Instance) needToMoveFund(tokenAddr string, poolAddr common.Address, et
 	return false, nil
 }
 
-func (pi *Instance) doMoveTokenFunds(index int, nonce uint64, previousPool *bcommon.PoolInfo, receiver common.Address, tokenAddr string, ethClient *ethclient.Client, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (bool, error) {
+func (pi *Instance) doMoveTokenFunds(chainInfo *ChainInfo, index int, nonce uint64, previousPool *bcommon.PoolInfo, receiver common.Address, tokenAddr string, ethClient *ethclient.Client, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (bool, error) {
 	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), ethClient)
 	if err != nil {
 		return false, err
@@ -214,13 +214,13 @@ func (pi *Instance) doMoveTokenFunds(index int, nonce uint64, previousPool *bcom
 		return true, nil
 	}
 
-	erc20TxHash, err := pi.moveERC20Token(index, nonce, previousPool.EthAddress, receiver, balance, tokenAddr, tssReqChan, tssRespChan)
+	erc20TxHash, err := pi.moveERC20Token(chainInfo, index, nonce, previousPool.EthAddress, receiver, balance, tokenAddr, tssReqChan, tssRespChan)
 	// if we fail erc20 token transfer, we should not transfer the bnb otherwise,we do not have enough fee to pay retry
 	if err != nil && err.Error() != "already passed the seq" {
 		return false, errors.New("fail to transfer erc20 token")
 	}
 
-	err1 := pi.CheckTxStatus(erc20TxHash.Hex())
+	err1 := chainInfo.CheckTxStatus(erc20TxHash.Hex())
 	if err1 != nil {
 		return false, err1
 	}
@@ -235,15 +235,15 @@ func (pi *Instance) doMoveTokenFunds(index int, nonce uint64, previousPool *bcom
 	return false, errors.New("we failed to move fund for this token")
 }
 
-func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver common.Address) (bool, bool, error) {
+func (pi *Instance) doMoveBNBFunds(chainInfo *ChainInfo, previousPool *bcommon.PoolInfo, receiver common.Address) (bool, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel()
-	balanceBnB, err := pi.getBalanceWithLock(ctx, previousPool.EthAddress)
+	balanceBnB, err := chainInfo.getBalanceWithLock(ctx, previousPool.EthAddress)
 	if err != nil {
 		return false, false, err
 	}
 
-	_, price, _, gas, err := pi.GetFeeLimitWithLock()
+	_, price, _, gas, err := chainInfo.GetFeeLimitWithLock()
 	if err != nil {
 		return false, false, err
 	}
@@ -260,23 +260,23 @@ func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver comm
 	pi.logger.Info().Msgf(" %v we move fund bnb:%v from %v to %v", tick, balanceBnB, previousPool.EthAddress.String(), receiver.String())
 
 	// we move the bnb
-	nonce, err := pi.getPendingNonceWithLock(ctx, previousPool.EthAddress)
+	nonce, err := chainInfo.getPendingNonceWithLock(ctx, previousPool.EthAddress)
 	if err != nil {
 		return false, false, err
 	}
 
-	bnbTxHash, emptyAccount, err := pi.SendNativeTokenForMoveFund(previousPool.Pk, previousPool.EthAddress, receiver, balanceBnB, new(big.Int).SetUint64(nonce))
+	bnbTxHash, emptyAccount, err := pi.SendNativeTokenForMoveFund(chainInfo, previousPool.Pk, previousPool.EthAddress, receiver, balanceBnB, new(big.Int).SetUint64(nonce))
 	// bnbTxHash, err = pi.moveBnb(previousPool.Pk, receiver, balanceBnB, nonce, blockHeight)
 	if err != nil {
 		if err.Error() == "already passed the seq" {
 			ctx2, cancel2 := context.WithTimeout(context.Background(), config.QueryTimeOut)
 			defer cancel2()
-			nowBalanceBnB, err := pi.getBalanceWithLock(ctx2, previousPool.EthAddress)
+			nowBalanceBnB, err := chainInfo.getBalanceWithLock(ctx2, previousPool.EthAddress)
 			if err != nil {
 				return false, false, err
 			}
 
-			// this indicate we have the leftover that smaller than the fee
+			// this indicates we have the leftover that smaller than the fee
 			if nowBalanceBnB.Cmp(fee) != 1 {
 				return true, true, nil
 			}
@@ -288,7 +288,7 @@ func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver comm
 		return true, true, nil
 	}
 
-	errCheck := pi.CheckTxStatus(bnbTxHash.Hex())
+	errCheck := chainInfo.CheckTxStatus(bnbTxHash.Hex())
 	if errCheck != nil {
 		return false, false, errCheck
 	}
@@ -297,7 +297,7 @@ func (pi *Instance) doMoveBNBFunds(previousPool *bcommon.PoolInfo, receiver comm
 
 	ctx2, cancel2 := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel2()
-	nowBalanceBnB, err := pi.getBalanceWithLock(ctx2, previousPool.EthAddress)
+	nowBalanceBnB, err := chainInfo.getBalanceWithLock(ctx2, previousPool.EthAddress)
 	if err != nil {
 		return false, false, err
 	}

@@ -38,7 +38,10 @@ const (
 	movefundretrygap  = 3
 )
 
-var OppyContractAddress = "0x94277968dff216265313657425d9d7577ad32dd1"
+var (
+	OppyContractAddressBSC = "0x94277968dff216265313657425d9d7577ad32dd1"
+	OppyContractAddressETH = "0x2BCD5745eBf28f367A0De2cF3C6fEBfE42B21338"
+)
 
 type InboundTx struct {
 	TxID           string         `json:"tx_id"` // this variable is used for locally saving and loading
@@ -65,12 +68,56 @@ type TssReq struct {
 	Index int
 }
 
+type BlockHead struct {
+	Head      *types.Header
+	ChainType string
+}
+
+type ChainInfo struct {
+	WsAddr          string
+	contractAddress string
+	ChainType       string
+	Client          *ethclient.Client
+	ChainLocker     *sync.RWMutex
+	ChainID         *big.Int
+	logger          zerolog.Logger
+	wg              *sync.WaitGroup // this must be the wg of the pubchain instance thus te whole process can be contolled by the main progress
+	SubChannelNow   chan *types.Header
+	SubHandler      ethereum.Subscription
+	ChannelQueue    chan *BlockHead
+}
+
+func NewChainInfo(wsAddress, chainType string, wg *sync.WaitGroup) (*ChainInfo, error) {
+	client, err := ethclient.Dial(wsAddress)
+	if err != nil {
+		return nil, errors.New("fail to dial the network")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
+	defer cancel()
+	// fixme should use chainID
+	// chainID, err := client.NetworkID(ctx)
+	chainID, err := client.ChainID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	c := ChainInfo{
+		WsAddr:      wsAddress,
+		ChainType:   chainType,
+		Client:      client,
+		ChainID:     chainID,
+		ChainLocker: &sync.RWMutex{},
+		logger:      log.With().Str("module", chainType).Logger(),
+		wg:          wg,
+	}
+	return &c, nil
+}
+
 // Instance hold the oppy_bridge entity
 type Instance struct {
-	EthClient            *ethclient.Client
-	ethClientLocker      *sync.RWMutex
-	configAddr           string
-	chainID              *big.Int
+	BSCChain             *ChainInfo
+	EthChain             *ChainInfo
 	tokenAbi             *abi.ABI
 	logger               zerolog.Logger
 	lastTwoPools         []*bcommon.PoolInfo
@@ -82,30 +129,32 @@ type Instance struct {
 	CurrentHeight        int64
 	TokenList            tokenlist.BridgeTokenListI
 	wg                   *sync.WaitGroup
-	SubChannelNow        chan *types.Header
-	ChannelQueue         chan *types.Header
-	SubHandler           ethereum.Subscription
+	ChannelQueue         chan *BlockHead
 	onHoldRetryQueue     []*bcommon.InBoundReq
 	onHoldRetryQueueLock *sync.Mutex
 }
 
 // NewChainInstance initialize the oppy_bridge entity
-func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, wg *sync.WaitGroup) (*Instance, error) {
+func NewChainInstance(wsBSC, wsETH string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, wg *sync.WaitGroup) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
 
-	ethClient, err := ethclient.Dial(ws)
-	if err != nil {
-		logger.Error().Err(err).Msg("fail to dial the websocket")
-		return nil, errors.New("fail to dial the network")
-	}
+	channelQueue := make(chan *BlockHead, sbchannelsize)
 
-	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
-	defer cancel()
-	chainID, err := ethClient.NetworkID(ctx)
+	bscChainClient, err := NewChainInfo(wsBSC, "BSC", wg)
 	if err != nil {
-		logger.Error().Err(err).Msg("fail to get the chain ID")
-		return nil, err
+		logger.Error().Err(err).Msg("fail to create the eth chain client")
+		return nil, errors.New("invalid eth client")
 	}
+	bscChainClient.ChannelQueue = channelQueue
+	bscChainClient.contractAddress = OppyContractAddressBSC
+
+	ethChainClient, err := NewChainInfo(wsETH, "ETH", wg)
+	if err != nil {
+		logger.Error().Err(err).Msg("fail to create the eth chain client")
+		return nil, errors.New("invalid eth client")
+	}
+	ethChainClient.ChannelQueue = channelQueue
+	ethChainClient.contractAddress = OppyContractAddressETH
 
 	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
 	if err != nil {
@@ -114,10 +163,8 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.B
 
 	return &Instance{
 		logger:               logger,
-		EthClient:            ethClient,
-		ethClientLocker:      &sync.RWMutex{},
-		configAddr:           ws,
-		chainID:              chainID,
+		BSCChain:             bscChainClient,
+		EthChain:             ethChainClient,
 		tokenAbi:             &tAbi,
 		poolLocker:           &sync.RWMutex{},
 		tssServer:            tssServer,
@@ -126,8 +173,8 @@ func NewChainInstance(ws string, tssServer tssclient.TssInstance, tl tokenlist.B
 		RetryInboundReq:      &sync.Map{},
 		moveFundReq:          &sync.Map{},
 		TokenList:            tl,
+		ChannelQueue:         channelQueue,
 		wg:                   wg,
-		ChannelQueue:         make(chan *types.Header, sbchannelsize),
 		onHoldRetryQueue:     []*bcommon.InBoundReq{},
 		onHoldRetryQueueLock: &sync.Mutex{},
 	}, nil

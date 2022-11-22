@@ -3,8 +3,9 @@ package config
 import "time"
 
 const (
-	OutBoundDenomFee = "abnb"
-	NativeSign       = "native"
+	OutBoundDenomFeeBSC = "abnb"
+	OutBoundDenomFeeETH = "aeth"
+	NativeSign          = "native"
 
 	TxTimeout                   = 300
 	GASFEERATIO                 = "5"

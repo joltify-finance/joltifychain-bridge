@@ -19,16 +19,41 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )
 
-func (oc *OppyChainInstance) calculateGas() types.Coin {
-	fee := oc.GetPubChainFee()
-	expectedFee := types.NewCoin(config.OutBoundDenomFee, types.NewIntFromUint64(uint64(fee)))
-	return expectedFee
+const (
+	BSC = "BSC"
+	ETH = "ETH"
+)
+
+func (oc *OppyChainInstance) calculateGas(chainType string) (types.Coin, error) {
+	fee := oc.GetPubChainFee(chainType)
+	switch chainType {
+	case BSC:
+		return types.NewCoin(config.OutBoundDenomFeeBSC, types.NewIntFromUint64(uint64(fee))), nil
+	case ETH:
+		return types.NewCoin(config.OutBoundDenomFeeETH, types.NewIntFromUint64(uint64(fee))), nil
+	default:
+		return types.Coin{}, errors.New("unknow chaintype")
+	}
 }
 
 func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, txBlockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
-	tokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenom(msg.Amount[0].GetDenom())
-	if !tokenExist || msg.Amount[0].GetDenom() != config.OutBoundDenomFee {
+	tokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenomAndChainType(msg.Amount[0].GetDenom(), memo.ChainType)
+
+	if !tokenExist {
 		return errors.New("token is not on our token list or not fee demon")
+	}
+
+	switch memo.ChainType {
+	case BSC:
+		if msg.Amount[0].GetDenom() != config.OutBoundDenomFeeBSC {
+			return errors.New("top up token does not match the top up chain")
+		}
+	case ETH:
+		if msg.Amount[0].GetDenom() != config.OutBoundDenomFeeETH {
+			return errors.New("top up token does not match the top up chain")
+		}
+	default:
+		return errors.New("invalid top up chain type")
 	}
 
 	dat, ok := oc.pendingTx.LoadAndDelete(memo.TopupID)
@@ -37,6 +62,9 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, txBlock
 	}
 	savedTx := dat.(*OutboundTx)
 	expectedFee := savedTx.FeeWanted
+	if savedTx.FeeWanted.Denom != msg.Amount[0].GetDenom() {
+		return errors.New("top up token does not match the original tx fee")
+	}
 
 	if savedTx.TokenAddr == config.NativeSign {
 		oc.logger.Warn().Msgf("topping up native token is not supported")
@@ -61,14 +89,14 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, txBlock
 	amount = amount.Mul(types.MustNewDecFromStr(config.FeeToValidatorGAP))
 	feeToValidator := savedTx.Fee.Sub(types.NewCoin(savedTx.FeeWanted.Denom, amount.TruncateInt()))
 
-	itemReq := bcommon.NewOutboundReq(memo.TopupID, savedTx.OutReceiverAddress, currEthAddr, savedTx.Token, savedTx.TokenAddr, txBlockHeight, types.Coins{savedTx.Fee}, types.Coins{feeToValidator})
+	itemReq := bcommon.NewOutboundReq(memo.TopupID, savedTx.OutReceiverAddress, currEthAddr, savedTx.Token, savedTx.TokenAddr, txBlockHeight, types.Coins{savedTx.Fee}, types.Coins{feeToValidator}, savedTx.ChainType)
 	oc.AddItem(&itemReq)
 	oc.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v) with fee %v paid to validators", txBlockHeight, oc.CurrentHeight, feeToValidator.String())
 	return nil
 }
 
 func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID string, txBlockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
-	tokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenom(msg.Amount[0].GetDenom())
+	tokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenomAndChainType(msg.Amount[0].GetDenom(), memo.ChainType)
 	if !tokenExist {
 		return errors.New("token is not on our token list")
 	}
@@ -79,7 +107,17 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 		return errors.New("not a native token")
 	}
 
-	item := oc.processNativeFee(txID, msg.FromAddress, tokenAddr, txBlockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[0].Amount)
+	if tokenDenom == config.OutBoundDenomFeeBSC && memo.ChainType != BSC {
+		return errors.New("token and chain claimed does not match")
+	}
+
+	if tokenDenom == config.OutBoundDenomFeeETH && memo.ChainType != ETH {
+		return errors.New("token and chain claimed does not match")
+	}
+
+	// this avoid the attack send memo chaintype as eth while send bnb cheat us
+
+	item := oc.processNativeFee(txID, msg.FromAddress, tokenAddr, txBlockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[0].Amount, memo.ChainType)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
 		delta := tokenItem.Decimals - types.Precision
@@ -91,7 +129,7 @@ func (oc *OppyChainInstance) processNativeRequest(msg *banktypes.MsgSend, txID s
 		amount := item.FeeWanted.Amount.ToDec()
 		amount = amount.Mul(types.MustNewDecFromStr(config.FeeToValidatorGAP))
 		feeToValidator := item.Fee.Sub(types.NewCoin(item.FeeWanted.Denom, amount.TruncateInt()))
-		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight, types.Coins{item.FeeWanted}, types.Coins{feeToValidator})
+		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight, types.Coins{item.FeeWanted}, types.Coins{feeToValidator}, memo.ChainType)
 		oc.AddItem(&itemReq)
 		oc.logger.Info().Msgf("Outbount Transaction in Block %v (Current Block %v), with fee %v paid to validators", txBlockHeight, oc.CurrentHeight, feeToValidator.String())
 		return nil
@@ -106,8 +144,19 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 	indexDemoFee := 0
 	tokenDenom := ""
 	tokenAddr := ""
-	tokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenom(msg.Amount[0].GetDenom())
-	if tokenExist && msg.Amount[1].GetDenom() == config.OutBoundDenomFee {
+
+	var feeDemo string
+	switch memo.ChainType {
+	case ETH:
+		feeDemo = config.OutBoundDenomFeeETH
+	case BSC:
+		feeDemo = config.OutBoundDenomFeeBSC
+	default:
+		return errors.New("invalid chain type")
+	}
+
+	tokenItem, tokenExist := oc.TokenList.GetTokenInfoByDenomAndChainType(msg.Amount[0].GetDenom(), memo.ChainType)
+	if tokenExist && msg.Amount[1].GetDenom() == feeDemo {
 		tokenDenom = msg.Amount[0].GetDenom()
 		tokenAddr = tokenItem.TokenAddr
 		indexDemo = 0
@@ -115,8 +164,8 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 		found = true
 	}
 
-	tokenItem, tokenExist = oc.TokenList.GetTokenInfoByDenom(msg.Amount[1].GetDenom())
-	if tokenExist && msg.Amount[0].GetDenom() == config.OutBoundDenomFee {
+	tokenItem, tokenExist = oc.TokenList.GetTokenInfoByDenomAndChainType(msg.Amount[1].GetDenom(), memo.ChainType)
+	if tokenExist && msg.Amount[0].GetDenom() == feeDemo {
 		tokenDenom = msg.Amount[1].GetDenom()
 		tokenAddr = tokenItem.TokenAddr
 		indexDemo = 1
@@ -127,7 +176,7 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 		return errors.New("invalid fee pair")
 	}
 
-	item := oc.processErc20DemonAndFee(txID, msg.FromAddress, tokenAddr, txBlockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount)
+	item := oc.processErc20DemonAndFee(txID, msg.FromAddress, tokenAddr, txBlockHeight, ethcommon.HexToAddress(memo.Dest), tokenDenom, msg.Amount[indexDemo].Amount, msg.Amount[indexDemoFee].Amount, memo.ChainType, feeDemo)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
 		delta := tokenItem.Decimals - types.Precision
@@ -139,7 +188,7 @@ func (oc *OppyChainInstance) processErc20Request(msg *banktypes.MsgSend, txID st
 		amount = amount.Mul(types.MustNewDecFromStr(config.FeeToValidatorGAP))
 		feeToValidator := item.Fee.Sub(types.NewCoin(item.FeeWanted.Denom, amount.TruncateInt()))
 
-		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight, types.Coins{item.Fee}, types.Coins{feeToValidator})
+		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenAddr, txBlockHeight, types.Coins{item.Fee}, types.Coins{feeToValidator}, memo.ChainType)
 		oc.AddItem(&itemReq)
 		oc.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v) with fee %v paid to validators", txBlockHeight, oc.CurrentHeight, types.Coins{feeToValidator})
 		return nil
@@ -183,7 +232,7 @@ func (oc *OppyChainInstance) processMsg(txBlockHeight int64, address []types.Acc
 	case 2:
 		err := oc.processErc20Request(msg, txID, txBlockHeight, curEthAddr, memo)
 		if err != nil {
-			return errors.New("fail to process the outbound erc20 request")
+			return fmt.Errorf("fail to process the outbound erc20 request %w", err)
 		}
 		return nil
 	default:
@@ -191,8 +240,11 @@ func (oc *OppyChainInstance) processMsg(txBlockHeight int64, address []types.Acc
 	}
 }
 
-func (oc *OppyChainInstance) processNativeFee(txID, fromAddress string, tokenAddr string, txBlockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount types.Int) *OutboundTx {
-	expectedFee := oc.calculateGas()
+func (oc *OppyChainInstance) processNativeFee(txID, fromAddress string, tokenAddr string, txBlockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount types.Int, chainType string) *OutboundTx {
+	expectedFee, err := oc.calculateGas(chainType)
+	if err != nil {
+		return nil
+	}
 
 	token := types.Coin{
 		Denom:  demonName,
@@ -203,13 +255,13 @@ func (oc *OppyChainInstance) processNativeFee(txID, fromAddress string, tokenAdd
 		receiverAddr,
 		fromAddress,
 		// todo should be dynamic once we have more than one chain
-		"56",
 		uint64(txBlockHeight),
 		token,
 		tokenAddr,
 		expectedFee,
 		expectedFee,
 		txID,
+		chainType,
 	}
 
 	AmountTransfer := demonAmount.Sub(expectedFee.Amount)
@@ -223,28 +275,31 @@ func (oc *OppyChainInstance) processNativeFee(txID, fromAddress string, tokenAdd
 	return &tx
 }
 
-func (oc *OppyChainInstance) processErc20DemonAndFee(txID, fromAddress string, tokenAddr string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount, feeAmount types.Int) *OutboundTx {
+func (oc *OppyChainInstance) processErc20DemonAndFee(txID, fromAddress string, tokenAddr string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount, feeAmount types.Int, chainType, feeDemo string) *OutboundTx {
 	token := types.Coin{
 		Denom:  demonName,
 		Amount: demonAmount,
 	}
 	fee := types.Coin{
-		Denom:  config.OutBoundDenomFee,
+		Denom:  feeDemo,
 		Amount: feeAmount,
 	}
 
-	expectedFee := oc.calculateGas()
+	expectedFee, err := oc.calculateGas(chainType)
+	if err != nil {
+		return nil
+	}
 	tx := OutboundTx{
 		receiverAddr,
 		fromAddress,
 		// todo should be dynamic once we have another chain
-		"56",
 		uint64(blockHeight),
 		token,
 		tokenAddr,
 		fee,
 		expectedFee,
 		txID,
+		chainType,
 	}
 
 	if !fee.IsGTE(expectedFee) {

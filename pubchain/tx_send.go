@@ -23,7 +23,7 @@ import (
 )
 
 // CheckTxStatus check whether the tx has been done successfully
-func (pi *Instance) waitToSend(poolAddress common.Address, targetNonce uint64) error {
+func (pi *Instance) waitToSend(chainInfo *ChainInfo, poolAddress common.Address, targetNonce uint64) error {
 	bf := backoff.NewExponentialBackOff()
 	bf.MaxElapsedTime = time.Minute * 2
 	bf.MaxInterval = time.Second * 20
@@ -33,7 +33,7 @@ func (pi *Instance) waitToSend(poolAddress common.Address, targetNonce uint64) e
 		ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 		defer cancel()
 
-		nonce, err := pi.getPendingNonceWithLock(ctx, poolAddress)
+		nonce, err := chainInfo.getPendingNonceWithLock(ctx, poolAddress)
 		if err != nil {
 			pi.logger.Error().Err(err).Msgf("fail to get the nonce of the given pool address")
 			return err
@@ -58,14 +58,14 @@ func (pi *Instance) waitToSend(poolAddress common.Address, targetNonce uint64) e
 }
 
 // SendNativeTokenBatch sends the native token to the public chain
-func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, bool, error) {
-	totalFee, gasPrice, adjGas, _, err := pi.GetFeeLimitWithLock()
+func (pi *Instance) SendNativeTokenBatch(chainInfo *ChainInfo, index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, bool, error) {
+	totalFee, gasPrice, adjGas, _, err := chainInfo.GetFeeLimitWithLock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
 		return common.Hash{}, false, err
 	}
 
-	txo, err := pi.composeTxBatch(index, sender, pi.chainID, tssReqChan, tssRespChan)
+	txo, err := pi.composeTxBatch(index, sender, chainInfo.ChainID, tssReqChan, tssRespChan)
 	if err != nil {
 		return common.Hash{}, false, err
 	}
@@ -88,13 +88,13 @@ func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Addr
 	defer cancelSend()
 
 	if nonce != nil {
-		err = pi.waitToSend(sender, nonce.Uint64())
+		err = pi.waitToSend(chainInfo, sender, nonce.Uint64())
 		if err != nil {
 			return signedTx.Hash(), false, err
 		}
 	}
 
-	err = pi.sendTransactionWithLock(ctxSend, signedTx)
+	err = chainInfo.sendTransactionWithLock(ctxSend, signedTx)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("we fail to send the outbound native tx, have reset the eth client")
 	}
@@ -102,11 +102,11 @@ func (pi *Instance) SendNativeTokenBatch(index int, sender, receiver common.Addr
 }
 
 // SendNativeTokenForMoveFund sends the native token to the public chain
-func (pi *Instance) SendNativeTokenForMoveFund(signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int) (common.Hash, bool, error) {
+func (pi *Instance) SendNativeTokenForMoveFund(chainInfo *ChainInfo, signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int) (common.Hash, bool, error) {
 	if nonce == nil {
 		return common.Hash{}, false, errors.New("invalid nonce")
 	}
-	_, price, _, gas, err := pi.GetFeeLimitWithLock()
+	_, price, _, gas, err := chainInfo.GetFeeLimitWithLock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
 		return common.Hash{}, false, err
@@ -124,7 +124,7 @@ func (pi *Instance) SendNativeTokenForMoveFund(signerPk string, sender, receiver
 		signerPk = lastPool.Pk
 	}
 
-	latest, err := pi.GetBlockByNumberWithLock(nil)
+	latest, err := chainInfo.GetBlockByNumberWithLock(nil)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to get the latest height")
 		return common.Hash{}, false, err
@@ -132,7 +132,7 @@ func (pi *Instance) SendNativeTokenForMoveFund(signerPk string, sender, receiver
 	blockHeight := int64(latest.NumberU64()) / ROUNDBLOCK
 	tick := html.UnescapeString("&#" + "128296" + ";")
 	pi.logger.Info().Msgf(">>>>>>%v we build tss at height %v>>>>>>>\n", tick, blockHeight)
-	txo, err := pi.composeTx(signerPk, sender, pi.chainID, blockHeight)
+	txo, err := pi.composeTx(signerPk, sender, chainInfo.ChainID, blockHeight)
 	if err != nil {
 		return common.Hash{}, false, err
 	}
@@ -154,13 +154,13 @@ func (pi *Instance) SendNativeTokenForMoveFund(signerPk string, sender, receiver
 	defer cancelSend()
 
 	if nonce != nil {
-		err = pi.waitToSend(sender, nonce.Uint64())
+		err = pi.waitToSend(chainInfo, sender, nonce.Uint64())
 		if err != nil {
 			return signedTx.Hash(), false, err
 		}
 	}
 
-	err = pi.sendTransactionWithLock(ctxSend, signedTx)
+	err = chainInfo.sendTransactionWithLock(ctxSend, signedTx)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("we fail to send the outbound native tx, have reset the eth client")
 	}
@@ -168,8 +168,8 @@ func (pi *Instance) SendNativeTokenForMoveFund(signerPk string, sender, receiver
 }
 
 // SendTokenBatch sends the token to the public chain
-func (pi *Instance) SendTokenBatch(index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
-	txo, err := pi.composeTxBatch(index, sender, pi.chainID, tssReqChan, tssRespChan)
+func (pi *Instance) SendTokenBatch(chainInfo *ChainInfo, index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
+	txo, err := pi.composeTxBatch(index, sender, chainInfo.ChainID, tssReqChan, tssRespChan)
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -178,7 +178,7 @@ func (pi *Instance) SendTokenBatch(index int, sender, receiver common.Address, a
 	}
 	txo.NoSend = true
 
-	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), pi.EthClient)
+	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), chainInfo.Client)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to generate token instance for %v while processing outbound tx", tokenAddr)
 		return common.Hash{}, err
@@ -190,7 +190,7 @@ func (pi *Instance) SendTokenBatch(index int, sender, receiver common.Address, a
 	}
 
 	if nonce != nil {
-		err = pi.waitToSend(sender, nonce.Uint64())
+		err = pi.waitToSend(chainInfo, sender, nonce.Uint64())
 		if err != nil {
 			return readyTx.Hash(), err
 		}
@@ -198,7 +198,7 @@ func (pi *Instance) SendTokenBatch(index int, sender, receiver common.Address, a
 
 	ctxSend, cancelSend := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancelSend()
-	err = pi.sendTransactionWithLock(ctxSend, readyTx)
+	err = chainInfo.sendTransactionWithLock(ctxSend, readyTx)
 	if err != nil {
 		// we reset the ethcliet
 		pi.logger.Error().Err(err).Msgf("we fail to send the outbound ERC20 tx, have reset the eth client")
@@ -207,13 +207,13 @@ func (pi *Instance) SendTokenBatch(index int, sender, receiver common.Address, a
 }
 
 // SendToken sends the token to the public chain
-func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string) (common.Hash, error) {
+func (pi *Instance) SendToken(chainInfo *ChainInfo, signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string) (common.Hash, error) {
 	if signerPk == "" {
 		lastPool := pi.GetPool()[1]
 		signerPk = lastPool.Pk
 	}
 
-	latest, err := pi.GetBlockByNumberWithLock(nil)
+	latest, err := chainInfo.GetBlockByNumberWithLock(nil)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to get the latest height")
 		return common.Hash{}, err
@@ -223,7 +223,7 @@ func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, 
 
 	tick := html.UnescapeString("&#" + "128296" + ";")
 	pi.logger.Info().Msgf(">>>>>>%v we build tss at height %v>>>>>>>\n", tick, blockHeight)
-	txo, err := pi.composeTx(signerPk, sender, pi.chainID, blockHeight)
+	txo, err := pi.composeTx(signerPk, sender, chainInfo.ChainID, blockHeight)
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -232,7 +232,7 @@ func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, 
 	}
 	pi.logger.Info().Msgf("we have get the signature from tss module")
 	txo.NoSend = true
-	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), pi.EthClient)
+	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), chainInfo.Client)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to generate token instance for %v while processing outbound tx", tokenAddr)
 		return common.Hash{}, err
@@ -247,12 +247,12 @@ func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, 
 	defer cancelSend()
 
 	if nonce != nil {
-		err = pi.waitToSend(sender, nonce.Uint64())
+		err = pi.waitToSend(chainInfo, sender, nonce.Uint64())
 		if err != nil {
 			return readyTx.Hash(), err
 		}
 	}
-	err = pi.sendTransactionWithLock(ctxSend, readyTx)
+	err = chainInfo.sendTransactionWithLock(ctxSend, readyTx)
 	if err != nil {
 		// we reset the ethcliet
 		pi.logger.Error().Err(err).Msgf("we fail to send the outbound ERC20 tx, have reset the eth client")
@@ -261,15 +261,15 @@ func (pi *Instance) SendToken(signerPk string, sender, receiver common.Address, 
 }
 
 // ProcessOutBound send the money to public chain
-func (pi *Instance) ProcessOutBound(index int, toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, nonce uint64, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (string, error) {
+func (pi *Instance) ProcessOutBound(chainInfo *ChainInfo, index int, toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, nonce uint64, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (string, error) {
 	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v of %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18), tokenAddr)
 	var txHash common.Hash
 	var err error
 	if tokenAddr == config.NativeSign {
-		txHash, _, err = pi.SendNativeTokenBatch(index, fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce), tssReqChan, tssRespChan)
+		txHash, _, err = pi.SendNativeTokenBatch(chainInfo, index, fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce), tssReqChan, tssRespChan)
 		tssReqChan <- &TssReq{Index: index, Data: []byte("done")}
 	} else {
-		txHash, err = pi.SendTokenBatch(index, fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce), tokenAddr, tssReqChan, tssRespChan)
+		txHash, err = pi.SendTokenBatch(chainInfo, index, fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce), tokenAddr, tssReqChan, tssRespChan)
 		tssReqChan <- &TssReq{Index: index, Data: []byte("done")}
 	}
 	if err != nil {

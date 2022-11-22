@@ -157,10 +157,10 @@ func TestProcessInBound(t *testing.T) {
 	acc, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 	tssServer := TssMock{acc[0].sk}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testDenom"}, []string{"testAddr"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pi, err := NewChainInstance(misc.WebsocketTest, &tssServer, tl, &wg)
+	pi, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tssServer, tl, &wg)
 	assert.Nil(t, err)
 
 	toStr := "FFcf8FDEE72ac11b5c542428B35EEF5769C409f0"
@@ -188,17 +188,17 @@ func TestProcessInBound(t *testing.T) {
 		Amount:       testAmount,
 	}
 
-	err = pi.ProcessInBoundERC20(tx, &erc20Tx, uint64(10))
+	err = pi.ProcessInBoundERC20(tx, "BSC", &erc20Tx, uint64(10))
 	require.EqualError(t, err, "token is not on our token list")
 
 	ExistedTokenAddrStr := "0x15fb343d82cD1C22542261dF408dA8396A829F6B"
 	ExistedTokenAddr := common.HexToAddress(ExistedTokenAddrStr)
-	pi.TokenList, err = tokenlist.CreateMockTokenlist([]string{ExistedTokenAddrStr}, []string{"testDenom"})
+	pi.TokenList, err = tokenlist.CreateMockTokenlist([]string{ExistedTokenAddrStr}, []string{"testDenom"}, []string{"BSC"})
 	assert.Nil(t, err)
 
 	erc20Tx.tokenAddress = ExistedTokenAddr
 
-	err = pi.ProcessInBoundERC20(tx, &erc20Tx, uint64(10))
+	err = pi.ProcessInBoundERC20(tx, "BSC", &erc20Tx, uint64(10))
 	require.Nil(t, err)
 
 	pi.RetryInboundReq.Range(func(key, value any) bool {
@@ -311,7 +311,7 @@ func newTestBackend(t *testing.T, txs []*ethTypes.Transaction) (*node.Node, []*e
 }
 
 func TestProcessEachBlock(t *testing.T) {
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testJUSDAddr"}, []string{"JUSD"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testJUSDAddr"}, []string{"JUSD"}, []string{"BSC"})
 	assert.Nil(t, err)
 	misc.SetupBech32Prefix()
 	accs, err := generateRandomPrivKey(2)
@@ -380,9 +380,13 @@ func TestProcessEachBlock(t *testing.T) {
 	defer backend.Close()
 	defer client.Close()
 	c := ethclient.NewClient(client)
+
+	cInfo := ChainInfo{
+		Client:      c,
+		ChainLocker: &sync.RWMutex{},
+	}
+
 	pi := Instance{
-		EthClient:       c,
-		ethClientLocker: &sync.RWMutex{},
 		lastTwoPools:    make([]*common2.PoolInfo, 2),
 		poolLocker:      &sync.RWMutex{},
 		tokenAbi:        &tAbi,
@@ -401,7 +405,7 @@ func TestProcessEachBlock(t *testing.T) {
 
 	err = pi.UpdatePool(&poolInfo)
 	require.Nil(t, err)
-	pi.processEachBlock(&tBlock, 10)
+	pi.processEachBlock("BSC", &cInfo, &tBlock, 10)
 	// indicate nothing happens
 
 	header := &ethTypes.Header{
@@ -415,28 +419,28 @@ func TestProcessEachBlock(t *testing.T) {
 	//
 	tBlock1 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718Tx}, nil, nil, newHasher())
 
-	pi.processEachBlock(tBlock1, 10)
+	pi.processEachBlock("BSC", &cInfo, tBlock1, 10)
 
 	// check not to bridge
 	tBlock2 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxNotToBridge}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock2, 10)
+	pi.processEachBlock("BSC", &cInfo, tBlock2, 10)
 
 	//
 	// now we top up the fee
 	tBlock3 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFee}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock3, 10)
+	pi.processEachBlock("BSC", &cInfo, tBlock3, 10)
 
 	tBlock3 = ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpEmptyData}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock3, 10)
+	pi.processEachBlock("BSC", &cInfo, tBlock3, 10)
 
 	//
 	tBlock3 = ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFee}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock3, 10)
+	pi.processEachBlock("BSC", &cInfo, tBlock3, 10)
 
 	//
 	//// now we top up the fee before ERC20 tx arrive
 	tBlock4 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFeeBeforeERC20}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock4, 10)
+	pi.processEachBlock("BSC", &cInfo, tBlock4, 10)
 }
 
 func TestProcessEachBlockErc20(t *testing.T) {
@@ -444,16 +448,15 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	assert.Nil(t, err)
 	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
 	assert.Nil(t, err)
-	tl, err := tokenlist.CreateMockTokenlist([]string{accs[0].commAddr.String()}, []string{"abnb"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{accs[0].commAddr.String()}, []string{"abnb"}, []string{"BSC"})
 	assert.Nil(t, err)
 
-	tl2, err := tokenlist.CreateMockTokenlist([]string{accs[4].commAddr.String()}, []string{"testtoken"})
+	tl2, err := tokenlist.CreateMockTokenlist([]string{accs[4].commAddr.String()}, []string{"testtoken"}, []string{"BSC"})
 	assert.Nil(t, err)
 
-	tl3, err := tokenlist.CreateMockTokenlist([]string{"native"}, []string{"abnb"})
+	tl3, err := tokenlist.CreateMockTokenlist([]string{"native"}, []string{"abnb"}, []string{"BSC"})
 	assert.Nil(t, err)
 	pi := Instance{
-		ethClientLocker: &sync.RWMutex{},
 		lastTwoPools:    make([]*common2.PoolInfo, 2),
 		poolLocker:      &sync.RWMutex{},
 		tokenAbi:        &tAbi,
@@ -489,7 +492,8 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	// this address should be the same as the pool address as ERC20 contract definition
 
 	memo := common2.BridgeMemo{
-		Dest: accs[3].oppyAddr.String(),
+		Dest:      accs[3].oppyAddr.String(),
+		ChainType: "BSC",
 	}
 
 	memoByte, err := json.Marshal(memo)
@@ -531,7 +535,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	s := signature[32:64]
 	v := signature[64:65]
 
-	contractAddressEth := common.HexToAddress(OppyContractAddress)
+	contractAddressEth := common.HexToAddress(OppyContractAddressBSC)
 	// though to the token addr but not to the pool, so we ignore this tx
 	Eip2718TxGoodPass := ethTypes.MustSignNewTx(testKey, ethTypes.LatestSigner(genesis.Config), &ethTypes.AccessListTx{
 		Nonce:    2,
@@ -568,11 +572,17 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	assert.NoError(t, err)
 	defer client.Close()
 	c := ethclient.NewClient(client)
-	pi.EthClient = c
+
+	chainInfo := ChainInfo{
+		Client:          c,
+		ChainLocker:     &sync.RWMutex{},
+		contractAddress: contractAddressEth.Hex(),
+	}
+	pi.BSCChain = &chainInfo
 
 	// since token addr is not set, so the system should not put this tx in top-up queue
 	tBlock := ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718Tx}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock, 10)
+	pi.processEachBlock("BSC", &chainInfo, tBlock, 10)
 	counter := 0
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		counter++
@@ -580,7 +590,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	})
 	assert.Equal(t, counter, 0)
 	tBlock = ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718TxNotPool}, nil, nil, newHasher())
-	pi.processEachBlock(tBlock, 10)
+	pi.processEachBlock("BSC", &chainInfo, tBlock, 10)
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		counter++
 		return true
@@ -590,7 +600,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 
 	tBlock = ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718TxGoodPass}, nil, nil, newHasher())
 	// we test that the tx is not to the pool
-	pi.processEachBlock(tBlock, 10)
+	pi.processEachBlock("BSC", &chainInfo, tBlock, 10)
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		panic("should not have items")
 	})
@@ -600,18 +610,18 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	assert.Nil(t, err)
 	err = pi.UpdatePool(&mockPoolInfo)
 	assert.Nil(t, err)
-	pi.processEachBlock(tBlock, 10)
+	pi.processEachBlock("BSC", &chainInfo, tBlock, 10)
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		counter++
 		return true
 	})
-	assert.Equal(t, counter, 1)
+	assert.Equal(t, 1, counter)
 
 	// now we process the native token
 	pi.TokenList = tl3
 	tBlock = ethTypes.NewBlock(header, []*ethTypes.Transaction{txNative}, nil, nil, newHasher())
 	// we test that the tx is not to the pool
-	pi.processEachBlock(tBlock, 10)
+	pi.processEachBlock("BSC", &chainInfo, tBlock, 10)
 	var storedToken sdk.Coins
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		data := value.(*common2.InBoundReq)
@@ -626,26 +636,26 @@ func TestProcessEachBlockErc20(t *testing.T) {
 
 func TestProcessERC20InBoundOnBSC(t *testing.T) {
 	misc.SetupBech32Prefix()
-	OppyContractAddress = "0x94277968dff216265313657425d9d7577ad32dd1"
+	OppyContractAddressBSC = "0x94277968dff216265313657425d9d7577ad32dd1"
 	acc, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 	tssServer := TssMock{acc[0].sk}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testDenom"}, []string{"testAddr"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testDenom"}, []string{"testAddr"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pi, err := NewChainInstance(misc.WebsocketTest, &tssServer, tl, &wg)
+	pi, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tssServer, tl, &wg)
 	assert.Nil(t, err)
 
 	// TODO since our bsc testnet is the pruned node, it can only store the latest tx
 	txid := common.HexToHash("0x5dd520d7ebcd1fc1c070d0c595839991c544cc45dcdbfa43aa86370daa258676")
-	tx, isPending, err := pi.EthClient.TransactionByHash(context.Background(), txid)
+	tx, isPending, err := pi.BSCChain.Client.TransactionByHash(context.Background(), txid)
 	assert.Nil(t, err)
 	assert.False(t, isPending)
 
 	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
 	assert.Nil(t, err)
 	pi.tokenAbi = &tAbi
-	txInfo, err := pi.checkErc20(tx.Data(), tx.To().Hex())
+	txInfo, err := pi.checkErc20(tx.Data(), tx.To().Hex(), OppyContractAddressBSC)
 	assert.Nil(t, err)
 	assert.Equal(t, txInfo.fromAddr.String(), "oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7")
 	wg.Wait()
@@ -656,10 +666,10 @@ func TestProcessNativeInBoundOnBSC(t *testing.T) {
 	acc, err := generateRandomPrivKey(3)
 	assert.Nil(t, err)
 	tssServer := TssMock{acc[0].sk}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"native"}, []string{"abnb"})
+	tl, err := tokenlist.CreateMockTokenlist([]string{"native"}, []string{"abnb"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pi, err := NewChainInstance(misc.WebsocketTest, &tssServer, tl, &wg)
+	pi, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tssServer, tl, &wg)
 
 	poolInfo := common2.PoolInfo{
 		EthAddress: common.HexToAddress("0x1f65cc33558b6825db119e9fe4c73b436211667e"),
@@ -669,13 +679,13 @@ func TestProcessNativeInBoundOnBSC(t *testing.T) {
 	assert.Nil(t, err)
 
 	// TODO need to update the hight as our bsc testnode is the pruned one
-	b, err := pi.EthClient.BlockByNumber(context.Background(), big.NewInt(22997528))
+	b, err := pi.BSCChain.Client.BlockByNumber(context.Background(), big.NewInt(22997528))
 	assert.Nil(t, err)
 
 	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
 	assert.Nil(t, err)
 	pi.tokenAbi = &tAbi
-	pi.processEachBlock(b, 101)
+	pi.processEachBlock("BSC", pi.BSCChain, b, 101)
 
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		item := value.(*common2.InBoundReq)
