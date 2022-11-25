@@ -1,4 +1,4 @@
-package oppybridge
+package cosbridge
 
 import (
 	"github.com/cosmos/cosmos-sdk/codec"

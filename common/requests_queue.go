@@ -96,11 +96,11 @@ func (i *InBoundReq) GetInboundReqInfo() (types.AccAddress, common.Address, type
 func (i *InBoundReq) SetAccountInfo(number, seq uint64, address types.AccAddress, pk string) {
 	i.AccNum = number
 	i.AccSeq = seq
-	i.PoolOppyAddress = address
+	i.PoolCosAddress = address
 	i.PoolPk = pk
 }
 
 // GetAccountInfo returns the account number and seq
 func (i *InBoundReq) GetAccountInfo() (uint64, uint64, types.AccAddress, string) {
-	return i.AccSeq, i.AccNum, i.PoolOppyAddress, i.PoolPk
+	return i.AccSeq, i.AccNum, i.PoolCosAddress, i.PoolPk
 }

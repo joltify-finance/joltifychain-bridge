@@ -1,4 +1,4 @@
-package oppybridge
+package cosbridge
 
 import (
 	"context"
@@ -237,9 +237,9 @@ func (m MintTestSuite) TestProcessInbound() {
 	m.Require().True(ret)
 
 	pool := common.PoolInfo{
-		Pk:          accs[0].pk,
-		OppyAddress: accs[0].oppyAddr,
-		EthAddress:  accs[0].commAddr,
+		Pk:         accs[0].pk,
+		CosAddress: accs[0].oppyAddr,
+		EthAddress: accs[0].commAddr,
 	}
 
 	oc.lastTwoPools[0] = &pool

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
+	"gitlab.com/oppy-finance/oppy-bridge/cosbridge"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/simulation"
@@ -23,15 +23,15 @@ func (s *PendingFileStateMgrTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 }
 
-func createdTestPendingTxs(n int) []*oppybridge.OutboundTx {
+func createdTestPendingTxs(n int) []*cosbridge.OutboundTx {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	accs := simulation.RandomAccounts(r, n)
-	pendingTxs := make([]*oppybridge.OutboundTx, n)
+	pendingTxs := make([]*cosbridge.OutboundTx, n)
 	for i := 0; i < n; i++ {
 		txid := fmt.Sprintf("testTXID %v", i)
 		testToken := sdk.NewCoin("testToken", sdk.NewInt(32))
 		testFee := sdk.NewCoin("testFee", sdk.NewInt(32))
-		tx := oppybridge.OutboundTx{
+		tx := cosbridge.OutboundTx{
 			TxID:               txid,
 			OutReceiverAddress: common.HexToAddress(accs[i].Address.String()),
 			BlockHeight:        uint64(i),

@@ -8,10 +8,10 @@ import (
 
 // PoolInfo stores the pool and pk of the oppy pool
 type PoolInfo struct {
-	Pk          string               `json:"pool_pubkey"`
-	OppyAddress types.AccAddress     `json:"oppy_address"`
-	EthAddress  common.Address       `json:"eth_address"`
-	PoolInfo    *vaulttypes.PoolInfo `json:"pool_info"`
+	Pk         string               `json:"pool_pubkey"`
+	CosAddress types.AccAddress     `json:"oppy_address"`
+	EthAddress common.Address       `json:"eth_address"`
+	PoolInfo   *vaulttypes.PoolInfo `json:"pool_info"`
 	// the height is only useful in saving the tx
 	Height int64 `json:"height"`
 }
@@ -33,15 +33,15 @@ type OutBoundReq struct {
 
 // InBoundReq is the account that top up account info to oppy pub_chain
 type InBoundReq struct {
-	Address         types.AccAddress `json:"address"`
-	TxID            []byte           `json:"tx_id"` // this indicates the identical inbound req
-	ToPoolAddr      common.Address   `json:"to_pool_addr"`
-	Coin            types.Coin       `json:"coin"`
-	BlockHeight     int64            `json:"block_height"`
-	AccNum          uint64           `json:"acc_num"`
-	AccSeq          uint64           `json:"acc_seq"`
-	PoolOppyAddress types.AccAddress `json:"pool_oppy_address"`
-	PoolPk          string           `json:"pool_pk"`
+	Address        types.AccAddress `json:"address"`
+	TxID           []byte           `json:"tx_id"` // this indicates the identical inbound req
+	ToPoolAddr     common.Address   `json:"to_pool_addr"`
+	Coin           types.Coin       `json:"coin"`
+	BlockHeight    int64            `json:"block_height"`
+	AccNum         uint64           `json:"acc_num"`
+	AccSeq         uint64           `json:"acc_seq"`
+	PoolCosAddress types.AccAddress `json:"pool_oppy_address"`
+	PoolPk         string           `json:"pool_pk"`
 }
 
 type BridgeMemo struct {

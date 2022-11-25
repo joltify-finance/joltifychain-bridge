@@ -18,13 +18,13 @@ testnet: go.sum
 	go install   -ldflags "-X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddressBSC=0x94277968dff216265313657425d9d7577ad32dd1 \
       -X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddressETH=0x77406A7678338abb5eA7a78b766F7F1125782C61 \
     	-X  gitlab.com/oppy-finance/oppy-bridge/version.VERSION=$(VERSION) \
-    	-X gitlab.com/oppy-finance/oppy-bridge/version.COMMIT=$(COMMIT)" ./cmd/oppyBridge.go
+    	-X gitlab.com/oppy-finance/oppy-bridge/version.COMMIT=$(COMMIT)" ./cmd/bridge_service.go
 
 install: go.sum
 	go install   -ldflags "-X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddressBSC=0x66fff09f83bfce2ed9240fa6a1f7e96ba166ddf7 \
       -X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddressETH=0x77406A7678338abb5eA7a78b766F7F1125782C61 \
 	-X  gitlab.com/oppy-finance/oppy-bridge/version.VERSION=$(VERSION) \
-    	-X gitlab.com/oppy-finance/oppy-bridge/version.COMMIT=$(COMMIT)" ./cmd/oppyBridge.go
+    	-X gitlab.com/oppy-finance/oppy-bridge/version.COMMIT=$(COMMIT)" ./cmd/bridge_service.go
 
 go.sum: go.mod
 	@echo "--> Ensure dependencies have not been modified"
@@ -38,7 +38,7 @@ test-watch: clear
 
 lint-pre:
 	@gofumpt -l  cmd config oppybridge monitor storage validators bridge common misc pubchain tssclient
-	#@test -z "$(shell gofumpt -l  cmd config oppybridge monitor storage validators bridge common misc pubchain tssclient)" # cause error
+	#@test -z "$(shell gofumpt -l  cmd config cosbridge monitor storage validators bridge common misc pubchain tssclient)" # cause error
 	@go mod verify
 
 lint: lint-pre
@@ -53,9 +53,11 @@ lint-verbose: lint-pre
 
 
 build: go.sum
-	go build   -ldflags "-X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddress=0x66fff09f83bfce2ed9240fa6a1f7e96ba166ddf7 \
-		-X  gitlab.com/oppy-finance/oppy-bridge/version.VERSION=$(VERSION) \
-    	-X gitlab.com/oppy-finance/oppy-bridge/version.COMMIT=$(COMMIT)" ./cmd/oppyBridge.go
+	go build -ldflags "-X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddressBSC=0x66fff09f83bfce2ed9240fa6a1f7e96ba166ddf7 \
+      -X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddressETH=0x77406A7678338abb5eA7a78b766F7F1125782C61 \
+	-X  gitlab.com/oppy-finance/oppy-bridge/version.VERSION=$(VERSION) \
+    	-X gitlab.com/oppy-finance/oppy-bridge/version.COMMIT=$(COMMIT)" ./cmd/bridge_service.go
+
 
 
 format:

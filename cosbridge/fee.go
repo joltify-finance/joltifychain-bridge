@@ -1,4 +1,4 @@
-package oppybridge
+package cosbridge
 
 func (oc *OppyChainInstance) GetPubChainFee(chainName string) int64 {
 	return oc.outBoundFeeMap[chainName].Load()

@@ -5,13 +5,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	zlog "github.com/rs/zerolog/log"
+	"gitlab.com/oppy-finance/oppy-bridge/cosbridge"
 	"gitlab.com/oppy-finance/oppy-bridge/monitor"
-	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
 	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
 	"go.uber.org/atomic"
 )
 
-func pubchainProcess(pi *pubchain.Instance, oppyChain *oppybridge.OppyChainInstance, oppyGrpc string, metric *monitor.Metric, blockHead *pubchain.BlockHead, pubRollbackGap int64, failedOutbound *atomic.Int32, outboundPauseHeight *uint64, outBoundWait *atomic.Bool, outBoundProcessDone, inKeygenInProgress *atomic.Bool, firstTimeOutbound *bool, previousTssBlockOutBound *int64) {
+func pubchainProcess(pi *pubchain.Instance, oppyChain *cosbridge.OppyChainInstance, oppyGrpc string, metric *monitor.Metric, blockHead *pubchain.BlockHead, pubRollbackGap int64, failedOutbound *atomic.Int32, outboundPauseHeight *uint64, outBoundWait *atomic.Bool, outBoundProcessDone, inKeygenInProgress *atomic.Bool, firstTimeOutbound *bool, previousTssBlockOutBound *int64) {
 	head := blockHead.Head
 	chainInfo := pi.GetChainClient(blockHead.ChainType)
 	if chainInfo == nil {
@@ -113,7 +113,7 @@ func pubchainProcess(pi *pubchain.Instance, oppyChain *oppybridge.OppyChainInsta
 	}
 
 	// todo we need also to add the check to avoid send tx near the churn blocks
-	if processableBlockHeight.Int64()-*previousTssBlockOutBound >= oppybridge.GroupBlockGap && !oppyChain.IsEmpty() {
+	if processableBlockHeight.Int64()-*previousTssBlockOutBound >= cosbridge.GroupBlockGap && !oppyChain.IsEmpty() {
 		// if we do not have enough tx to process, we wait for another round
 		if oppyChain.Size() < pubchain.GroupSign && *firstTimeOutbound {
 			*firstTimeOutbound = false

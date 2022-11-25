@@ -10,7 +10,7 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
+	"gitlab.com/oppy-finance/oppy-bridge/cosbridge"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -18,29 +18,29 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// OppyHTTPServer provide http endpoint for tss server
-type OppyHTTPServer struct {
-	logger     zerolog.Logger
-	s          *http.Server
-	peerID     string
-	ctx        context.Context
-	oppyBridge *oppybridge.OppyChainInstance
+// CosHTTPServer provide http endpoint for tss server
+type CosHTTPServer struct {
+	logger    zerolog.Logger
+	s         *http.Server
+	peerID    string
+	ctx       context.Context
+	cosBridge *cosbridge.OppyChainInstance
 }
 
-// NewOppyHttpServer should only listen to the loopback
-func NewOppyHttpServer(ctx context.Context, tssAddr string, peerID string, oppyBridge *oppybridge.OppyChainInstance) *OppyHTTPServer {
-	hs := &OppyHTTPServer{
+// NewCosHttpServer should only listen to the loopback
+func NewCosHttpServer(ctx context.Context, tssAddr string, peerID string, oppyBridge *cosbridge.OppyChainInstance) *CosHTTPServer {
+	hs := &CosHTTPServer{
 		logger: log.With().Str("module", "http").Logger(),
 		peerID: peerID,
 		ctx:    ctx,
 	}
 	s := &http.Server{
 		Addr:              tssAddr,
-		Handler:           hs.oppyNewHandler(),
+		Handler:           hs.bridgeNewHandler(),
 		ReadHeaderTimeout: time.Second * 30,
 	}
 	hs.s = s
-	hs.oppyBridge = oppyBridge
+	hs.cosBridge = oppyBridge
 	return hs
 }
 
@@ -58,14 +58,14 @@ func logMiddleware() mux.MiddlewareFunc {
 	}
 }
 
-func (t *OppyHTTPServer) getP2pIDHandler(w http.ResponseWriter, _ *http.Request) {
+func (t *CosHTTPServer) getP2pIDHandler(w http.ResponseWriter, _ *http.Request) {
 	_, err := w.Write([]byte(t.peerID))
 	if err != nil {
 		t.logger.Error().Err(err).Msg("fail to write to response")
 	}
 }
 
-func (t *OppyHTTPServer) queryPendingTxHandler(w http.ResponseWriter, r *http.Request) {
+func (t *CosHTTPServer) queryPendingTxHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -84,7 +84,7 @@ func (t *OppyHTTPServer) queryPendingTxHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	result := t.oppyBridge.QueryPendingTx(address)
+	result := t.cosBridge.QueryPendingTx(address)
 
 	retData, err := json.Marshal(result)
 	if err != nil {
@@ -99,7 +99,7 @@ func (t *OppyHTTPServer) queryPendingTxHandler(w http.ResponseWriter, r *http.Re
 }
 
 // NewHandler registers the API routes and returns a new HTTP handler
-func (t *OppyHTTPServer) oppyNewHandler() http.Handler {
+func (t *CosHTTPServer) bridgeNewHandler() http.Handler {
 	router := mux.NewRouter()
 	router.Handle("/p2pid", http.HandlerFunc(t.getP2pIDHandler)).Methods(http.MethodGet)
 	router.Handle("/metrics", promhttp.Handler())
@@ -108,7 +108,7 @@ func (t *OppyHTTPServer) oppyNewHandler() http.Handler {
 	return router
 }
 
-func (t *OppyHTTPServer) Start(wg *sync.WaitGroup) error {
+func (t *CosHTTPServer) Start(wg *sync.WaitGroup) error {
 	if t.s == nil {
 		return errors.New("invalid http server instance")
 	}

@@ -1,4 +1,4 @@
-package oppybridge
+package cosbridge
 
 import (
 	"encoding/hex"
@@ -336,10 +336,10 @@ func (oc *OppyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.Pool
 	}
 
 	p := bcommon.PoolInfo{
-		Pk:          poolPubKey,
-		OppyAddress: addr,
-		EthAddress:  ethAddr,
-		PoolInfo:    pool,
+		Pk:         poolPubKey,
+		CosAddress: addr,
+		EthAddress: ethAddr,
+		PoolInfo:   pool,
 	}
 
 	oc.poolUpdateLocker.Lock()
@@ -354,7 +354,7 @@ func (oc *OppyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.Pool
 }
 
 func (oc *OppyChainInstance) DoMoveFunds(conn grpc1.ClientConn, fromPool *bcommon.PoolInfo, to types.AccAddress, height int64) (bool, error) {
-	from := fromPool.OppyAddress
+	from := fromPool.CosAddress
 	acc, err := queryAccount(conn, from.String(), "")
 	if err != nil {
 		oc.logger.Error().Err(err).Msg("Fail to query the pool account")

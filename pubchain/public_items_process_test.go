@@ -79,15 +79,15 @@ func TestConfig(t *testing.T) {
 	accs, err := generateRandomPrivKey(2)
 	assert.Nil(t, err)
 	pool := common.PoolInfo{
-		Pk:          accs[0].pk,
-		OppyAddress: accs[0].oppyAddr,
-		EthAddress:  accs[0].commAddr,
+		Pk:         accs[0].pk,
+		CosAddress: accs[0].oppyAddr,
+		EthAddress: accs[0].commAddr,
 	}
 
 	pool1 := common.PoolInfo{
-		Pk:          accs[1].pk,
-		OppyAddress: accs[1].oppyAddr,
-		EthAddress:  accs[1].commAddr,
+		Pk:         accs[1].pk,
+		CosAddress: accs[1].oppyAddr,
+		EthAddress: accs[1].commAddr,
 	}
 
 	oc.AddMoveFundItem(&pool, 10)

@@ -114,9 +114,9 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	tn.Require().NoError(err)
 
 	previous := bcommon.PoolInfo{
-		Pk:          previouspool,
-		OppyAddress: oppyAddr,
-		EthAddress:  ethAddr,
+		Pk:         previouspool,
+		CosAddress: oppyAddr,
+		EthAddress: ethAddr,
 	}
 
 	poolInfo2 := vaulttypes.PoolInfo{

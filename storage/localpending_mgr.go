@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
+	"gitlab.com/oppy-finance/oppy-bridge/cosbridge"
 )
 
 // PendingTxMgr save the local state to file
@@ -33,7 +33,7 @@ func NewPendingTxStateMgr(folder string) *PendingTxMgr {
 	}
 }
 
-func (fsm *PendingTxMgr) SavePendingItems(pendingTxs []*oppybridge.OutboundTx) error {
+func (fsm *PendingTxMgr) SavePendingItems(pendingTxs []*cosbridge.OutboundTx) error {
 	fsm.writePendingLock.Lock()
 	defer fsm.writePendingLock.Unlock()
 
@@ -46,7 +46,7 @@ func (fsm *PendingTxMgr) SavePendingItems(pendingTxs []*oppybridge.OutboundTx) e
 	return ioutil.WriteFile(filePathName, buf, 0o600)
 }
 
-func (fsm *PendingTxMgr) LoadPendingItems() ([]*oppybridge.OutboundTx, error) {
+func (fsm *PendingTxMgr) LoadPendingItems() ([]*cosbridge.OutboundTx, error) {
 	if len(fsm.folder) < 1 {
 		return nil, errors.New("base file path is invalid")
 	}
@@ -63,7 +63,7 @@ func (fsm *PendingTxMgr) LoadPendingItems() ([]*oppybridge.OutboundTx, error) {
 		return nil, err
 	}
 	fsm.writePendingLock.RUnlock()
-	var outboundPending []*oppybridge.OutboundTx
+	var outboundPending []*cosbridge.OutboundTx
 	err = json.Unmarshal(input, &outboundPending)
 	if err != nil {
 		fsm.logger.Error().Err(err).Msgf("fail to unmarshal the inbound pending tx")

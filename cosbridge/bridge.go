@@ -1,4 +1,4 @@
-package oppybridge
+package cosbridge
 
 import (
 	"context"
@@ -490,7 +490,7 @@ func (oc *OppyChainInstance) CheckOutBoundTx(conn grpc1.ClientConn, txBlockHeigh
 	if pools[0] == nil || pools[1] == nil {
 		return
 	}
-	poolAddress := []sdk.AccAddress{pools[0].OppyAddress, pools[1].OppyAddress}
+	poolAddress := []sdk.AccAddress{pools[0].CosAddress, pools[1].CosAddress}
 	encodingConfig := oc.encoding
 
 	tx, err := encodingConfig.TxConfig.TxDecoder()(rawTx)

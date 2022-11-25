@@ -34,7 +34,7 @@ import (
 
 	zlog "github.com/rs/zerolog/log"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
-	"gitlab.com/oppy-finance/oppy-bridge/oppybridge"
+	"gitlab.com/oppy-finance/oppy-bridge/cosbridge"
 	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
 )
 
@@ -106,7 +106,7 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	oppyBridge, err := oppybridge.NewOppyBridge(config.OppyChain.GrpcAddress, config.OppyChain.WsAddress, tssServer, tl)
+	oppyBridge, err := cosbridge.NewOppyBridge(config.CosChain.GrpcAddress, config.CosChain.WsAddress, tssServer, tl)
 	if err != nil {
 		log.Fatalln("fail to create the invoice oppy_bridge", err)
 		return
@@ -135,13 +135,13 @@ func NewBridgeService(config config.Config) {
 		}
 	}()
 
-	err = oppyBridge.InitValidators(config.OppyChain.HTTPAddress)
+	err = oppyBridge.InitValidators(config.CosChain.HTTPAddress)
 	if err != nil {
 		fmt.Printf("error in init the validators %v", err)
 		cancel()
 		return
 	}
-	tssHTTPServer := NewOppyHttpServer(ctx, config.TssConfig.HTTPAddr, oppyBridge.GetTssNodeID(), oppyBridge)
+	tssHTTPServer := NewCosHttpServer(ctx, config.TssConfig.HTTPAddr, oppyBridge.GetTssNodeID(), oppyBridge)
 
 	wg.Add(1)
 	ret := tssHTTPServer.Start(&wg)
@@ -207,7 +207,7 @@ func NewBridgeService(config config.Config) {
 		}
 	}
 
-	addEventLoop(ctx, &wg, oppyBridge, pubChainInstance, metrics, int64(config.OppyChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl, config.OppyChain.GrpcAddress)
+	addEventLoop(ctx, &wg, oppyBridge, pubChainInstance, metrics, int64(config.CosChain.RollbackGap), int64(config.PubChainConfig.RollbackGap), tl, config.CosChain.GrpcAddress)
 	<-c
 	cancel()
 	wg.Wait()
@@ -252,7 +252,7 @@ func NewBridgeService(config config.Config) {
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, oppyRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList, oppyGrpc string) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.OppyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, oppyRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList, oppyGrpc string) {
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
 
@@ -352,7 +352,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 					continue
 				}
 
-				latestHeight, err := oppybridge.GetLastBlockHeight(grpcClient)
+				latestHeight, err := cosbridge.GetLastBlockHeight(grpcClient)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msgf("fail to get the latest block height")
 					grpcClient.Close()
@@ -584,7 +584,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *oppybridge
 	}(wg)
 }
 
-func processInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, items []*common2.InBoundReq, inBoundWait *atomic.Bool, failedInbound *atomic.Int32) {
+func processInbound(oppyGrpc string, oppyChain *cosbridge.OppyChainInstance, pi *pubchain.Instance, items []*common2.InBoundReq, inBoundWait *atomic.Bool, failedInbound *atomic.Int32) {
 	grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")
@@ -657,7 +657,7 @@ func processInbound(oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi
 	wg.Wait()
 }
 
-func processEachOutBound(chainInfo *pubchain.ChainInfo, oppyGrpc string, oppyChain *oppybridge.OppyChainInstance, pi *pubchain.Instance, items []*common2.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
+func processEachOutBound(chainInfo *pubchain.ChainInfo, oppyGrpc string, oppyChain *cosbridge.OppyChainInstance, pi *pubchain.Instance, items []*common2.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
 	checkWg := sync.WaitGroup{}
 	needToBeProcessed := make([]*common2.OutBoundReq, 0)
 	needToBeProcessedLock := sync.Mutex{}
@@ -801,7 +801,7 @@ func processEachOutBound(chainInfo *pubchain.ChainInfo, oppyGrpc string, oppyCha
 	tssWaitGroup.Wait()
 }
 
-func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain *oppybridge.OppyChainInstance) {
+func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain *cosbridge.OppyChainInstance) {
 	grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")
@@ -828,7 +828,7 @@ func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain
 	wgDump.Wait()
 }
 
-func putOnHoldBlockOutBoundBack(oppyGrpc string, chainInfo *pubchain.ChainInfo, oppyChain *oppybridge.OppyChainInstance) {
+func putOnHoldBlockOutBoundBack(oppyGrpc string, chainInfo *pubchain.ChainInfo, oppyChain *cosbridge.OppyChainInstance) {
 	grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")

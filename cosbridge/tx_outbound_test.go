@@ -1,4 +1,4 @@
-package oppybridge
+package cosbridge
 
 import (
 	"encoding/hex"
@@ -186,7 +186,7 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 	o.Require().NoError(err)
 	pools := oc.GetPool()
 	o.Require().Nil(pools[0])
-	addr2 := pools[1].OppyAddress
+	addr2 := pools[1].CosAddress
 	o.Require().True(pk.Equals(addr2))
 	// now we add another pool
 	cospk = legacybech32.MustMarshalPubKey(legacybech32.AccPK, key2.GetPubKey()) // nolint
@@ -203,9 +203,9 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 	pubkeyStr = key2.GetPubKey().Address().String()
 	pk2, err := sdk.AccAddressFromHex(pubkeyStr)
 	o.Require().NoError(err)
-	o.Require().True(pk.Equals(pools[0].OppyAddress))
+	o.Require().True(pk.Equals(pools[0].CosAddress))
 
-	pool1 := oc.lastTwoPools[1].OppyAddress
+	pool1 := oc.lastTwoPools[1].CosAddress
 	o.Require().True(pk2.Equals(pool1))
 
 	// now we add another pool and pop out the firt one
@@ -225,7 +225,7 @@ func (o OutBoundTestSuite) TestUpdatePool() {
 	pubkeyStr = key3.GetPubKey().Address().String()
 	pk3, err := sdk.AccAddressFromHex(pubkeyStr)
 	o.Require().NoError(err)
-	o.Require().True(pk3.Equals(pools[1].OppyAddress))
+	o.Require().True(pk3.Equals(pools[1].CosAddress))
 
 	time.Sleep(time.Second)
 }

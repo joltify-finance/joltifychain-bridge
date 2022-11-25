@@ -1,4 +1,4 @@
-package oppybridge
+package cosbridge
 
 func (oc *OppyChainInstance) QueryPendingTx(addr string) []*OutboundTx {
 	items := []*OutboundTx{}

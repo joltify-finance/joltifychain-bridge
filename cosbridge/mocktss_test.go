@@ -1,4 +1,4 @@
-package oppybridge
+package cosbridge
 
 import (
 	"crypto/ecdsa"

@@ -15,17 +15,17 @@ stages:
 
 
 variables:
-  #  DARWIN_AMD64_BINARY: "oppyBridge-darwin-amd64-${CI_COMMIT_TAG}"
-  LINUX_AMD64_BINARY: "oppyBridge-linux-amd64-${CI_COMMIT_TAG}"
+  #  DARWIN_AMD64_BINARY: "bridgeService-darwin-amd64-${CI_COMMIT_TAG}"
+  LINUX_AMD64_BINARY: "bridgeSerivce-linux-amd64-${CI_COMMIT_TAG}"
 
 build-job:       # This job runs in the build stage, which runs first.
   stage: build
   image: golang:1.18
   script:
     - make build
-    - sha256sum oppyBridge> checksum.txt
+    - sha256sum bridge_service> checksum.txt
     - mkdir release_files
-    - cp oppyBridge release_files/oppyBridge
+    - cp bridge_service release_files/bridge_service
     - cp checksum.txt release_files/${LINUX_AMD64_BINARY}-checksum.txt
   artifacts:
     paths:
@@ -63,7 +63,7 @@ upload-job:
   rules:
     - if: $CI_COMMIT_TAG
   script:
-    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file release_files/oppyBridge "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${LINUX_AMD64_BINARY}/${CI_COMMIT_TAG}/oppyBridge"'
+    - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file release_files/bridge_service "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${LINUX_AMD64_BINARY}/${CI_COMMIT_TAG}/bridge_service"'
     - 'curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file release_files/${LINUX_AMD64_BINARY}-checksum.txt  "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${LINUX_AMD64_BINARY}/${CI_COMMIT_TAG}/${LINUX_AMD64_BINARY}-checksum.txt"'
 
 release-job:
@@ -80,6 +80,6 @@ release-job:
     assets:
       links:
         - name: '$LINUX_AMD64_BINARY'
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${LINUX_AMD64_BINARY}/${CI_COMMIT_TAG}/oppyBridge"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${LINUX_AMD64_BINARY}/${CI_COMMIT_TAG}/bridge_service"
         - name: '${LINUX_AMD64_BINARY}-checksum.txt'
           url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${LINUX_AMD64_BINARY}/${CI_COMMIT_TAG}/${LINUX_AMD64_BINARY}-checksum.txt"

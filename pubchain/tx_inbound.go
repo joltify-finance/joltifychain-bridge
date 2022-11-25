@@ -224,10 +224,10 @@ func (pi *Instance) UpdatePool(pool *vaulttypes.PoolInfo) error {
 	defer pi.poolLocker.Unlock()
 
 	p := bcommon.PoolInfo{
-		Pk:          poolPubKey,
-		OppyAddress: addr,
-		EthAddress:  ethAddr,
-		PoolInfo:    pool,
+		Pk:         poolPubKey,
+		CosAddress: addr,
+		EthAddress: ethAddr,
+		PoolInfo:   pool,
 	}
 
 	if pi.lastTwoPools[1] != nil {

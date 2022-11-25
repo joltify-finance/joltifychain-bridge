@@ -22,10 +22,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	common.InitLog("info", true, "oppyBridge_service")
+	common.InitLog("info", true, "bridge_service")
 	bridge.NewBridgeService(cfg)
 	if cfg.Version {
-		fmt.Printf("oppyBridge %v-%v\n", version.VERSION, version.COMMIT)
+		fmt.Printf("bridge service %v-%v\n", version.VERSION, version.COMMIT)
 		return
 	}
 }

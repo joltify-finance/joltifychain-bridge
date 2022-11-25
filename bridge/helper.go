@@ -23,13 +23,13 @@ func NeedUpdate(qcPools []*vaulttypes.PoolInfo, curPools []*common.PoolInfo) boo
 			return false
 		}
 		v1 := common.PoolInfo{
-			Pk:          pk,
-			OppyAddress: addr,
-			EthAddress:  ethAddr,
+			Pk:         pk,
+			CosAddress: addr,
+			EthAddress: ethAddr,
 		}
 		qPools = append(qPools, v1)
 	}
-	if qPools[0].OppyAddress.Equals(curPools[1].OppyAddress) && qPools[1].OppyAddress.Equals(curPools[0].OppyAddress) {
+	if qPools[0].CosAddress.Equals(curPools[1].CosAddress) && qPools[1].CosAddress.Equals(curPools[0].CosAddress) {
 		return false
 	}
 	return true

@@ -8,7 +8,7 @@ import (
 	maddr "github.com/multiformats/go-multiaddr"
 )
 
-type OppyChainConfig struct {
+type CosChainConfig struct {
 	GrpcAddress string
 	WsAddress   string
 	WsEndpoint  string
@@ -64,7 +64,7 @@ func (al *AddrList) Set(value string) error {
 }
 
 type Config struct {
-	OppyChain          OppyChainConfig
+	CosChain           CosChainConfig
 	PubChainConfig     PubChainConfig
 	TssConfig          TssConfig
 	KeyringAddress     string
@@ -78,11 +78,11 @@ type Config struct {
 func DefaultConfig() Config {
 	var config Config
 	flag.BoolVar(&config.Version, "v", false, "version of the oppyChain")
-	flag.StringVar(&config.OppyChain.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for oppy pub_chain")
-	flag.StringVar(&config.OppyChain.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for oppy pub_chain")
-	flag.StringVar(&config.OppyChain.HTTPAddress, "http-port", "http://localhost:26657", "ws address for oppy pub_chain")
-	flag.StringVar(&config.OppyChain.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for oppy pub_chain")
-	flag.IntVar(&config.OppyChain.RollbackGap, "oppy-rollback-gap", 1, "delay the transaction process to prevent chain rollback")
+	flag.StringVar(&config.CosChain.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for oppy pub_chain")
+	flag.StringVar(&config.CosChain.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for oppy pub_chain")
+	flag.StringVar(&config.CosChain.HTTPAddress, "http-port", "http://localhost:26657", "ws address for oppy pub_chain")
+	flag.StringVar(&config.CosChain.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for oppy pub_chain")
+	flag.IntVar(&config.CosChain.RollbackGap, "oppy-rollback-gap", 1, "delay the transaction process to prevent chain rollback")
 	flag.StringVar(&config.PubChainConfig.WsAddressBSC, "pub-ws-endpoint", "ws://rpc.test.oppy.zone:8456/", "endpoint for public pub_chain listener")
 	flag.StringVar(&config.PubChainConfig.WsAddressETH, "pub-ws-ETHendpoint", "ws://104.238.136.146:8453/", "endpoint for public pub_chain listener")
 	flag.IntVar(&config.PubChainConfig.RollbackGap, "pubchain-rollback-gap", 1, "delay the transaction process to prevent chain rollback")
