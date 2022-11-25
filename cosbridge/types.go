@@ -16,10 +16,10 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	grpc1 "github.com/gogo/protobuf/grpc"
+	"github.com/joltify-finance/joltify_lending/x/vault/types"
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
 	"gitlab.com/oppy-finance/oppy-bridge/validators"
-	"gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/rs/zerolog"

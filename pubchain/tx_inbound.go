@@ -8,9 +8,9 @@ import (
 	"math/big"
 	"strings"
 
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/types"
 

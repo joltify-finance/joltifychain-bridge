@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	grpc1 "github.com/gogo/protobuf/grpc"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"

@@ -3,7 +3,7 @@ package common
 import (
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 )
 
 // PoolInfo stores the pool and pk of the oppy pool

@@ -4,11 +4,11 @@ import (
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/types"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	cryptoenc "github.com/tendermint/tendermint/crypto/encoding"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 func TestNewValidator(t *testing.T) {

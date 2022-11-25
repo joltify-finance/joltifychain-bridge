@@ -12,7 +12,7 @@ import (
 
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 )
 
 // SubmitOutboundTx submit the outbound record to oppy chain

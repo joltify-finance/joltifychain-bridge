@@ -8,10 +8,10 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 	"gotest.tools/assert"
 )
 

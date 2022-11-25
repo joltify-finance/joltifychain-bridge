@@ -13,9 +13,9 @@ import (
 
 	zlog "github.com/rs/zerolog/log"
 
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types"

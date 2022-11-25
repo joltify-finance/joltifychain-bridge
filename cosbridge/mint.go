@@ -7,8 +7,8 @@ import (
 	grpc1 "github.com/gogo/protobuf/grpc"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string) (*vaulttypes.MsgCreateIssueToken, error) {

@@ -21,7 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
 
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"

@@ -11,9 +11,9 @@ import (
 	"time"
 
 	grpc1 "github.com/gogo/protobuf/grpc"
+	"github.com/joltify-finance/joltify_lending/app"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
-	"gitlab.com/oppy-finance/oppychain/app"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -24,12 +24,12 @@ import (
 	cosTx "github.com/cosmos/cosmos-sdk/types/tx"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	"github.com/joltify-finance/joltify_lending/testutil/network"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
-	"gitlab.com/oppy-finance/oppychain/testutil/network"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 	"golang.org/x/crypto/sha3"
 )
 

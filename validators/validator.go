@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/types"
 )

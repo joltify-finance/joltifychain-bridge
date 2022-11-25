@@ -13,10 +13,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	grpc1 "github.com/gogo/protobuf/grpc"
+	"github.com/joltify-finance/joltify_lending/testutil/network"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
-	"gitlab.com/oppy-finance/oppychain/testutil/network"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 type ValidatorTestSuite struct {

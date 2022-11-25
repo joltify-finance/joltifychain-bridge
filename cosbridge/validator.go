@@ -9,9 +9,9 @@ import (
 
 	"github.com/cenkalti/backoff"
 	grpc1 "github.com/gogo/protobuf/grpc"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/validators"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/types"

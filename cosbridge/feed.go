@@ -4,9 +4,9 @@ import (
 	"errors"
 
 	grpc1 "github.com/gogo/protobuf/grpc"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	zlog "github.com/rs/zerolog/log"
 	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 // FeedTx feed the tx with the given

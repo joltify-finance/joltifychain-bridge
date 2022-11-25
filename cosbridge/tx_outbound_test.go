@@ -20,11 +20,11 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/joltify-finance/joltify_lending/testutil/network"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
-	"gitlab.com/oppy-finance/oppychain/testutil/network"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 type OutBoundTestSuite struct {

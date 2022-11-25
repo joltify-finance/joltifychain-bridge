@@ -17,9 +17,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"github.com/tendermint/tendermint/proto/tendermint/types"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 // queryAccount get the current sender account info

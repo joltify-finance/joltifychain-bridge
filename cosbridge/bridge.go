@@ -19,12 +19,12 @@ import (
 
 	coscrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/joltify-finance/joltify_lending/x/vault/types"
 	"github.com/oppyfinance/tss/common"
 	"github.com/oppyfinance/tss/keysign"
 	"github.com/tendermint/tendermint/crypto"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
-	"gitlab.com/oppy-finance/oppychain/x/vault/types"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"

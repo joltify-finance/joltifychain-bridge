@@ -3,9 +3,9 @@ package pubchain
 import (
 	"context"
 
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
-	vaulttypes "gitlab.com/oppy-finance/oppychain/x/vault/types"
 )
 
 func (pi *Instance) FeedTx(lastPoolInfo *vaulttypes.PoolInfo, outboundReqs []*common.OutBoundReq, chainType string) error {

@@ -20,9 +20,9 @@ const WebsocketTest = "ws://152.69.189.218:8456"
 // SetupBech32Prefix sets up the prefix of the oppy chain
 func SetupBech32Prefix() {
 	config := types.GetConfig()
-	config.SetBech32PrefixForAccount("oppy", "oppypub")
-	config.SetBech32PrefixForValidator("oppyval", "oppyvpub")
-	config.SetBech32PrefixForConsensusNode("oppyvalcons", "oppycpub")
+	config.SetBech32PrefixForAccount("jolt", "joltpub")
+	config.SetBech32PrefixForValidator("joltval", "joltvpub")
+	config.SetBech32PrefixForConsensusNode("joltvalcons", "joltcpub")
 }
 
 // PoolPubKeyToOppyAddress return the oppy encoded pubkey
