@@ -28,7 +28,7 @@ func main() {
 	names := []string{"abnb", "abusd"}
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	for i := 0; i < 100; i++ {
-		acc, err := types.AccAddressFromBech32(itemsIn[0].Address.String())
+		acc, err := types.AccAddressFromBech32(itemsIn[0].UserReceiverAddress.String())
 		if err != nil {
 			panic(err)
 		}

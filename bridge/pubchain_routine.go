@@ -121,7 +121,7 @@ func pubchainProcess(pi *pubchain.Instance, oppyChain *cosbridge.OppyChainInstan
 			return
 		}
 
-		zlog.Logger.Warn().Msgf("we feed the outbound tx now %v", pools[1].PoolInfo.CreatePool.String())
+		zlog.Logger.Warn().Msgf("we feed the outbound tx now %v", pools[1].PoolInfo.CreatePool.PoolAddr.String())
 
 		outboundItems := oppyChain.PopItem(pubchain.GroupSign, blockHead.ChainType)
 

@@ -36,6 +36,9 @@ const (
 	GroupSign         = 4
 	PRICEUPDATEGAP    = 10
 	movefundretrygap  = 3
+	ETH               = "ETH"
+	BSC               = "BSC"
+	OPPY              = "OPPY"
 )
 
 var (
@@ -44,17 +47,19 @@ var (
 )
 
 type InboundTx struct {
-	TxID           string         `json:"tx_id"` // this variable is used for locally saving and loading
-	Address        sdk.AccAddress `json:"address"`
-	PubBlockHeight uint64         `json:"pub_block_height"` // this variable is used to delete the expired tx
-	Token          sdk.Coin       `json:"token"`
+	TxID            string         `json:"tx_id"` // this variable is used for locally saving and loading
+	ReceiverAddress sdk.AccAddress `json:"receiver_address"`
+	PubBlockHeight  uint64         `json:"pub_block_height"` // this variable is used to delete the expired tx
+	Token           sdk.Coin       `json:"token"`
 }
 
 type Erc20TxInfo struct {
-	fromAddr     sdk.AccAddress // address that we should send token to
-	toAddr       common.Address // address to the pool
-	Amount       *big.Int       // the amount of the token that cross the bridge
-	tokenAddress common.Address // the erc20 contract address (we need to ensure the token address is 100% correct)
+	receiverAddr      sdk.AccAddress // address that we should send token to
+	receiverAddrERC20 string         // address that we should send token to
+	toAddr            common.Address // address to the pool
+	Amount            *big.Int       // the amount of the token that cross the bridge
+	tokenAddress      common.Address // the erc20 contract address (we need to ensure the token address is 100% correct)
+	dstChainType      string
 }
 
 type InboundTxBnb struct {
@@ -132,10 +137,11 @@ type Instance struct {
 	ChannelQueue         chan *BlockHead
 	onHoldRetryQueue     []*bcommon.InBoundReq
 	onHoldRetryQueueLock *sync.Mutex
+	RetryOutboundReq     *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 }
 
 // NewChainInstance initialize the oppy_bridge entity
-func NewChainInstance(wsBSC, wsETH string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, wg *sync.WaitGroup) (*Instance, error) {
+func NewChainInstance(wsBSC, wsETH string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, wg *sync.WaitGroup, retryPools *bcommon.RetryPools) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
 
 	channelQueue := make(chan *BlockHead, sbchannelsize)
@@ -177,5 +183,6 @@ func NewChainInstance(wsBSC, wsETH string, tssServer tssclient.TssInstance, tl t
 		wg:                   wg,
 		onHoldRetryQueue:     []*bcommon.InBoundReq{},
 		onHoldRetryQueueLock: &sync.Mutex{},
+		RetryOutboundReq:     retryPools.RetryOutboundReq,
 	}, nil
 }

@@ -102,7 +102,7 @@ type OutboundTx struct {
 }
 
 // NewOppyBridge new the instance for the oppy pub_chain
-func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI) (*OppyChainInstance, error) {
+func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, retryPools *bcommon.RetryPools) (*OppyChainInstance, error) {
 	var oppyBridge OppyChainInstance
 	var err error
 	oppyBridge.logger = log.With().Str("module", "oppyChain").Logger()
@@ -137,7 +137,7 @@ func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, t
 	encode := MakeEncodingConfig()
 	oppyBridge.encoding = &encode
 	oppyBridge.OutboundReqChan = make(chan []*bcommon.OutBoundReq, reqCacheSize)
-	oppyBridge.RetryOutboundReq = &sync.Map{}
+	oppyBridge.RetryOutboundReq = retryPools.RetryOutboundReq
 	oppyBridge.TokenList = tl
 	oppyBridge.pendingTx = &sync.Map{}
 	oppyBridge.ChannelQueueNewBlock = make(chan ctypes.ResultEvent, channelSize)

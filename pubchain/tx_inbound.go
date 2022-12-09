@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	zlog "github.com/rs/zerolog/log"
 	"math/big"
 	"strings"
 
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
-	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/types"
@@ -23,7 +23,7 @@ const alreadyKnown = "already known"
 
 // ProcessInBoundERC20 process the inbound contract token top-up
 func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, chainType string, txInfo *Erc20TxInfo, txBlockHeight uint64) error {
-	err := pi.processInboundERC20Tx(tx.Hash().Hex()[2:], chainType, txBlockHeight, txInfo.fromAddr, txInfo.tokenAddress, txInfo.Amount, txInfo.tokenAddress)
+	err := pi.processInboundERC20Tx(tx.Hash().Hex()[2:], chainType, txBlockHeight, txInfo.receiverAddr, txInfo.tokenAddress, txInfo.Amount, txInfo.tokenAddress)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
 		return err
@@ -43,7 +43,7 @@ func (pi *Instance) ProcessNewBlock(chainType string, chainInfo *ChainInfo, numb
 	return nil
 }
 
-func (pi *Instance) processInboundERC20Tx(txID, chainType string, txBlockHeight uint64, from types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
+func (pi *Instance) processInboundERC20Tx(txID, chainType string, txBlockHeight uint64, receiverAddr types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
 	// this is repeated check for tokenAddr which is cheked at function 'processEachBlock'
 	tokenItem, exit := pi.TokenList.GetTokenInfoByAddressAndChainType(strings.ToLower(addr.Hex()), chainType)
 	if !exit {
@@ -58,7 +58,7 @@ func (pi *Instance) processInboundERC20Tx(txID, chainType string, txBlockHeight 
 
 	tx := InboundTx{
 		txID,
-		from,
+		receiverAddr,
 		txBlockHeight,
 		token,
 	}
@@ -75,8 +75,8 @@ func (pi *Instance) processInboundERC20Tx(txID, chainType string, txBlockHeight 
 		tx.Token.Amount = adjustedTokenAmount
 	}
 
-	item := bcommon.NewAccountInboundReq(tx.Address, to, tx.Token, txIDBytes, int64(txBlockHeight))
-	pi.AddItem(&item)
+	item := bcommon.NewAccountInboundReq(tx.ReceiverAddress, to, tx.Token, txIDBytes, int64(txBlockHeight))
+	pi.AddInBoundItem(&item)
 	return nil
 }
 
@@ -118,18 +118,33 @@ func (pi *Instance) checkErc20(data []byte, to, contractAddress string) (*Erc20T
 		var memoInfo bcommon.BridgeMemo
 		err = json.Unmarshal(memo, &memoInfo)
 		if err != nil {
+			pi.logger.Error().Err(err).Msgf("unable to unmarshal")
 			return nil, err
 		}
 
-		fromAddr, err := types.AccAddressFromBech32(memoInfo.Dest)
-		if err != nil {
-			return nil, err
+		var dstAddr types.AccAddress
+		var dstAddrErc20 string
+		switch memoInfo.ChainType {
+		case OPPY:
+			dstAddr, err = types.AccAddressFromBech32(memoInfo.Dest)
+			if err != nil {
+				return nil, err
+			}
+			dstAddrErc20 = ""
+		case BSC, ETH:
+			dstAddr = types.AccAddress{}
+			dstAddrErc20 = memoInfo.Dest
+		default:
+			return nil, errors.New("unknow chain type")
 		}
+
 		ret := Erc20TxInfo{
-			fromAddr:     fromAddr,
-			toAddr:       toAddr,
-			Amount:       amount,
-			tokenAddress: tokenAddress,
+			receiverAddr:      dstAddr,
+			toAddr:            toAddr,
+			Amount:            amount,
+			tokenAddress:      tokenAddress,
+			dstChainType:      memoInfo.ChainType,
+			receiverAddrERC20: dstAddrErc20,
 		}
 
 		return &ret, nil
@@ -159,12 +174,24 @@ func (pi *Instance) processEachBlock(chainType string, chainInfo *ChainInfo, blo
 				continue
 			}
 
-			err := pi.ProcessInBoundERC20(tx, chainType, txInfo, block.NumberU64())
-			if err != nil {
-				zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
+			switch txInfo.dstChainType {
+			case "ETH", "BSC":
+				err := pi.processDstInbound(txInfo, tx.Hash().Hex()[2:], chainType, txBlockHeight)
+				if err != nil {
+					zlog.Logger.Error().Err(err).Msgf("fail to process the inbound tx for outbound from %v to %v", chainType, txInfo.dstChainType)
+					continue
+				}
+
+			case "OPPY":
+				err := pi.ProcessInBoundERC20(tx, chainType, txInfo, block.NumberU64())
+				if err != nil {
+					zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
+					continue
+				}
+			default:
+				zlog.Warn().Msgf("fail to process the tx with chain type %v", txInfo.dstChainType)
 				continue
 			}
-			continue
 		}
 		if pi.checkToBridge(*tx.To()) {
 			var memoInfo bcommon.BridgeMemo
@@ -173,33 +200,102 @@ func (pi *Instance) processEachBlock(chainType string, chainInfo *ChainInfo, blo
 				pi.logger.Error().Err(err).Msgf("fail to unmarshal the memo")
 				continue
 			}
-
-			fromAddr, err := types.AccAddressFromBech32(memoInfo.Dest)
-			if err != nil {
-				pi.logger.Error().Err(err).Msgf("fail to the acc address")
-				continue
+			switch memoInfo.ChainType {
+			case "OPPY":
+				pi.processOppyInbound(memoInfo, chainType, *tx, txBlockHeight)
+			default:
+				pi.logger.Warn().Msgf("unknown chain type %v", memoInfo.ChainType)
 			}
-
-			tokenItem, exist := pi.TokenList.GetTokenInfoByAddressAndChainType("native", chainType)
-			if !exist {
-				panic("native token is not set")
-			}
-			// this indicates it is a native bnb transfer
-			balance, err := pi.getBalance(tx.Value(), tokenItem.Denom)
-			if err != nil {
-				continue
-			}
-			delta := types.Precision - tokenItem.Decimals
-			if delta != 0 {
-				adjustedTokenAmount := bcommon.AdjustInt(balance.Amount, int64(delta))
-				balance.Amount = adjustedTokenAmount
-			}
-
-			item := bcommon.NewAccountInboundReq(fromAddr, *tx.To(), balance, tx.Hash().Bytes(), txBlockHeight)
-			// we add to the retry pool to  sort the tx
-			pi.AddItem(&item)
 		}
 	}
+}
+
+func calculateFee(a types.Int, ratio string) (types.Int, types.Int) {
+	amountDec := a.ToDec()
+	leftOver := amountDec.Mul(types.MustNewDecFromStr(ratio)).TruncateInt()
+	fee := a.Sub(leftOver)
+	return leftOver, fee
+}
+
+func (pi *Instance) processDstInbound(txInfo *Erc20TxInfo, txHash, chainType string, txBlockHeight int64) error {
+	tokenInItem, exit := pi.TokenList.GetTokenInfoByAddressAndChainType(strings.ToLower(txInfo.tokenAddress.Hex()), chainType)
+	if !exit {
+		pi.logger.Error().Msgf("Token is not on our token list")
+		return errors.New("token is not on our token list")
+	}
+
+	token := types.NewCoin(tokenInItem.Denom, types.NewIntFromBigInt(txInfo.Amount))
+
+	delta := types.Precision - tokenInItem.Decimals
+	if delta != 0 {
+		adjustedTokenAmount := bcommon.AdjustInt(token.Amount, int64(delta))
+		token.Amount = adjustedTokenAmount
+	}
+
+	//fixme we need to have the dynamic fee
+	leftover, fee := calculateFee(token.Amount, "0.9")
+	if leftover.IsZero() {
+		pi.logger.Warn().Msg("zero value to be transffered")
+		return errors.New("zero value to be transferred, rejected")
+	}
+	feeToValidator := types.NewCoin(token.Denom, fee)
+	token.Amount = leftover
+
+	tokenOutItem, tokenExist := pi.TokenList.GetTokenInfoByDenomAndChainType(token.Denom, txInfo.dstChainType)
+	if !tokenExist {
+		pi.logger.Error().Msgf("fail to find the token %v for outbound chain %v", token.Denom, txInfo.dstChainType)
+		return errors.New("cannot find the token")
+	}
+
+	//now outbound decimal convertion
+	deltaOut := tokenOutItem.Decimals - types.Precision
+	if deltaOut != 0 {
+		adjustedTokenAmount := bcommon.AdjustInt(token.Amount, int64(deltaOut))
+		token.Amount = adjustedTokenAmount
+	}
+
+	receiver := common.HexToAddress(txInfo.receiverAddrERC20)
+	if receiver == common.BigToAddress(big.NewInt(0)) {
+		pi.logger.Warn().Msgf("incorrect receiver address %v for chain %v", txInfo.receiverAddrERC20, txInfo.dstChainType)
+		return nil
+	}
+	currEthAddr := pi.lastTwoPools[1].EthAddress
+
+	itemReq := bcommon.NewOutboundReq(txHash, receiver, currEthAddr, token, tokenOutItem.TokenAddr, txBlockHeight, types.Coins{}, types.Coins{feeToValidator}, txInfo.dstChainType)
+
+	pi.AddOutBoundItem(&itemReq)
+	pi.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v) with fee %v paid to validators", txBlockHeight, pi.CurrentHeight, types.Coins{feeToValidator})
+	return nil
+}
+
+func (pi *Instance) processOppyInbound(memoInfo bcommon.BridgeMemo, chainType string, tx ethTypes.Transaction, txBlockHeight int64) {
+
+	dstAddr, err := types.AccAddressFromBech32(memoInfo.Dest)
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("fail to the acc address")
+		return
+	}
+
+	tokenItem, exist := pi.TokenList.GetTokenInfoByAddressAndChainType("native", chainType)
+	if !exist {
+		panic("native token is not set")
+	}
+	// this indicates it is a native bnb transfer
+	balance, err := pi.getBalance(tx.Value(), tokenItem.Denom)
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("fail to the the balance of the given token")
+		return
+	}
+	delta := types.Precision - tokenItem.Decimals
+	if delta != 0 {
+		adjustedTokenAmount := bcommon.AdjustInt(balance.Amount, int64(delta))
+		balance.Amount = adjustedTokenAmount
+	}
+
+	item := bcommon.NewAccountInboundReq(dstAddr, *tx.To(), balance, tx.Hash().Bytes(), txBlockHeight)
+	// we add to the retry pool to  sort the tx
+	pi.AddInBoundItem(&item)
+
 }
 
 // UpdatePool update the tss pool address

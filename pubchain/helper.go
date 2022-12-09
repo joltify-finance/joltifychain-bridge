@@ -314,7 +314,7 @@ func (pi *Instance) retrieveAddrfromRawTx(tx *types.Transaction) (types2.AccAddr
 
 	transferFrom, err := misc.EthSignPubKeyToOppyAddr(sigPublicKey)
 	if err != nil {
-		pi.logger.Error().Err(err).Msg("fail to recover the oppy Address")
+		pi.logger.Error().Err(err).Msg("fail to recover the oppy ReceiverAddress")
 		return types2.AccAddress{}, err
 	}
 	return transferFrom, nil
@@ -323,9 +323,9 @@ func (pi *Instance) retrieveAddrfromRawTx(tx *types.Transaction) (types2.AccAddr
 func (pi *Instance) GetChainClient(chainType string) *ChainInfo {
 	var chainInfo *ChainInfo
 	switch chainType {
-	case "ETH":
+	case ETH:
 		chainInfo = pi.EthChain
-	case "BSC":
+	case BSC:
 		chainInfo = pi.BSCChain
 	default:
 		zlog.Error().Msgf("invalid chain type")

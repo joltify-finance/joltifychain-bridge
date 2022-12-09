@@ -159,7 +159,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 	f.Require().Equal(len(pi.InboundReqChan), 0)
 	reqs := createdTestInBoundReqs(1)
 	for _, el := range reqs {
-		pi.AddItem(el)
+		pi.AddInBoundItem(el)
 	}
 
 	err = oc.FeedTx(f.grpc, &poolInfo, &pi)

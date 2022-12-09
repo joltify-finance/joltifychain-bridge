@@ -46,7 +46,7 @@ func TestConfig(t *testing.T) {
 	}
 
 	for _, el := range reqs {
-		oc.AddItem(el)
+		oc.AddInBoundItem(el)
 	}
 	assert.Equal(t, oc.Size(), 100)
 
@@ -68,7 +68,7 @@ func TestConfig(t *testing.T) {
 	assert.Equal(t, oc.Size(), 0)
 
 	for _, el := range reqs {
-		oc.AddItem(el)
+		oc.AddInBoundItem(el)
 	}
 	item := oc.ExportItems()
 	assert.Equal(t, len(item), 100)

@@ -182,7 +182,7 @@ func TestProcessInBound(t *testing.T) {
 	nonExistedTokenAddr := common.HexToAddress(nonExistedTokenAddrStr)
 
 	erc20Tx := Erc20TxInfo{
-		fromAddr:     sdk.AccAddress{},
+		receiverAddr: sdk.AccAddress{},
 		tokenAddress: nonExistedTokenAddr,
 		toAddr:       transferTo,
 		Amount:       testAmount,
@@ -657,7 +657,7 @@ func TestProcessERC20InBoundOnBSC(t *testing.T) {
 	pi.tokenAbi = &tAbi
 	txInfo, err := pi.checkErc20(tx.Data(), tx.To().Hex(), OppyContractAddressBSC)
 	assert.Nil(t, err)
-	assert.Equal(t, txInfo.fromAddr.String(), "oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7")
+	assert.Equal(t, txInfo.receiverAddr.String(), "oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7")
 	wg.Wait()
 }
 

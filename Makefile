@@ -16,7 +16,7 @@ BUILD_FLAGS := -ldflags '$(ldflags)'
 
 testnet: go.sum
 	go install   -ldflags "-X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddressBSC=0x94277968dff216265313657425d9d7577ad32dd1 \
-      -X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddressETH=0x77406A7678338abb5eA7a78b766F7F1125782C61 \
+      -X gitlab.com/oppy-finance/oppy-bridge/pubchain.OppyContractAddressETH=0x395931E1f64f1DC1889cbC3208dD746667C31126\
     	-X  gitlab.com/oppy-finance/oppy-bridge/version.VERSION=$(VERSION) \
     	-X gitlab.com/oppy-finance/oppy-bridge/version.COMMIT=$(COMMIT)" ./cmd/bridge_service.go
 

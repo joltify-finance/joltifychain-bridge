@@ -121,7 +121,7 @@ func TestCreateInstance(t *testing.T) {
 	reqs, sortedReqs, err := createNreq(500)
 	assert.Nil(t, err)
 	for i := 0; i < len(sortedReqs); i++ {
-		pi.AddItem(reqs[i])
+		pi.AddInBoundItem(reqs[i])
 	}
 
 	// now we test whether the pop is in the correct order

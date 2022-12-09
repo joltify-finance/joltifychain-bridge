@@ -4,6 +4,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
+	"sync"
 )
 
 // PoolInfo stores the pool and pk of the oppy pool
@@ -33,15 +34,15 @@ type OutBoundReq struct {
 
 // InBoundReq is the account that top up account info to oppy pub_chain
 type InBoundReq struct {
-	Address        types.AccAddress `json:"address"`
-	TxID           []byte           `json:"tx_id"` // this indicates the identical inbound req
-	ToPoolAddr     common.Address   `json:"to_pool_addr"`
-	Coin           types.Coin       `json:"coin"`
-	BlockHeight    int64            `json:"block_height"`
-	AccNum         uint64           `json:"acc_num"`
-	AccSeq         uint64           `json:"acc_seq"`
-	PoolCosAddress types.AccAddress `json:"pool_oppy_address"`
-	PoolPk         string           `json:"pool_pk"`
+	UserReceiverAddress types.AccAddress `json:"user_receiver_address"`
+	TxID                []byte           `json:"tx_id"` // this indicates the identical inbound req
+	ToPoolAddr          common.Address   `json:"to_pool_addr"`
+	Coin                types.Coin       `json:"coin"`
+	BlockHeight         int64            `json:"block_height"`
+	AccNum              uint64           `json:"acc_num"`
+	AccSeq              uint64           `json:"acc_seq"`
+	PoolCosAddress      types.AccAddress `json:"pool_oppy_address"`
+	PoolPk              string           `json:"pool_pk"`
 }
 
 type BridgeMemo struct {
@@ -49,4 +50,14 @@ type BridgeMemo struct {
 	TopupID   string `json:"topup_id"`
 	USerData  string `json:"user_data"`
 	ChainType string `json:"chain_type"`
+}
+
+type RetryPools struct {
+	RetryOutboundReq *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
+}
+
+func NewRetryPools() *RetryPools {
+	return &RetryPools{
+		&sync.Map{},
+	}
 }

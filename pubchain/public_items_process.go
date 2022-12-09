@@ -7,7 +7,7 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/common"
 )
 
-func (pi *Instance) AddItem(req *common.InBoundReq) {
+func (pi *Instance) AddInBoundItem(req *common.InBoundReq) {
 	pi.RetryInboundReq.Store(req.Index(), req)
 }
 
@@ -35,6 +35,10 @@ func (pi *Instance) ExportItems() []*common.InBoundReq {
 		return true
 	})
 	return items
+}
+
+func (pi *Instance) AddOutBoundItem(req *common.OutBoundReq) {
+	pi.RetryOutboundReq.Store(req.Index(), req)
 }
 
 func (pi *Instance) IsEmpty() bool {

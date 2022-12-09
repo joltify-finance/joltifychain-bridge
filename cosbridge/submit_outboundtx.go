@@ -16,7 +16,7 @@ import (
 )
 
 // SubmitOutboundTx submit the outbound record to oppy chain
-func (oc *OppyChainInstance) SubmitOutboundTx(conn grpc1.ClientConn, operator keyring.Info, requestID string, blockHeight int64, pubchainTx string, fee sdk.Coins) error {
+func (oc *OppyChainInstance) SubmitOutboundTx(conn grpc1.ClientConn, operator keyring.Info, requestID string, blockHeight int64, pubchainTx string, fee sdk.Coins, chainType, inTxHash string, receiverAddress sdk.AccAddress) error {
 	var err error
 	if operator == nil {
 		operator, err = oc.Keyring.Key("operator")
@@ -31,12 +31,21 @@ func (oc *OppyChainInstance) SubmitOutboundTx(conn grpc1.ClientConn, operator ke
 	}
 	accSeq, accNum := acc.GetSequence(), acc.GetAccountNumber()
 
+	needMint := true
+	if chainType == "OPPY" {
+		needMint = false
+	}
+
 	outboundMsg := vaulttypes.MsgCreateOutboundTx{
-		Creator:     operator.GetAddress(),
-		RequestID:   requestID,
-		OutboundTx:  pubchainTx,
-		BlockHeight: strconv.FormatInt(blockHeight, 10),
-		Feecoin:     fee,
+		Creator:         operator.GetAddress(),
+		RequestID:       requestID,
+		OutboundTx:      pubchainTx,
+		BlockHeight:     strconv.FormatInt(blockHeight, 10),
+		Feecoin:         fee,
+		ChainType:       chainType,
+		NeedMint:        needMint,
+		InTxHash:        inTxHash,
+		ReceiverAddress: receiverAddress,
 	}
 
 	ok, _, err := oc.composeAndSend(conn, operator, &outboundMsg, accSeq, accNum, nil, operator.GetAddress())

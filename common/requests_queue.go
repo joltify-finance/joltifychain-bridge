@@ -15,7 +15,11 @@ func (o *OutBoundReq) Hash() common.Hash {
 	if err != nil {
 		panic(err)
 	}
-	hash := crypto.Keccak256Hash(o.OutReceiverAddress.Bytes(), data)
+	needMintStr := "true"
+	if o.ChainType == "OPPy" {
+		needMintStr = "false"
+	}
+	hash := crypto.Keccak256Hash(o.OutReceiverAddress.Bytes(), []byte(o.ChainType), []byte(needMintStr), data)
 	return hash
 }
 
@@ -60,13 +64,13 @@ func (o *OutBoundReq) GetOutBoundInfo() (common.Address, common.Address, string,
 }
 
 func (i *InBoundReq) Hash() common.Hash {
-	hash := crypto.Keccak256Hash(i.Address.Bytes(), i.TxID)
+	hash := crypto.Keccak256Hash(i.UserReceiverAddress.Bytes(), i.TxID)
 	return hash
 }
 
 // Index generate the index of a given inbound req
 func (i *InBoundReq) Index() string {
-	hash := crypto.Keccak256Hash(i.Address.Bytes(), i.TxID)
+	hash := crypto.Keccak256Hash(i.UserReceiverAddress.Bytes(), i.TxID)
 	lower := hash.Big().String()
 	higher := strconv.FormatInt(i.BlockHeight, 10)
 	indexStr := higher + lower
@@ -89,7 +93,7 @@ func NewAccountInboundReq(address types.AccAddress, toPoolAddr common.Address, c
 
 // GetInboundReqInfo returns the info of the inbound transaction
 func (i *InBoundReq) GetInboundReqInfo() (types.AccAddress, common.Address, types.Coin, int64) {
-	return i.Address, i.ToPoolAddr, i.Coin, i.BlockHeight
+	return i.UserReceiverAddress, i.ToPoolAddr, i.Coin, i.BlockHeight
 }
 
 // SetAccountInfo sets the block height of the tx

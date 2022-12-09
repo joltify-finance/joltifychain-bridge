@@ -27,7 +27,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	common2 "gitlab.com/oppy-finance/oppy-bridge/common"
+	oppycommon "gitlab.com/oppy-finance/oppy-bridge/common"
 
 	"gitlab.com/oppy-finance/oppy-bridge/monitor"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
@@ -106,7 +106,9 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	oppyBridge, err := cosbridge.NewOppyBridge(config.CosChain.GrpcAddress, config.CosChain.WsAddress, tssServer, tl)
+	retryPools := oppycommon.NewRetryPools()
+
+	oppyBridge, err := cosbridge.NewOppyBridge(config.CosChain.GrpcAddress, config.CosChain.WsAddress, tssServer, tl, retryPools)
 	if err != nil {
 		log.Fatalln("fail to create the invoice oppy_bridge", err)
 		return
@@ -151,7 +153,7 @@ func NewBridgeService(config config.Config) {
 	}
 
 	// now we monitor the bsc transfer event
-	pubChainInstance, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddressBSC, config.PubChainConfig.WsAddressETH, tssServer, tl, &wg)
+	pubChainInstance, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddressBSC, config.PubChainConfig.WsAddressETH, tssServer, tl, &wg, retryPools)
 	if err != nil {
 		fmt.Printf("fail to connect the public pub_chain with address %v\n", config.PubChainConfig.WsAddressBSC)
 		cancel()
@@ -178,7 +180,7 @@ func NewBridgeService(config config.Config) {
 	}
 	if itemsIn != nil {
 		for _, el := range itemsIn {
-			pubChainInstance.AddItem(el)
+			pubChainInstance.AddInBoundItem(el)
 		}
 		fmt.Printf("we have loaded the unprocessed inbound tx\n")
 	}
@@ -219,7 +221,7 @@ func NewBridgeService(config config.Config) {
 
 	items2 := pubChainInstance.DumpQueue()
 	for _, el := range items2 {
-		pubChainInstance.AddItem(el)
+		pubChainInstance.AddInBoundItem(el)
 	}
 
 	itemsexported := oppyBridge.ExportItems()
@@ -584,7 +586,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 	}(wg)
 }
 
-func processInbound(oppyGrpc string, oppyChain *cosbridge.OppyChainInstance, pi *pubchain.Instance, items []*common2.InBoundReq, inBoundWait *atomic.Bool, failedInbound *atomic.Int32) {
+func processInbound(oppyGrpc string, oppyChain *cosbridge.OppyChainInstance, pi *pubchain.Instance, items []*oppycommon.InBoundReq, inBoundWait *atomic.Bool, failedInbound *atomic.Int32) {
 	grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")
@@ -592,12 +594,12 @@ func processInbound(oppyGrpc string, oppyChain *cosbridge.OppyChainInstance, pi 
 	}
 	defer grpcClient.Close()
 
-	itemsMap := make(map[string]*common2.InBoundReq)
+	itemsMap := make(map[string]*oppycommon.InBoundReq)
 	for _, el := range items {
 		itemsMap[el.Hash().Hex()] = el
 	}
 
-	needToBeProcessed := make([]*common2.InBoundReq, 0)
+	needToBeProcessed := make([]*oppycommon.InBoundReq, 0)
 	for _, item := range items {
 		// we need to check against the previous account sequence
 		index := item.Hash().Hex()
@@ -657,16 +659,16 @@ func processInbound(oppyGrpc string, oppyChain *cosbridge.OppyChainInstance, pi 
 	wg.Wait()
 }
 
-func processEachOutBound(chainInfo *pubchain.ChainInfo, oppyGrpc string, oppyChain *cosbridge.OppyChainInstance, pi *pubchain.Instance, items []*common2.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
+func processEachOutBound(chainInfo *pubchain.ChainInfo, oppyGrpc string, oppyChain *cosbridge.OppyChainInstance, pi *pubchain.Instance, items []*oppycommon.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
 	checkWg := sync.WaitGroup{}
-	needToBeProcessed := make([]*common2.OutBoundReq, 0)
+	needToBeProcessed := make([]*oppycommon.OutBoundReq, 0)
 	needToBeProcessedLock := sync.Mutex{}
 	for _, el := range items {
 		if el == nil {
 			continue
 		}
 		checkWg.Add(1)
-		go func(each *common2.OutBoundReq) {
+		go func(each *oppycommon.OutBoundReq) {
 			defer checkWg.Done()
 			submittedTx, err := oppyChain.GetPubChainSubmittedTx(*each)
 			if err != nil {
@@ -704,7 +706,7 @@ func processEachOutBound(chainInfo *pubchain.ChainInfo, oppyGrpc string, oppyCha
 	defer close(tssReqChan)
 	for i, pItem := range needToBeProcessed {
 		tssWaitGroup.Add(1)
-		go func(index int, item *common2.OutBoundReq) {
+		go func(index int, item *oppycommon.OutBoundReq) {
 			defer tssWaitGroup.Done()
 			toAddr, fromAddr, tokenAddr, amount, nonce := item.GetOutBoundInfo()
 			tssRespChan, err := bc.Subscribe(int64(index))
@@ -741,7 +743,7 @@ func processEachOutBound(chainInfo *pubchain.ChainInfo, oppyGrpc string, oppyCha
 						if err != nil {
 							panic("blockheigh convert should never fail")
 						}
-						errInner := oppyChain.SubmitOutboundTx(grpcClient, nil, item.Hash().Hex(), poolCreateHeight, txHash, item.FeeToValidator)
+						errInner := oppyChain.SubmitOutboundTx(grpcClient, nil, item.Hash().Hex(), poolCreateHeight, txHash, item.FeeToValidator, item.ChainType, item.TxID, item.OutReceiverAddress.Bytes())
 						return errInner
 					}
 					err := backoff.Retry(op, bf)
@@ -814,14 +816,14 @@ func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain
 	wgDump := &sync.WaitGroup{}
 	wgDump.Add(len(itemInbound))
 	for _, el := range itemInbound {
-		go func(each *common2.InBoundReq) {
+		go func(each *oppycommon.InBoundReq) {
 			defer wgDump.Done()
 			err := oppyChain.CheckTxStatus(grpcClient, each.Hash().Hex(), 2)
 			if err == nil {
 				tick := html.UnescapeString("&#" + "127866" + ";")
 				zlog.Info().Msgf(" %v the tx has been submitted, we catch up with others on oppyChain", tick)
 			} else {
-				pi.AddItem(each)
+				pi.AddInBoundItem(each)
 			}
 		}(el)
 	}
@@ -841,7 +843,7 @@ func putOnHoldBlockOutBoundBack(oppyGrpc string, chainInfo *pubchain.ChainInfo, 
 	wgDump := &sync.WaitGroup{}
 	wgDump.Add(len(itemsOutBound))
 	for _, el := range itemsOutBound {
-		go func(each *common2.OutBoundReq) {
+		go func(each *oppycommon.OutBoundReq) {
 			defer wgDump.Done()
 			empty := common.Hash{}.Hex()
 			if each.SubmittedTxHash == empty {
