@@ -8,7 +8,7 @@ import (
 	"gitlab.com/oppy-finance/oppy-bridge/version"
 
 	golog "github.com/ipfs/go-log"
-	"github.com/oppyfinance/tss/common"
+	"github.com/joltify-finance/tss/common"
 	"github.com/rs/zerolog"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"

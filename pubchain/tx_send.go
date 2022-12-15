@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	common3 "github.com/oppyfinance/tss/common"
+	common3 "github.com/joltify-finance/tss/common"
 	"gitlab.com/oppy-finance/oppy-bridge/generated"
 	"gitlab.com/oppy-finance/oppy-bridge/misc"
 )

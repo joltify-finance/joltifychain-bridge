@@ -9,7 +9,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/oppyfinance/tss/keysign"
+	"github.com/joltify-finance/tss/keysign"
 	"github.com/tendermint/btcd/btcec"
 )
 

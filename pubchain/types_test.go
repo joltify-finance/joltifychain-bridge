@@ -11,9 +11,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/oppyfinance/tss/common"
-	"github.com/oppyfinance/tss/keygen"
-	"github.com/oppyfinance/tss/keysign"
+	"github.com/joltify-finance/tss/common"
+	"github.com/joltify-finance/tss/keygen"
+	"github.com/joltify-finance/tss/keysign"
 	"github.com/stretchr/testify/assert"
 	common2 "gitlab.com/oppy-finance/oppy-bridge/common"
 )

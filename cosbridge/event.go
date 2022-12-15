@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
-	"github.com/oppyfinance/tss/keygen"
+	"github.com/joltify-finance/tss/keygen"
 	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
 	"go.uber.org/atomic"
 
-	"github.com/oppyfinance/tss/common"
+	"github.com/joltify-finance/tss/common"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 )

@@ -7,17 +7,17 @@ import (
 	"os"
 	"path"
 
-	"github.com/oppyfinance/tss/keysign"
+	"github.com/joltify-finance/tss/keysign"
 	"gitlab.com/oppy-finance/oppy-bridge/config"
 
-	"github.com/oppyfinance/tss/keygen"
+	"github.com/joltify-finance/tss/keygen"
 
 	golog "github.com/ipfs/go-log"
 
+	"github.com/joltify-finance/tss/common"
 	"github.com/libp2p/go-libp2p-peerstore/addr"
-	"github.com/oppyfinance/tss/common"
 
-	tsslib "github.com/oppyfinance/tss/tss"
+	tsslib "github.com/joltify-finance/tss/tss"
 
 	"github.com/tendermint/tendermint/crypto/ed25519"
 )
