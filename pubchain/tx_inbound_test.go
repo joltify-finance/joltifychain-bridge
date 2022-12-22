@@ -32,10 +32,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	common2 "gitlab.com/oppy-finance/oppy-bridge/common"
-	"gitlab.com/oppy-finance/oppy-bridge/generated"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
-	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
+	common2 "gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/generated"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 	"golang.org/x/crypto/sha3"
 )
 

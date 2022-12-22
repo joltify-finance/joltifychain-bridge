@@ -4,8 +4,8 @@ import (
 	"context"
 
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
-	"gitlab.com/oppy-finance/oppy-bridge/common"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 func (pi *Instance) FeedTx(lastPoolInfo *vaulttypes.PoolInfo, outboundReqs []*common.OutBoundReq, chainType string) error {

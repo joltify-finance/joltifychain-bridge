@@ -13,14 +13,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"gitlab.com/oppy-finance/oppy-bridge/config"
-	"gitlab.com/oppy-finance/oppy-bridge/generated"
+	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/generated"
 
 	"github.com/containerd/containerd/pkg/atomic"
 	"github.com/ethereum/go-ethereum/ethclient"
 	zlog "github.com/rs/zerolog/log"
 
-	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 )
 
 // MoveFound moves the fund for the public chain

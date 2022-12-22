@@ -2,7 +2,7 @@ style: gitlab
 template: CHANGELOG.tpl.md
 info:
   title: CHANGELOG
-  repository_url: https://gitlab.com/oppy-finance/oppy-bridge
+  repository_url: https://gitlab.com/joltify/joltifychain-bridge
 options:
   commits:
     # filters:

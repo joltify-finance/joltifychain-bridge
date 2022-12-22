@@ -15,15 +15,15 @@ import (
 
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	types2 "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/oppy-finance/oppy-bridge/common"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 func generateRandomPrivKey(n int) ([]account, error) {

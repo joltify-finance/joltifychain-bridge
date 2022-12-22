@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	"github.com/tendermint/tendermint/types"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 type subscribeTestSuite struct {

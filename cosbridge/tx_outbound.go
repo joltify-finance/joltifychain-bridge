@@ -8,15 +8,15 @@ import (
 
 	grpc1 "github.com/gogo/protobuf/grpc"
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
-	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
-	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	"github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	"gitlab.com/oppy-finance/oppy-bridge/config"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 const (

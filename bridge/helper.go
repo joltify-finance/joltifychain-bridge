@@ -2,8 +2,8 @@ package bridge
 
 import (
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
-	"gitlab.com/oppy-finance/oppy-bridge/common"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 func NeedUpdate(qcPools []*vaulttypes.PoolInfo, curPools []*common.PoolInfo) bool {

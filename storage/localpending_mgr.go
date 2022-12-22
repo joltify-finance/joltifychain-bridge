@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"gitlab.com/oppy-finance/oppy-bridge/cosbridge"
+	"gitlab.com/joltify/joltifychain-bridge/cosbridge"
 )
 
 // PendingTxMgr save the local state to file

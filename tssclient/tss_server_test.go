@@ -18,8 +18,8 @@ import (
 	"github.com/joltify-finance/tss/keysign"
 	maddr "github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
-	"gitlab.com/oppy-finance/oppy-bridge/config"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 
 	. "gopkg.in/check.v1"
 )

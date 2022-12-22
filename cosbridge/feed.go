@@ -6,7 +6,7 @@ import (
 	grpc1 "github.com/gogo/protobuf/grpc"
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	zlog "github.com/rs/zerolog/log"
-	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
+	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 )
 
 // FeedTx feed the tx with the given

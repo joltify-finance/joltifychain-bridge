@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
-	"gitlab.com/oppy-finance/oppy-bridge/common"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
-	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
+	"gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 	"gotest.tools/assert"
 )
 

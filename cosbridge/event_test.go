@@ -19,8 +19,8 @@ import (
 	"github.com/joltify-finance/joltify_lending/testutil/network"
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
-	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 	"go.uber.org/atomic"
 )
 

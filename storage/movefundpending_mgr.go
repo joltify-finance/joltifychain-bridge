@@ -10,7 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 )
 
 // PendingMoveFundMgr save the local state to file

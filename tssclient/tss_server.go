@@ -8,7 +8,7 @@ import (
 	"path"
 
 	"github.com/joltify-finance/tss/keysign"
-	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/config"
 
 	"github.com/joltify-finance/tss/keygen"
 

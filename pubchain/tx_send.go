@@ -9,7 +9,7 @@ import (
 	"math/big"
 	"time"
 
-	"gitlab.com/oppy-finance/oppy-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/config"
 
 	"github.com/cenkalti/backoff"
 
@@ -18,8 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	common3 "github.com/joltify-finance/tss/common"
-	"gitlab.com/oppy-finance/oppy-bridge/generated"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/generated"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 // CheckTxStatus check whether the tx has been done successfully

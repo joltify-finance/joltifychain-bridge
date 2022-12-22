@@ -1,4 +1,4 @@
-module gitlab.com/oppy-finance/oppy-bridge
+module gitlab.com/joltify/joltifychain-bridge
 
 go 1.18
 
@@ -10,7 +10,7 @@ require (
 	github.com/gogo/protobuf v1.3.3
 	github.com/gorilla/mux v1.8.0
 	github.com/ipfs/go-log v1.0.5
-	github.com/joltify-finance/joltify_lending v1.0.1-0.20221214064751-4b634caf58da
+	github.com/joltify-finance/joltify_lending v0.0.1
 	github.com/joltify-finance/tss v1.7.9
 	github.com/libp2p/go-libp2p-peerstore v0.6.0
 	github.com/multiformats/go-multiaddr v0.8.0

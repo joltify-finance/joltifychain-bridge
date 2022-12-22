@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"sort"
 
-	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/common"
 )
 
 func (pi *Instance) AddInBoundItem(req *common.InBoundReq) {

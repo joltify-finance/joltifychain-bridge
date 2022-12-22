@@ -5,9 +5,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	zlog "github.com/rs/zerolog/log"
-	"gitlab.com/oppy-finance/oppy-bridge/cosbridge"
-	"gitlab.com/oppy-finance/oppy-bridge/monitor"
-	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
+	"gitlab.com/joltify/joltifychain-bridge/cosbridge"
+	"gitlab.com/joltify/joltifychain-bridge/monitor"
+	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 	"go.uber.org/atomic"
 )
 

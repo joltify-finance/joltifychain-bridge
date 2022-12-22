@@ -10,7 +10,7 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"gitlab.com/oppy-finance/oppy-bridge/cosbridge"
+	"gitlab.com/joltify/joltifychain-bridge/cosbridge"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

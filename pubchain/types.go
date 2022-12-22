@@ -11,19 +11,19 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
-	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/rs/zerolog"
-	"gitlab.com/oppy-finance/oppy-bridge/generated"
-	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
+	"gitlab.com/joltify/joltifychain-bridge/generated"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/rs/zerolog/log"
 
 	"github.com/ethereum/go-ethereum/core/types"
-	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 )
 
 const (

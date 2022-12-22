@@ -10,7 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/common"
 )
 
 // LocalStateManager provide necessary methods to manage the local state, save it , and read it back

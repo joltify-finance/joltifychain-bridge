@@ -3,15 +3,15 @@ package main
 import (
 	"fmt"
 
-	"gitlab.com/oppy-finance/oppy-bridge/bridge"
+	"gitlab.com/joltify/joltifychain-bridge/bridge"
 
-	"gitlab.com/oppy-finance/oppy-bridge/version"
+	"gitlab.com/joltify/joltifychain-bridge/version"
 
 	golog "github.com/ipfs/go-log"
 	"github.com/joltify-finance/tss/common"
 	"github.com/rs/zerolog"
-	"gitlab.com/oppy-finance/oppy-bridge/config"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 func main() {

@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"sort"
 
-	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/common"
 )
 
 func (oc *OppyChainInstance) AddOnHoldQueue(item *common.OutBoundReq) {

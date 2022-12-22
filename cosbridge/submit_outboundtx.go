@@ -10,7 +10,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	grpc1 "github.com/gogo/protobuf/grpc"
 
-	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/common"
 
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 )

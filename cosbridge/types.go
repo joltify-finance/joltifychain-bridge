@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc"
 
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 
 	"go.uber.org/atomic"
 
@@ -17,9 +17,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	grpc1 "github.com/gogo/protobuf/grpc"
 	"github.com/joltify-finance/joltify_lending/x/vault/types"
-	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
-	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
-	"gitlab.com/oppy-finance/oppy-bridge/validators"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
+	"gitlab.com/joltify/joltifychain-bridge/validators"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/rs/zerolog"

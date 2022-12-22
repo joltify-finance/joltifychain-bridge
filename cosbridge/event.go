@@ -10,7 +10,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" //nolint
 	"github.com/joltify-finance/tss/keygen"
-	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 	"go.uber.org/atomic"
 
 	"github.com/joltify-finance/tss/common"

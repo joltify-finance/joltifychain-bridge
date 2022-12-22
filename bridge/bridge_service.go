@@ -19,23 +19,23 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/pkg/errors"
-	"gitlab.com/oppy-finance/oppy-bridge/storage"
-	"gitlab.com/oppy-finance/oppy-bridge/tokenlist"
+	"gitlab.com/joltify/joltifychain-bridge/storage"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 	"go.uber.org/atomic"
 	"golang.org/x/term"
 	"google.golang.org/grpc"
 
 	"github.com/ethereum/go-ethereum/common"
 
-	oppycommon "gitlab.com/oppy-finance/oppy-bridge/common"
+	oppycommon "gitlab.com/joltify/joltifychain-bridge/common"
 
-	"gitlab.com/oppy-finance/oppy-bridge/monitor"
-	"gitlab.com/oppy-finance/oppy-bridge/tssclient"
+	"gitlab.com/joltify/joltifychain-bridge/monitor"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 
 	zlog "github.com/rs/zerolog/log"
-	"gitlab.com/oppy-finance/oppy-bridge/config"
-	"gitlab.com/oppy-finance/oppy-bridge/cosbridge"
-	"gitlab.com/oppy-finance/oppy-bridge/pubchain"
+	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/cosbridge"
+	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 )
 
 // ROUNDBLOCK we may need to increase it as we increase the time for keygen/keysign and join party

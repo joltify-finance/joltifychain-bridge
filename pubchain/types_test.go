@@ -15,7 +15,7 @@ import (
 	"github.com/joltify-finance/tss/keygen"
 	"github.com/joltify-finance/tss/keysign"
 	"github.com/stretchr/testify/assert"
-	common2 "gitlab.com/oppy-finance/oppy-bridge/common"
+	common2 "gitlab.com/joltify/joltifychain-bridge/common"
 )
 
 type TssMock struct {

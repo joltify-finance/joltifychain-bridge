@@ -5,18 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	zlog "github.com/rs/zerolog/log"
 	"math/big"
 	"strings"
 
+	zlog "github.com/rs/zerolog/log"
+
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
-	bcommon "gitlab.com/oppy-finance/oppy-bridge/common"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 const alreadyKnown = "already known"

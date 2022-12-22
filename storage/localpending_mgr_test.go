@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"gitlab.com/oppy-finance/oppy-bridge/cosbridge"
+	"gitlab.com/joltify/joltifychain-bridge/cosbridge"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/oppy-finance/oppy-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
 type PendingFileStateMgrTestSuite struct{ suite.Suite }

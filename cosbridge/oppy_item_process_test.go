@@ -16,7 +16,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/oppy-finance/oppy-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/common"
 )
 
 func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
