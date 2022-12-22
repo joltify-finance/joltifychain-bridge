@@ -24,7 +24,7 @@ func (pi *Instance) FeedTx(lastPoolInfo *vaulttypes.PoolInfo, outboundReqs []*co
 		return err
 	}
 
-	// for BSC we need to use the next nonce while for oppy, we used the returned nonce
+	// for BSC we need to use the next nonce while for joltify, we used the returned nonce
 	for _, el := range outboundReqs {
 		el.SetItemNonce(poolEthAddress, nonce)
 		nonce++

@@ -112,7 +112,7 @@ func (oc *OppyChainInstance) RetryOppyChain() error {
 
 		oc.retryLock.Lock()
 		defer oc.retryLock.Unlock()
-		oc.logger.Warn().Msgf("we renewed the oppy client")
+		oc.logger.Warn().Msgf("we renewed the joltify client")
 
 		err = oc.WsClient.Stop()
 		if err != nil {

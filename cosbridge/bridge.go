@@ -428,7 +428,7 @@ func (oc *OppyChainInstance) GetBlockByHeight(conn grpc1.ClientConn, blockHeight
 	return block, err
 }
 
-// CheckAndUpdatePool send the tx to the oppy pub_chain, if the pool outReceiverAddress is updated, it returns true
+// CheckAndUpdatePool send the tx to the joltify pub_chain, if the pool outReceiverAddress is updated, it returns true
 func (oc *OppyChainInstance) CheckAndUpdatePool(conn grpc1.ClientConn, blockHeight int64) (bool, string) {
 	oc.poolUpdateLocker.Lock()
 	if len(oc.keyGenCache) < 1 {

@@ -336,7 +336,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 					continue
 				}
 
-			// process the new oppy block, validator may need to submit the pool address
+			// process the new joltify block, validator may need to submit the pool address
 			case block := <-oppyChain.CurrentNewBlockChan:
 				oppyChain.ChannelQueueNewBlock <- block
 
@@ -433,7 +433,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 						continue
 					}
 					if !amISigner {
-						zlog.Logger.Info().Msgf("we are not the signer in oppy chain check")
+						zlog.Logger.Info().Msgf("we are not the signer in joltify chain check")
 						grpcClient.Close()
 						continue
 					}
@@ -579,7 +579,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 
 				err = oppyChain.RetryOppyChain()
 				if err != nil {
-					zlog.Logger.Error().Err(err).Msgf("fail to restart the oppy chain")
+					zlog.Logger.Error().Err(err).Msgf("fail to restart the joltify chain")
 				}
 			}
 		}

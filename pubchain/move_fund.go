@@ -31,7 +31,7 @@ func (pi *Instance) MoveFound(height int64, chainInfo *ChainInfo, previousPool *
 	currentPool := pi.GetPool()
 	emptyERC20Tokens := atomic.NewBool(true)
 
-	// if we restart the bridge, pubchain go routine may run before oppy go routine which acquire the pool info
+	// if we restart the bridge, pubchain go routine may run before joltify go routine which acquire the pool info
 	if currentPool[1] == nil {
 		zlog.Warn().Msgf("the current pool has not been set, move fund can not start")
 		return false

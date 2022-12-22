@@ -21,7 +21,7 @@ func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string
 	return a, nil
 }
 
-// DoProcessInBound mint the token in oppy chain
+// DoProcessInBound mint the token in joltify chain
 func (oc *OppyChainInstance) DoProcessInBound(conn grpc1.ClientConn, items []*common.InBoundReq) (map[string]string, error) {
 	signMsgs := make([]*tssclient.TssSignigMsg, len(items))
 	issueReqs := make([]sdk.Msg, len(items))

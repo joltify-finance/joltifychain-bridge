@@ -78,7 +78,7 @@ func (oc *OppyChainInstance) processTopUpRequest(msg *banktypes.MsgSend, txBlock
 		}
 	}
 	// we need to adjust the decimal as some token may not have 18 decimals
-	// in oppy, we apply 18 decimal
+	// in joltify, we apply 18 decimal
 	delta := tokenItem.Decimals - types.Precision
 	if delta != 0 {
 		adjustedTokenAmount := bcommon.AdjustInt(savedTx.Token.Amount, int64(delta))
@@ -325,13 +325,13 @@ func (oc *OppyChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.Pool
 	poolPubKey := pool.CreatePool.PoolPubKey
 	ethAddr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
 	if err != nil {
-		fmt.Printf("fail to convert the oppy address to eth address %v", poolPubKey)
+		fmt.Printf("fail to convert the joltify address to eth address %v", poolPubKey)
 		return nil
 	}
 
 	addr, err := misc.PoolPubKeyToOppyAddress(poolPubKey)
 	if err != nil {
-		fmt.Printf("fail to convert the eth address to oppy address %v", poolPubKey)
+		fmt.Printf("fail to convert the eth address to joltify address %v", poolPubKey)
 		return nil
 	}
 

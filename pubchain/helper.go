@@ -314,7 +314,7 @@ func (pi *Instance) retrieveAddrfromRawTx(tx *types.Transaction) (types2.AccAddr
 
 	transferFrom, err := misc.EthSignPubKeyToOppyAddr(sigPublicKey)
 	if err != nil {
-		pi.logger.Error().Err(err).Msg("fail to recover the oppy ReceiverAddress")
+		pi.logger.Error().Err(err).Msg("fail to recover the joltify ReceiverAddress")
 		return types2.AccAddress{}, err
 	}
 	return transferFrom, nil

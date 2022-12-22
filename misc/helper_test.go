@@ -42,7 +42,7 @@ func TestPoolPubkeyToEthAddress(t *testing.T) {
 		Key: pkCompressed,
 	}
 
-	// we generate the eth address from oppy
+	// we generate the eth address from joltify
 	poolPk := legacybech32.MustMarshalPubKey(legacybech32.AccPK, &cpk) //nolint
 	ethAddr, err := PoolPubKeyToEthAddress(poolPk)
 	assert.NoError(t, err)

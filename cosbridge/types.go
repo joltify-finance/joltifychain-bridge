@@ -43,7 +43,7 @@ type tssPoolMsg struct {
 	blockHeight int64
 }
 
-// OppyChainInstance defines the types for oppy pub_chain side
+// OppyChainInstance defines the types for joltify pub_chain side
 type OppyChainInstance struct {
 	grpcAddr              string
 	httpAddr              string
@@ -101,7 +101,7 @@ type OutboundTx struct {
 	ChainType          string         `json:"chain_type"`
 }
 
-// NewOppyBridge new the instance for the oppy pub_chain
+// NewOppyBridge new the instance for the joltify pub_chain
 func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, retryPools *bcommon.RetryPools) (*OppyChainInstance, error) {
 	var oppyBridge OppyChainInstance
 	var err error

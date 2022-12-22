@@ -1,13 +1,14 @@
 package common
 
 import (
+	"sync"
+
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
-	"sync"
 )
 
-// PoolInfo stores the pool and pk of the oppy pool
+// PoolInfo stores the pool and pk of the joltify pool
 type PoolInfo struct {
 	Pk         string               `json:"pool_pubkey"`
 	CosAddress types.AccAddress     `json:"oppy_address"`
@@ -32,7 +33,7 @@ type OutBoundReq struct {
 	ChainType          string         `json:"chain_type"`
 }
 
-// InBoundReq is the account that top up account info to oppy pub_chain
+// InBoundReq is the account that top up account info to joltify pub_chain
 type InBoundReq struct {
 	UserReceiverAddress types.AccAddress `json:"user_receiver_address"`
 	TxID                []byte           `json:"tx_id"` // this indicates the identical inbound req

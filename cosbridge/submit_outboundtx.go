@@ -15,7 +15,7 @@ import (
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 )
 
-// SubmitOutboundTx submit the outbound record to oppy chain
+// SubmitOutboundTx submit the outbound record to joltify chain
 func (oc *OppyChainInstance) SubmitOutboundTx(conn grpc1.ClientConn, operator keyring.Info, requestID string, blockHeight int64, pubchainTx string, fee sdk.Coins, chainType, inTxHash string, receiverAddress sdk.AccAddress) error {
 	var err error
 	if operator == nil {

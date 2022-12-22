@@ -17,7 +17,7 @@ const WebsocketTest = "ws://152.69.189.218:8456"
 
 // const WebsocketTest = "ws://localhost:8456"
 
-// SetupBech32Prefix sets up the prefix of the oppy chain
+// SetupBech32Prefix sets up the prefix of the joltify chain
 func SetupBech32Prefix() {
 	config := types.GetConfig()
 	config.SetBech32PrefixForAccount("jolt", "joltpub")
@@ -25,7 +25,7 @@ func SetupBech32Prefix() {
 	config.SetBech32PrefixForConsensusNode("joltvalcons", "joltcpub")
 }
 
-// PoolPubKeyToOppyAddress return the oppy encoded pubkey
+// PoolPubKeyToOppyAddress return the joltify encoded pubkey
 func PoolPubKeyToOppyAddress(pk string) (types.AccAddress, error) {
 	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) //nolint
 	if err != nil {
@@ -35,7 +35,7 @@ func PoolPubKeyToOppyAddress(pk string) (types.AccAddress, error) {
 	return addr, err
 }
 
-// PoolPubKeyToEthAddress export the oppy pubkey to the ETH format address
+// PoolPubKeyToEthAddress export the joltify pubkey to the ETH format address
 func PoolPubKeyToEthAddress(pk string) (common.Address, error) {
 	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) //nolint
 	if err != nil {
@@ -49,7 +49,7 @@ func PoolPubKeyToEthAddress(pk string) (common.Address, error) {
 	return addr, nil
 }
 
-// SerializeSig for both oppy chain and public chain
+// SerializeSig for both joltify chain and public chain
 func SerializeSig(sig *keysign.Signature, needRecovery bool) ([]byte, error) {
 	rBytes, err := base64.StdEncoding.DecodeString(sig.R)
 	if err != nil {
@@ -109,7 +109,7 @@ func MakeSignature(r, s, v *big.Int) []byte {
 	return sigBytes
 }
 
-// EthSignPubKeyToOppyAddr derives the oppy address from the pubkey derived from the signature
+// EthSignPubKeyToOppyAddr derives the joltify address from the pubkey derived from the signature
 func EthSignPubKeyToOppyAddr(pk []byte) (types.AccAddress, error) {
 	pk2, err := btcec.ParsePubKey(pk, btcec.S256())
 	if err != nil {

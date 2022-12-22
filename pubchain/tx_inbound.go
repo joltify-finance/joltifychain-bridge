@@ -307,13 +307,13 @@ func (pi *Instance) UpdatePool(pool *vaulttypes.PoolInfo) error {
 	poolPubKey := pool.CreatePool.PoolPubKey
 	addr, err := misc.PoolPubKeyToOppyAddress(poolPubKey)
 	if err != nil {
-		pi.logger.Error().Err(err).Msgf("fail to convert the oppy address to eth address %v", poolPubKey)
+		pi.logger.Error().Err(err).Msgf("fail to convert the joltify address to eth address %v", poolPubKey)
 		return err
 	}
 
 	ethAddr, err := misc.PoolPubKeyToEthAddress(poolPubKey)
 	if err != nil {
-		fmt.Printf("fail to convert the oppy address to eth address %v", poolPubKey)
+		fmt.Printf("fail to convert the joltify address to eth address %v", poolPubKey)
 		return err
 	}
 

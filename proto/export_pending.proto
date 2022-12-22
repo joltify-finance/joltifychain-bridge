@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package oppybridge.pendingtx;
-option go_package = "oppy-bridge/cosbridge";
+option go_package = "joltify-bridge/cosbridge";
 import "cosmos/base/v1beta1/coin.proto";
 
 
