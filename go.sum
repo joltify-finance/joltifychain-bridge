@@ -1019,8 +1019,8 @@ github.com/jmhodges/levigo v1.0.0 h1:q5EC36kV79HWeTBWsod3mG11EgStG3qArTKcvlksN1U
 github.com/jmhodges/levigo v1.0.0/go.mod h1:Q6Qx+uH3RAqyK4rFQroq9RL7mdkABMcfhEI+nNuzMJQ=
 github.com/jmoiron/sqlx v1.2.0/go.mod h1:1FEQNm3xlJgrMD+FBdI9+xvCksHtbpVBBw5dYhBSsks=
 github.com/joefitzgerald/rainbow-reporter v0.1.0/go.mod h1:481CNgqmVHQZzdIbN52CupLJyoVwB10FQ/IQlF1pdL8=
-github.com/joltify-finance/joltify_lending v0.0.1 h1:3UG1UTSRyeekR0uL9jVCCD2YbdsDj0yrQLSEUsUio5Y=
-github.com/joltify-finance/joltify_lending v0.0.1/go.mod h1:jaHH8nA4FOsh0Z38ifFIfVgsJSiOVcdutqMknc9CLFQ=
+github.com/joltify-finance/joltify_lending v0.0.2 h1:Vv0nbHg4Xby1RWuPSffgGRj7yVgeierT7+X+S3PLgO4=
+github.com/joltify-finance/joltify_lending v0.0.2/go.mod h1:jaHH8nA4FOsh0Z38ifFIfVgsJSiOVcdutqMknc9CLFQ=
 github.com/joltify-finance/tss v1.7.9 h1:TbcdhjpWjZAj21lvY/0ylGeY+ohf5bPSNNQTfQLKXDQ=
 github.com/joltify-finance/tss v1.7.9/go.mod h1:o2loR7AM9TbF0LpzM2t0CthSA9pLF9d8zpZm45h626Y=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
