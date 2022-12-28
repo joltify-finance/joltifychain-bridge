@@ -38,7 +38,7 @@ const (
 	movefundretrygap  = 3
 	ETH               = "ETH"
 	BSC               = "BSC"
-	OPPY              = "OPPY"
+	JOLTIFY           = "JOLTIFY"
 )
 
 var (

@@ -126,7 +126,7 @@ func (pi *Instance) checkErc20(data []byte, to, contractAddress string) (*Erc20T
 		var dstAddr types.AccAddress
 		var dstAddrErc20 string
 		switch memoInfo.ChainType {
-		case OPPY:
+		case JOLTIFY:
 			dstAddr, err = types.AccAddressFromBech32(memoInfo.Dest)
 			if err != nil {
 				return nil, err
@@ -176,14 +176,14 @@ func (pi *Instance) processEachBlock(chainType string, chainInfo *ChainInfo, blo
 			}
 
 			switch txInfo.dstChainType {
-			case "ETH", "BSC":
+			case ETH, BSC:
 				err := pi.processDstInbound(txInfo, tx.Hash().Hex()[2:], chainType, txBlockHeight)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msgf("fail to process the inbound tx for outbound from %v to %v", chainType, txInfo.dstChainType)
 					continue
 				}
 
-			case "OPPY":
+			case JOLTIFY:
 				err := pi.ProcessInBoundERC20(tx, chainType, txInfo, block.NumberU64())
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
@@ -202,7 +202,7 @@ func (pi *Instance) processEachBlock(chainType string, chainInfo *ChainInfo, blo
 				continue
 			}
 			switch memoInfo.ChainType {
-			case "OPPY":
+			case JOLTIFY:
 				pi.processOppyInbound(memoInfo, chainType, *tx, txBlockHeight)
 			default:
 				pi.logger.Warn().Msgf("unknown chain type %v", memoInfo.ChainType)

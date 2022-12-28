@@ -32,7 +32,8 @@ func (oc *OppyChainInstance) SubmitOutboundTx(conn grpc1.ClientConn, operator ke
 	accSeq, accNum := acc.GetSequence(), acc.GetAccountNumber()
 
 	needMint := true
-	if chainType == "OPPY" {
+	// todo need to use const value
+	if chainType == "JOLTIFY" {
 		needMint = false
 	}
 
