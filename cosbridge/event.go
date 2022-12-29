@@ -26,18 +26,18 @@ const (
 var sleepTime = 60
 
 // HandleUpdateValidators check whether we need to generate the new tss pool message
-func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitGroup, inKeygenProcess *atomic.Bool, mock bool) error {
-	v, err := oc.getValidators(strconv.FormatInt(height, 10))
+func (jc *JoltChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitGroup, inKeygenProcess *atomic.Bool, mock bool) error {
+	v, err := jc.getValidators(strconv.FormatInt(height, 10))
 	if err != nil {
 		return err
 	}
 
-	err = oc.UpdateLatestValidator(v, height)
+	err = jc.UpdateLatestValidator(v, height)
 	if err != nil {
-		oc.logger.Error().Msgf("fail to query the latest validator %v", err)
+		jc.logger.Error().Msgf("fail to query the latest validator %v", err)
 		return err
 	}
-	lastValidators, blockHeight := oc.GetLastValidator()
+	lastValidators, blockHeight := jc.GetLastValidator()
 
 	pubKeys := make([]string, len(lastValidators))
 	doKeyGen := false
@@ -52,7 +52,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 			return err
 		}
 
-		pkValidator, err := base64.StdEncoding.DecodeString(oc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value)
+		pkValidator, err := base64.StdEncoding.DecodeString(jc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value)
 		if err != nil {
 			return err
 		}
@@ -70,9 +70,9 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 		return nil
 	}
 
-	oc.logger.Info().Msgf(">>>>>>>>>>>>>>>>at block height %v system do keygen>>>>>>>>>>>>>>>\n", blockHeight)
-	oc.logger.Info().Msgf("public keys: %v>>>>>>>>>>>>>>>\n", pubKeys)
-	oc.logger.Info().Msgf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+	jc.logger.Info().Msgf(">>>>>>>>>>>>>>>>at block height %v system do keygen>>>>>>>>>>>>>>>\n", blockHeight)
+	jc.logger.Info().Msgf("public keys: %v>>>>>>>>>>>>>>>\n", pubKeys)
+	jc.logger.Info().Msgf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
 
 	var errKeygen error
 	errWriteLock := sync.Mutex{}
@@ -85,9 +85,9 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 		defer inKeygenProcess.Store(false)
 		retry := 0
 		for retry = 0; retry < maxretry; retry++ {
-			resp, err := oc.tssServer.KeyGen(pubKeys, blockHeight, tssclient.TssVersion)
+			resp, err := jc.tssServer.KeyGen(pubKeys, blockHeight, tssclient.TssVersion)
 			if err != nil {
-				oc.logger.Error().Err(err).Msgf("fail to do the keygen with retry %v", retry)
+				jc.logger.Error().Err(err).Msgf("fail to do the keygen with retry %v", retry)
 				if mock {
 					sleepTime = 1
 				}
@@ -96,7 +96,7 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 			}
 			if resp.Status != common.Success {
 				// todo we need to put our blame on pub_chain as well
-				oc.logger.Error().Msgf("we fail to ge the valid key")
+				jc.logger.Error().Msgf("we fail to ge the valid key")
 				if mock {
 					sleepTime = 1
 				}
@@ -114,24 +114,24 @@ func (oc *OppyChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 			return
 		}
 
-		oc.logger.Info().Msgf("we done the keygen at height %v successfully\n", blockHeight)
+		jc.logger.Info().Msgf("we done the keygen at height %v successfully\n", blockHeight)
 
 		// now we put the tss key on pub_chain
 		// fixme we need to allow user to choose the name of the key
-		creator, err := oc.Keyring.Key("operator")
+		creator, err := jc.Keyring.Key("operator")
 		if err != nil {
-			oc.logger.Error().Msgf("fail to get the operator key :%v", err)
+			jc.logger.Error().Msgf("fail to get the operator key :%v", err)
 			errKeygen = err
 			return
 		}
 
-		err = oc.prepareTssPool(creator.GetAddress(), keygenResponse.PubKey, strconv.FormatInt(blockHeight+1, 10))
+		err = jc.prepareTssPool(creator.GetAddress(), keygenResponse.PubKey, strconv.FormatInt(blockHeight+1, 10))
 		if err != nil {
-			oc.logger.Error().Msgf("fail to broadcast the tss generated key on pub_chain")
+			jc.logger.Error().Msgf("fail to broadcast the tss generated key on pub_chain")
 			errKeygen = err
 			return
 		}
-		oc.logger.Info().Msgf("successfully prepared the tss key info on pub_chain")
+		jc.logger.Info().Msgf("successfully prepared the tss key info on pub_chain")
 	}()
 	errWriteLock.Lock()
 	defer errWriteLock.Unlock()

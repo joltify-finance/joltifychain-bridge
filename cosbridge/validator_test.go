@@ -126,7 +126,7 @@ func (v *ValidatorTestSuite) SetupSuite() {
 }
 
 func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
-	oc := new(OppyChainInstance)
+	oc := new(JoltChainInstance)
 	oc.GrpcClient = v.network.Validators[0].ClientCtx
 	err := oc.InitValidators(v.network.Validators[0].APIAddress)
 	v.Require().Nil(err)
@@ -136,14 +136,14 @@ func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
 }
 
 func (v ValidatorTestSuite) TestQueryPool() {
-	oc := new(OppyChainInstance)
+	oc := new(JoltChainInstance)
 	oc.GrpcClient = v.network.Validators[0].ClientCtx
 	_, err := oc.QueryLastPoolAddress(v.grpc)
 	v.Require().NoError(err)
 }
 
 func (v ValidatorTestSuite) TestCheckWhetherSigner() {
-	oc := new(OppyChainInstance)
+	oc := new(JoltChainInstance)
 	oc.GrpcClient = v.network.Validators[0].ClientCtx
 	oc.Keyring = v.validatorky
 	blockHeight, err := GetLastBlockHeight(oc.GrpcClient)
@@ -173,7 +173,7 @@ func TestInitValidator(t *testing.T) {
 }
 
 func (v ValidatorTestSuite) TestOppyChainBridge_CheckWhetherAlreadyExist() {
-	oc := new(OppyChainInstance)
+	oc := new(JoltChainInstance)
 	oc.GrpcClient = v.network.Validators[0].ClientCtx
 	ret := oc.CheckWhetherAlreadyExist(v.grpc, "testindex")
 	v.Require().True(ret)
@@ -183,7 +183,7 @@ func (v ValidatorTestSuite) TestOppyChainBridge_CheckWhetherAlreadyExist() {
 }
 
 func (v ValidatorTestSuite) TestCheckTxStatus() {
-	oc := new(OppyChainInstance)
+	oc := new(JoltChainInstance)
 	oc.GrpcClient = v.network.Validators[0].ClientCtx
 	err := oc.CheckTxStatus(oc.GrpcClient, "testindex", 1)
 	v.Require().NoError(err)

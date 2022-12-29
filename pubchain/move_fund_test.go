@@ -81,7 +81,7 @@ func (tn TestNetTestSuite) TestProcessNewBlock() {
 	number, err := tn.pubChain.BSCChain.Client.BlockNumber(ctx)
 	tn.Require().NoError(err)
 	tn.pubChain.BSCChain.ChainLocker.Unlock()
-	err = tn.pubChain.ProcessNewBlock("BSC", tn.pubChain.BSCChain, big.NewInt(int64(number)))
+	err = tn.pubChain.ProcessNewBlock("BSC", tn.pubChain.BSCChain, big.NewInt(int64(number)), tn.pubChain.FeeModule, "")
 	tn.Require().NoError(err)
 }
 

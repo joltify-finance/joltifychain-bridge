@@ -30,10 +30,10 @@ const (
 )
 
 var testPubKeys = []string{
-	"oppypub1zcjduepq8sysqavl67rtytlezccjkq4dvnewtscnlck3ku5uac46rggkfe8qk9tp59",
-	"oppypub1zcjduepqfa9cy9w6sn5wkzfm0zm25e7u9nag55ev4vmasqp7xxhlj78xz7kq3fhjlw",
-	"oppypub1zcjduepqv4p9n26ss3djrnvwufjrs6v8gg5tr2fqpjv3av4n6tx4efclp2tqjdrekz",
-	"oppypub1zcjduepqaxxpz2kfr939dlyhdvuhqvmg2rkv8enls663uegnfqaghp9tr32se58x7n",
+	"joltpub1zcjduepq8sysqavl67rtytlezccjkq4dvnewtscnlck3ku5uac46rggkfe8qdwyv3u",
+	"joltpub1zcjduepqfa9cy9w6sn5wkzfm0zm25e7u9nag55ev4vmasqp7xxhlj78xz7kq2zcl6h",
+	"joltpub1zcjduepqv4p9n26ss3djrnvwufjrs6v8gg5tr2fqpjv3av4n6tx4efclp2tqfxv5nm",
+	"joltpub1zcjduepqaxxpz2kfr939dlyhdvuhqvmg2rkv8enls663uegnfqaghp9tr32szlgtm2",
 }
 
 func TestPackage(t *testing.T) {

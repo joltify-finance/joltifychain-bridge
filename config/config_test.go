@@ -8,5 +8,5 @@ import (
 
 func TestConfig(t *testing.T) {
 	config := DefaultConfig()
-	assert.Equal(t, config.HomeDir, "/root/.oppyChain/config")
+	assert.Equal(t, config.HomeDir, "/root/.joltify/config")
 }

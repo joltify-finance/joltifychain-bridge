@@ -106,16 +106,16 @@ func (v *MintTestSuite) SetupSuite() {
 func (m MintTestSuite) TestPrepareIssueTokenRequest() {
 	accs, err := generateRandomPrivKey(3)
 	m.Require().NoError(err)
-	tx := common.NewAccountInboundReq(accs[0].oppyAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(2))
+	tx := common.NewAccountInboundReq(accs[0].joltAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(2))
 	_, err = prepareIssueTokenRequest(&tx, accs[2].commAddr.String(), "1")
 	m.Require().EqualError(err, "decoding bech32 failed: string not all lowercase or all uppercase")
 
-	_, err = prepareIssueTokenRequest(&tx, accs[2].oppyAddr.String(), "1")
+	_, err = prepareIssueTokenRequest(&tx, accs[2].joltAddr.String(), "1")
 
 	m.Require().NoError(err)
 }
 
-func Gensigntx(oc *OppyChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum, accSeq uint64, signkeyring keyring.Keyring, memo string) (client.TxBuilder, error) {
+func Gensigntx(oc *JoltChainInstance, sdkMsg []sdk.Msg, key keyring.Info, accNum, accSeq uint64, signkeyring keyring.Keyring, memo string) (client.TxBuilder, error) {
 	encCfg := *oc.encoding
 	// Create a new TxBuilder.
 	txBuilder := encCfg.TxConfig.NewTxBuilder()
@@ -195,7 +195,8 @@ func (m MintTestSuite) TestProcessInbound() {
 	}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	m.Require().NoError(err)
-	oc, err := NewOppyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, &tss, tl)
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, &tss, tl, rp)
 	m.Require().NoError(err)
 	oc.Keyring = m.validatorky
 
@@ -224,9 +225,9 @@ func (m MintTestSuite) TestProcessInbound() {
 	m.Require().NoError(err)
 	tx := common.NewAccountInboundReq(valAddr, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100))
 
-	tx.SetAccountInfo(0, 0, accs[0].oppyAddr, accs[0].pk)
+	tx.SetAccountInfo(0, 0, accs[0].joltAddr, accs[0].pk)
 
-	send := banktypes.NewMsgSend(valAddr, accs[0].oppyAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
+	send := banktypes.NewMsgSend(valAddr, accs[0].joltAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
 	txBuilder, err := Gensigntx(oc, []sdk.Msg{send}, info, acc.GetAccountNumber(), acc.GetSequence(), m.network.Validators[0].ClientCtx.Keyring, "")
 	m.Require().NoError(err)
@@ -238,7 +239,7 @@ func (m MintTestSuite) TestProcessInbound() {
 
 	pool := common.PoolInfo{
 		Pk:         accs[0].pk,
-		CosAddress: accs[0].oppyAddr,
+		CosAddress: accs[0].joltAddr,
 		EthAddress: accs[0].commAddr,
 	}
 

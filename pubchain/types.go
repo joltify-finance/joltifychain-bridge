@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"math/big"
 	"strings"
 	"sync"
@@ -45,6 +46,11 @@ var (
 	OppyContractAddressBSC = "0x94277968dff216265313657425d9d7577ad32dd1"
 	OppyContractAddressETH = "0x2BCD5745eBf28f367A0De2cF3C6fEBfE42B21338"
 )
+
+type JoltHandler interface {
+	queryTokenPrice(grpcClient grpc1.ClientConn, grpcAddr string, denom string) (sdk.Dec, error)
+	QueryJoltBlockHeight(grpcAddr string) (int64, error)
+}
 
 type InboundTx struct {
 	TxID            string         `json:"tx_id"` // this variable is used for locally saving and loading
@@ -131,18 +137,22 @@ type Instance struct {
 	InboundReqChan       chan []*bcommon.InBoundReq
 	RetryInboundReq      *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	moveFundReq          *sync.Map
-	CurrentHeight        int64
 	TokenList            tokenlist.BridgeTokenListI
 	wg                   *sync.WaitGroup
 	ChannelQueue         chan *BlockHead
 	onHoldRetryQueue     []*bcommon.InBoundReq
 	onHoldRetryQueueLock *sync.Mutex
 	RetryOutboundReq     *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
+	FeeModule            map[string]*bcommon.FeeModule
+	joltHandler          JoltHandler
+	joltRetryOutBoundReq *sync.Map
 }
 
 // NewChainInstance initialize the oppy_bridge entity
-func NewChainInstance(wsBSC, wsETH string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, wg *sync.WaitGroup, retryPools *bcommon.RetryPools) (*Instance, error) {
+func NewChainInstance(wsBSC, wsETH string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, wg *sync.WaitGroup, joltRetryOutBoundReq *sync.Map) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
+
+	retryPools := bcommon.NewRetryPools()
 
 	channelQueue := make(chan *BlockHead, sbchannelsize)
 
@@ -184,5 +194,8 @@ func NewChainInstance(wsBSC, wsETH string, tssServer tssclient.TssInstance, tl t
 		onHoldRetryQueue:     []*bcommon.InBoundReq{},
 		onHoldRetryQueueLock: &sync.Mutex{},
 		RetryOutboundReq:     retryPools.RetryOutboundReq,
+		FeeModule:            bcommon.InitFeeModule(),
+		joltHandler:          NewJoltHandler(),
+		joltRetryOutBoundReq: joltRetryOutBoundReq,
 	}, nil
 }

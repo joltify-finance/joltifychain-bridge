@@ -66,14 +66,14 @@ func TestPubChainInstance_composeTx(t *testing.T) {
 		BlockHeight: "100",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: accs[0].pk,
-			PoolAddr:   accs[0].oppyAddr,
+			PoolAddr:   accs[0].joltAddr,
 		},
 	}
 	poolInfo1 := vaulttypes.PoolInfo{
 		BlockHeight: "101",
 		CreatePool: &vaulttypes.PoolProposal{
 			PoolPubKey: accs[1].pk,
-			PoolAddr:   accs[1].oppyAddr,
+			PoolAddr:   accs[1].joltAddr,
 		},
 	}
 

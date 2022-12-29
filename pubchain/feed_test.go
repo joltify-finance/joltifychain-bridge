@@ -52,16 +52,16 @@ func TestFeedTx(t *testing.T) {
 	poolInfo := vaulttypes.PoolInfo{
 		BlockHeight: "225",
 		CreatePool: &vaulttypes.PoolProposal{
-			PoolPubKey: "oppypub1addwnpepqgknlvjpa7237gnrm2kakjd37xagm7435hmk6zqf5248dnext9cfse7dze7",
+			PoolPubKey: "joltpub1addwnpepqgknlvjpa7237gnrm2kakjd37xagm7435hmk6zqf5248dnext9cfshhe990",
 		},
 	}
-	toAddr, err := misc.PoolPubKeyToEthAddress("oppypub1addwnpepqgknlvjpa7237gnrm2kakjd37xagm7435hmk6zqf5248dnext9cfse7dze7")
+	toAddr, err := misc.PoolPubKeyToEthAddress("joltpub1addwnpepqgknlvjpa7237gnrm2kakjd37xagm7435hmk6zqf5248dnext9cfshhe990")
 	assert.NilError(t, err)
 
-	a1 := common.NewOutboundReq("test1", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, nil, "BSC")
-	a2 := common.NewOutboundReq("test2", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, nil, "BSC")
-	a3 := common.NewOutboundReq("test3", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, nil, "BSC")
-	a4 := common.NewOutboundReq("test4", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, nil, "BSC")
+	a1 := common.NewOutboundReq("test1", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, "BSC", true)
+	a2 := common.NewOutboundReq("test2", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, "BSC", true)
+	a3 := common.NewOutboundReq("test3", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, "BSC", true)
+	a4 := common.NewOutboundReq("test4", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, "BSC", true)
 	testOutBoundReqs := []*common.OutBoundReq{&a1, &a2, &a3, &a4}
 
 	err = pi.FeedTx(&poolInfo, testOutBoundReqs, "BSC")

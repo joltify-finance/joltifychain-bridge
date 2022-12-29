@@ -11,5 +11,7 @@ func TestMetricInbound(t *testing.T) {
 
 func TestMetricOutbound(t *testing.T) {
 	metrics := NewMetric()
+	metrics.Enable()
+	metrics.UpdateStatus()
 	metrics.UpdateOutboundTxNum(1)
 }

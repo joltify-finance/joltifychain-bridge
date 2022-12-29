@@ -51,7 +51,7 @@ func TestPoolPubkeyToEthAddress(t *testing.T) {
 
 	require.Nil(t, err)
 	require.EqualValues(t, ethAddr.Hex(), expectedAddr.Hex())
-	require.EqualValues(t, addrOppy.String(), "oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7")
+	require.EqualValues(t, "jolt1txtsnx4gr4effr8542778fsxc20j5vzqxet7t0", addrOppy.String())
 }
 
 func TestGetOppyAddressFromETHSignature(t *testing.T) {
@@ -115,7 +115,7 @@ func TestMakeSignature(t *testing.T) {
 
 	transferFrom, err := EthSignPubKeyToOppyAddr(sigPublicKey)
 	assert.Nil(t, err)
-	assert.Equal(t, "oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7", transferFrom.String())
+	assert.Equal(t, "jolt1txtsnx4gr4effr8542778fsxc20j5vzqxet7t0", transferFrom.String())
 
 	// now we test serialize the signature
 
@@ -140,13 +140,21 @@ func TestMakeSignature(t *testing.T) {
 	assert.True(t, bytes.Equal(out, sigBytes))
 }
 
+func SetupBech32PrefixOppy() {
+	config := types.GetConfig()
+	config.SetBech32PrefixForAccount("oppy", "oppypub")
+	config.SetBech32PrefixForValidator("oppyvaloper", "oppyvpub")
+	config.SetBech32PrefixForConsensusNode("oppyvalcons", "oppycpub")
+}
+
 func TestPubkeyToOppyAddress(t *testing.T) {
-	poolkey := "oppypub1addwnpepqgqd9v2x3axlkkmv5zj8hr6z7pl4fyt8xmhdmfx5kzql2uu6xfdwcahd8ah"
+	SetupBech32Prefix()
+	poolkey := "joltpub1addwnpepqgqd9v2x3axlkkmv5zj8hr6z7pl4fyt8xmhdmfx5kzql2uu6xfdwcn7eqpx"
 	addr, err := PoolPubKeyToOppyAddress(poolkey)
 	assert.NoError(t, err)
-	assert.Equal(t, addr.String(), "oppy106q2q2k37jum8zua08yp7lr6llygl3m8933692")
+	assert.Equal(t, "jolt106q2q2k37jum8zua08yp7lr6llygl3m8axx6dm", addr.String())
 
-	poolkeyWrong := "oppypub1addwnpepqgqd9v2x3axlkkmv5zj8hr6z7pl4fyt8xmhdxfx5kzql2uu6xfdwcahd8ah"
+	poolkeyWrong := "joltpub1addwnpepqgqd9v2x3axlkkmv5zj8hr6z7pl4fyt8xmhdmfx5kzql2uu6xfdwcn7eqp0"
 	_, err = PoolPubKeyToOppyAddress(poolkeyWrong)
 	assert.Error(t, err)
 }

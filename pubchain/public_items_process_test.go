@@ -23,7 +23,7 @@ func createdTestOutBoundReqs(n int) []*common.InBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		oppyAddress := "oppy1rfmwldwrm3652shx3a7say0v4vvtglasncg0uu"
+		oppyAddress := "jolt1txtsnx4gr4effr8542778fsxc20j5vzqxet7t0"
 		oaddr, err := sdk.AccAddressFromBech32(oppyAddress)
 		if err != nil {
 			panic(err)
@@ -80,13 +80,13 @@ func TestConfig(t *testing.T) {
 	assert.Nil(t, err)
 	pool := common.PoolInfo{
 		Pk:         accs[0].pk,
-		CosAddress: accs[0].oppyAddr,
+		CosAddress: accs[0].joltAddr,
 		EthAddress: accs[0].commAddr,
 	}
 
 	pool1 := common.PoolInfo{
 		Pk:         accs[1].pk,
-		CosAddress: accs[1].oppyAddr,
+		CosAddress: accs[1].joltAddr,
 		EthAddress: accs[1].commAddr,
 	}
 

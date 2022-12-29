@@ -111,7 +111,8 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	s.Require().NoError(err)
-	oc, err := NewOppyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, &tss, tl)
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, &tss, tl, rp)
 	s.Require().NoError(err)
 	oc.Keyring = s.validatorky
 
@@ -156,9 +157,14 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	req := common.OutBoundReq{
 		TxID:               hex.EncodeToString([]byte("testreq")),
 		OutReceiverAddress: accs[0].commAddr,
+		ChainType:          "BSC",
+		NeedMint:           true,
 	}
-	s.Require().NoError(err)
-	err = oc.SubmitOutboundTx(s.grpc, info, req.Hash().Hex(), 10, hex.EncodeToString([]byte("testpubtx")), sdk.NewCoins(sdk.NewCoin("abc", sdk.NewInt(32))))
+	err = oc.SubmitOutboundTx(s.grpc, info, "incorrect_request_ID", 10, hex.EncodeToString([]byte("testpubtx")), sdk.NewCoins(sdk.NewCoin("abc", sdk.NewInt(32))), req.ChainType, req.TxID, req.OutReceiverAddress.Bytes(), req.NeedMint)
+	//we submit the incorrect req ID
+	s.Require().Error(err)
+
+	err = oc.SubmitOutboundTx(s.grpc, info, req.Hash().Hex(), 10, hex.EncodeToString([]byte("testpubtx")), sdk.NewCoins(sdk.NewCoin("abc", sdk.NewInt(32))), "BSC", req.TxID, req.OutReceiverAddress.Bytes(), req.NeedMint)
 	s.Require().NoError(err)
 	_, err = oc.GetPubChainSubmittedTx(req)
 	s.Require().NoError(err)

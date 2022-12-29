@@ -2,6 +2,7 @@ package cosbridge
 
 import (
 	"context"
+	"gitlab.com/joltify/joltifychain-bridge/common"
 	"strconv"
 	"testing"
 	"time"
@@ -93,7 +94,8 @@ func (f *subscribeTestSuite) SetupSuite() {
 }
 
 func (s *subscribeTestSuite) TestSubscribe() {
-	oc, err := NewOppyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, nil, nil)
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, nil, nil, rp)
 	s.Require().NoError(err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -151,7 +153,8 @@ func (s *subscribeTestSuite) createMockChan() <-chan coretypes.ResultEvent {
 }
 
 func (s *subscribeTestSuite) TestProcess() {
-	oc, err := NewOppyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, nil, nil)
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, nil, nil, rp)
 	s.Require().NoError(err)
 
 	mockChan := s.createMockChan()

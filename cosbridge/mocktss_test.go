@@ -4,6 +4,8 @@ import (
 	"crypto/ecdsa"
 	"encoding/base64"
 	"errors"
+	"github.com/ethereum/go-ethereum/common"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 
@@ -12,10 +14,42 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/bech32/legacybech32" // nolint
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/joltify-finance/tss/blame"
-	"github.com/joltify-finance/tss/common"
+	tcommon "github.com/joltify-finance/tss/common"
 	"github.com/joltify-finance/tss/keygen"
 	"github.com/joltify-finance/tss/keysign"
 )
+
+type Account struct {
+	sk       *secp256k1.PrivKey
+	pk       string
+	joltAddr types.AccAddress
+	commAddr common.Address
+}
+
+func generateRandomPrivKey(n int) ([]Account, error) {
+	randomAccounts := make([]Account, n)
+	for i := 0; i < n; i++ {
+		sk := secp256k1.GenPrivKey()
+		pk := legacybech32.MustMarshalPubKey(legacybech32.AccPK, sk.PubKey()) // nolint
+
+		ethAddr, err := misc.PoolPubKeyToEthAddress(pk)
+		if err != nil {
+			return nil, err
+		}
+		addrOppy, err := types.AccAddressFromHex(sk.PubKey().Address().String())
+		if err != nil {
+			return nil, err
+		}
+		tAccount := Account{
+			sk,
+			pk,
+			addrOppy,
+			ethAddr,
+		}
+		randomAccounts[i] = tAccount
+	}
+	return randomAccounts, nil
+}
 
 type TssMock struct {
 	sk             *secp256k1.PrivKey
@@ -26,7 +60,7 @@ type TssMock struct {
 
 func (tm *TssMock) KeySign(pk string, msgs []string, blockHeight int64, signers []string, version string) (keysign.Response, error) {
 	if !tm.keysignSuccess {
-		return keysign.NewResponse(nil, common.Fail, blame.NewBlame("", nil)), errors.New("fail in keysign")
+		return keysign.NewResponse(nil, tcommon.Fail, blame.NewBlame("", nil)), errors.New("fail in keysign")
 	}
 
 	msg, err := base64.StdEncoding.DecodeString(msgs[0])
@@ -73,10 +107,10 @@ func (tm *TssMock) KeySign(pk string, msgs []string, blockHeight int64, signers 
 		RecoveryID: vEncoded,
 	}
 
-	return keysign.Response{Signatures: []keysign.Signature{sig}, Status: common.Success}, nil
+	return keysign.Response{Signatures: []keysign.Signature{sig}, Status: tcommon.Success}, nil
 }
 
-func (tm *TssMock) KeyGen(keys []string, blockHeight int64, version string) (keygen.Response, error) {
+func (tm *TssMock) KeyGen(_ []string, _ int64, _ string) (keygen.Response, error) {
 	if tm.keygenSuccess {
 		sk := secp256k1.GenPrivKey()
 		pk := legacybech32.MustMarshalPubKey(legacybech32.AccPK, sk.PubKey()) // nolint
@@ -84,9 +118,9 @@ func (tm *TssMock) KeyGen(keys []string, blockHeight int64, version string) (key
 		if err != nil {
 			panic(err)
 		}
-		return keygen.NewResponse(pk, address.String(), common.Success, blame.Blame{}), nil
+		return keygen.NewResponse(pk, address.String(), tcommon.Success, blame.Blame{}), nil
 	}
-	return keygen.NewResponse("", "", common.Fail, blame.Blame{}), nil
+	return keygen.NewResponse("", "", tcommon.Fail, blame.Blame{}), nil
 }
 
 func (tm *TssMock) GetTssNodeID() string {

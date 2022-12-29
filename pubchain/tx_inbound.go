@@ -8,9 +8,8 @@ import (
 	"math/big"
 	"strings"
 
-	zlog "github.com/rs/zerolog/log"
-
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
+	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/types"
@@ -33,14 +32,14 @@ func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, chainType stri
 }
 
 // ProcessNewBlock process the blocks received from the public pub_chain
-func (pi *Instance) ProcessNewBlock(chainType string, chainInfo *ChainInfo, number *big.Int) error {
+func (pi *Instance) ProcessNewBlock(chainType string, chainInfo *ChainInfo, number *big.Int, feeModule map[string]*bcommon.FeeModule, oppyGrpc string) error {
 	block, err := chainInfo.GetBlockByNumberWithLock(number)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to retrieve the block")
 		return err
 	}
 	// we need to put the block height in which we find the tx
-	pi.processEachBlock(chainType, chainInfo, block, number.Int64())
+	pi.processEachBlock(chainType, chainInfo, block, number.Int64(), feeModule, oppyGrpc)
 	return nil
 }
 
@@ -70,12 +69,7 @@ func (pi *Instance) processInboundERC20Tx(txID, chainType string, txBlockHeight 
 		return nil
 	}
 
-	delta := types.Precision - tokenItem.Decimals
-	if delta != 0 {
-		adjustedTokenAmount := bcommon.AdjustInt(tx.Token.Amount, int64(delta))
-		tx.Token.Amount = adjustedTokenAmount
-	}
-
+	tx.Token.Amount = inboundAdjust(tx.Token.Amount, tokenItem.Decimals, types.Precision)
 	item := bcommon.NewAccountInboundReq(tx.ReceiverAddress, to, tx.Token, txIDBytes, int64(txBlockHeight))
 	pi.AddInBoundItem(&item)
 	return nil
@@ -153,7 +147,7 @@ func (pi *Instance) checkErc20(data []byte, to, contractAddress string) (*Erc20T
 	return nil, errors.New("invalid method for decode")
 }
 
-func (pi *Instance) processEachBlock(chainType string, chainInfo *ChainInfo, block *ethTypes.Block, txBlockHeight int64) {
+func (pi *Instance) processEachBlock(chainType string, chainInfo *ChainInfo, block *ethTypes.Block, txBlockHeight int64, feeModule map[string]*bcommon.FeeModule, oppyGrpc string) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
 			continue
@@ -171,13 +165,17 @@ func (pi *Instance) processEachBlock(chainType string, chainInfo *ChainInfo, blo
 			}
 			// process the public chain inbound message to the channel
 			if !pi.checkToBridge(txInfo.toAddr) {
-				pi.logger.Warn().Msg("the top up message is not to the bridge, ignored")
+				pi.logger.Warn().Msg("tx is not to the bridge, ignored")
+				continue
+			}
+			if txInfo.dstChainType == chainType {
+				zlog.Error().Msgf("cannot transfer from and to the same chain")
 				continue
 			}
 
 			switch txInfo.dstChainType {
 			case ETH, BSC:
-				err := pi.processDstInbound(txInfo, tx.Hash().Hex()[2:], chainType, txBlockHeight)
+				err := pi.processDstInbound(txInfo, tx.Hash().Hex()[2:], chainType, txBlockHeight, feeModule, oppyGrpc)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msgf("fail to process the inbound tx for outbound from %v to %v", chainType, txInfo.dstChainType)
 					continue
@@ -203,7 +201,7 @@ func (pi *Instance) processEachBlock(chainType string, chainInfo *ChainInfo, blo
 			}
 			switch memoInfo.ChainType {
 			case JOLTIFY:
-				pi.processOppyInbound(memoInfo, chainType, *tx, txBlockHeight)
+				pi.processJoltifyInbound(memoInfo, chainType, *tx, txBlockHeight)
 			default:
 				pi.logger.Warn().Msgf("unknown chain type %v", memoInfo.ChainType)
 			}
@@ -211,14 +209,7 @@ func (pi *Instance) processEachBlock(chainType string, chainInfo *ChainInfo, blo
 	}
 }
 
-func calculateFee(a types.Int, ratio string) (types.Int, types.Int) {
-	amountDec := a.ToDec()
-	leftOver := amountDec.Mul(types.MustNewDecFromStr(ratio)).TruncateInt()
-	fee := a.Sub(leftOver)
-	return leftOver, fee
-}
-
-func (pi *Instance) processDstInbound(txInfo *Erc20TxInfo, txHash, chainType string, txBlockHeight int64) error {
+func (pi *Instance) processDstInbound(txInfo *Erc20TxInfo, txHash, chainType string, txBlockHeight int64, feeModule map[string]*bcommon.FeeModule, oppyGrpc string) error {
 	tokenInItem, exit := pi.TokenList.GetTokenInfoByAddressAndChainType(strings.ToLower(txInfo.tokenAddress.Hex()), chainType)
 	if !exit {
 		pi.logger.Error().Msgf("Token is not on our token list")
@@ -226,21 +217,30 @@ func (pi *Instance) processDstInbound(txInfo *Erc20TxInfo, txHash, chainType str
 	}
 
 	token := types.NewCoin(tokenInItem.Denom, types.NewIntFromBigInt(txInfo.Amount))
+	token.Amount = inboundAdjust(token.Amount, tokenInItem.Decimals, types.Precision)
 
-	delta := types.Precision - tokenInItem.Decimals
-	if delta != 0 {
-		adjustedTokenAmount := bcommon.AdjustInt(token.Amount, int64(delta))
-		token.Amount = adjustedTokenAmount
+	price, err := pi.joltHandler.queryTokenPrice(nil, oppyGrpc, token.Denom)
+	if err != nil {
+		return errors.New("fail to get the token price")
 	}
 
-	//fixme we need to have the dynamic fee
-	leftover, fee := calculateFee(token.Amount, "0.9")
-	if leftover.IsZero() {
-		pi.logger.Warn().Msg("zero value to be transffered")
-		return errors.New("zero value to be transferred, rejected")
+	thisFeeModule, ok := feeModule[chainType]
+	if !ok {
+		panic("the fee module does not exist!!")
 	}
-	feeToValidator := types.NewCoin(token.Denom, fee)
-	token.Amount = leftover
+
+	fee, err := bcommon.CalculateFee(thisFeeModule, price, token)
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to calculate the fee")
+		return nil
+	}
+	if token.IsLT(fee) || token.Equal(fee) {
+		pi.logger.Warn().Msg("token is smaller than the fee,we drop the tx")
+		return nil
+	}
+
+	feeToValidator := fee
+	token = token.Sub(feeToValidator)
 
 	tokenOutItem, tokenExist := pi.TokenList.GetTokenInfoByDenomAndChainType(token.Denom, txInfo.dstChainType)
 	if !tokenExist {
@@ -248,12 +248,7 @@ func (pi *Instance) processDstInbound(txInfo *Erc20TxInfo, txHash, chainType str
 		return errors.New("cannot find the token")
 	}
 
-	//now outbound decimal convertion
-	deltaOut := tokenOutItem.Decimals - types.Precision
-	if deltaOut != 0 {
-		adjustedTokenAmount := bcommon.AdjustInt(token.Amount, int64(deltaOut))
-		token.Amount = adjustedTokenAmount
-	}
+	token.Amount = outboundAdjust(token.Amount, tokenOutItem.Decimals, types.Precision)
 
 	receiver := common.HexToAddress(txInfo.receiverAddrERC20)
 	if receiver == common.BigToAddress(big.NewInt(0)) {
@@ -262,14 +257,18 @@ func (pi *Instance) processDstInbound(txInfo *Erc20TxInfo, txHash, chainType str
 	}
 	currEthAddr := pi.lastTwoPools[1].EthAddress
 
-	itemReq := bcommon.NewOutboundReq(txHash, receiver, currEthAddr, token, tokenOutItem.TokenAddr, txBlockHeight, types.Coins{}, types.Coins{feeToValidator}, txInfo.dstChainType)
+	joltHeight, err := pi.joltHandler.QueryJoltBlockHeight(oppyGrpc)
+	if err != nil {
+		return errors.New("fail to get the token price")
+	}
 
+	itemReq := bcommon.NewOutboundReq(txHash, receiver, currEthAddr, token, tokenOutItem.TokenAddr, joltHeight, types.Coins{feeToValidator}, txInfo.dstChainType, true)
 	pi.AddOutBoundItem(&itemReq)
-	pi.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v) with fee %v paid to validators", txBlockHeight, pi.CurrentHeight, types.Coins{feeToValidator})
+	pi.logger.Info().Msgf("Outbound Transaction in Joltify Block %v  with fee %v paid to validators", txBlockHeight, types.Coins{feeToValidator})
 	return nil
 }
 
-func (pi *Instance) processOppyInbound(memoInfo bcommon.BridgeMemo, chainType string, tx ethTypes.Transaction, txBlockHeight int64) {
+func (pi *Instance) processJoltifyInbound(memoInfo bcommon.BridgeMemo, chainType string, tx ethTypes.Transaction, txBlockHeight int64) {
 
 	dstAddr, err := types.AccAddressFromBech32(memoInfo.Dest)
 	if err != nil {
@@ -287,12 +286,7 @@ func (pi *Instance) processOppyInbound(memoInfo bcommon.BridgeMemo, chainType st
 		pi.logger.Error().Err(err).Msgf("fail to the the balance of the given token")
 		return
 	}
-	delta := types.Precision - tokenItem.Decimals
-	if delta != 0 {
-		adjustedTokenAmount := bcommon.AdjustInt(balance.Amount, int64(delta))
-		balance.Amount = adjustedTokenAmount
-	}
-
+	balance.Amount = inboundAdjust(balance.Amount, tokenItem.Decimals, types.Precision)
 	item := bcommon.NewAccountInboundReq(dstAddr, *tx.To(), balance, tx.Hash().Bytes(), txBlockHeight)
 	// we add to the retry pool to  sort the tx
 	pi.AddInBoundItem(&item)

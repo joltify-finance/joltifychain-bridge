@@ -16,14 +16,14 @@ func (o *OutBoundReq) Hash() common.Hash {
 		panic(err)
 	}
 	needMintStr := "true"
-	if o.ChainType == "OPPy" {
+	if !o.NeedMint {
 		needMintStr = "false"
 	}
 	hash := crypto.Keccak256Hash(o.OutReceiverAddress.Bytes(), []byte(o.ChainType), []byte(needMintStr), data)
 	return hash
 }
 
-func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin types.Coin, coinAddr string, txBlockHeight int64, feeCoins, feeToValidator types.Coins, chainType string) OutBoundReq {
+func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin types.Coin, coinAddr string, txBlockHeight int64, feeToValidator types.Coins, chainType string, needMint bool) OutBoundReq {
 	return OutBoundReq{
 		txID,
 		address,
@@ -33,9 +33,9 @@ func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin type
 		txBlockHeight,
 		uint64(0),
 		common.Hash{}.Hex(),
-		feeCoins,
 		feeToValidator,
 		chainType,
+		needMint,
 	}
 }
 

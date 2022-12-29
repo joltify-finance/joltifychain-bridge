@@ -22,28 +22,28 @@ func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string
 }
 
 // DoProcessInBound mint the token in joltify chain
-func (oc *OppyChainInstance) DoProcessInBound(conn grpc1.ClientConn, items []*common.InBoundReq) (map[string]string, error) {
+func (jc *JoltChainInstance) DoProcessInBound(conn grpc1.ClientConn, items []*common.InBoundReq) (map[string]string, error) {
 	signMsgs := make([]*tssclient.TssSignigMsg, len(items))
 	issueReqs := make([]sdk.Msg, len(items))
 
-	blockHeight, err := oc.GetLastBlockHeightWithLock()
+	blockHeight, err := jc.GetLastBlockHeightWithLock()
 	if err != nil {
-		oc.logger.Error().Err(err).Msgf("fail to get the block height in process the inbound tx")
+		jc.logger.Error().Err(err).Msgf("fail to get the block height in process the inbound tx")
 		return nil, err
 	}
 	roundBlockHeight := blockHeight / ROUNDBLOCK
 	for i, item := range items {
 		index := item.Hash().Hex()
 		_, _, poolAddress, poolPk := item.GetAccountInfo()
-		oc.logger.Info().Msgf("we are about to prepare the tx with other nodes with index %v", index)
+		jc.logger.Info().Msgf("we are about to prepare the tx with other nodes with index %v", index)
 		issueReq, err := prepareIssueTokenRequest(item, poolAddress.String(), index)
 		if err != nil {
-			oc.logger.Error().Err(err).Msg("fail to prepare the issuing of the token")
+			jc.logger.Error().Err(err).Msg("fail to prepare the issuing of the token")
 			continue
 		}
 
 		tick := html.UnescapeString("&#" + "128296" + ";")
-		oc.logger.Info().Msgf("%v we do the top up for %v at height %v", tick, issueReq.Receiver.String(), roundBlockHeight)
+		jc.logger.Info().Msgf("%v we do the top up for %v at height %v", tick, issueReq.Receiver.String(), roundBlockHeight)
 		signMsg := tssclient.TssSignigMsg{
 			Pk:          poolPk,
 			Signers:     nil,
@@ -55,10 +55,10 @@ func (oc *OppyChainInstance) DoProcessInBound(conn grpc1.ClientConn, items []*co
 	}
 	// as in a group, the accseq MUST has been sorted.
 	accSeq, accNum, poolAddress, _ := items[0].GetAccountInfo()
-	// for batchsigning, the signMsgs for all the members in the grop is the same
-	txHashes, err := oc.batchComposeAndSend(conn, issueReqs, accSeq, accNum, signMsgs[0], poolAddress)
+	// for batchsigning, the signMsgs for all the members in the group is the same
+	txHashes, err := jc.batchComposeAndSend(conn, issueReqs, accSeq, accNum, signMsgs[0], poolAddress)
 	if err != nil {
-		oc.logger.Error().Msgf("we fail to process one or more txs")
+		jc.logger.Error().Msgf("we fail to process one or more txs")
 	}
 
 	hashIndexMap := make(map[string]string)

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/ethereum/go-ethereum/crypto"
 	grpc1 "github.com/gogo/protobuf/grpc"
@@ -132,7 +133,9 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 	}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	f.Require().NoError(err)
-	oc, err := NewOppyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl)
+
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl, rp)
 	f.Require().NoError(err)
 	oc.Keyring = f.validatorky
 	oc.GrpcClient = f.network.Validators[0].ClientCtx
@@ -166,6 +169,21 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 	f.Require().NoError(err)
 	value := <-pi.InboundReqChan
 	f.Require().Equal(value[0].TxID, reqs[0].TxID)
+
+	info, err = oc.Keyring.Key("operator")
+	f.Require().NoError(err)
+	err = oc.Keyring.Delete("operator")
+	f.Require().NoError(err)
+
+	err = oc.FeedTx(f.grpc, &poolInfo, &pi)
+	f.Require().Error(err)
+
+	_, _, err = oc.Keyring.NewMnemonic("operator", keyring.English, sdk.FullFundraiserPath, keyring.DefaultBIP39Passphrase, hd.Secp256k1)
+	f.Require().NoError(err)
+
+	err = oc.FeedTx(f.grpc, &poolInfo, &pi)
+	f.Require().NoError(err)
+
 }
 
 func TestFedTransaction(t *testing.T) {

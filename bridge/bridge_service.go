@@ -27,7 +27,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	oppycommon "gitlab.com/joltify/joltifychain-bridge/common"
+	joltcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"gitlab.com/joltify/joltifychain-bridge/monitor"
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
@@ -42,6 +42,33 @@ import (
 var (
 	ROUNDBLOCK = 100
 )
+
+type PreviousTssBlockOutBound struct {
+	BscBlockHeight,
+	EthBlockHeight int64
+}
+
+func (p *PreviousTssBlockOutBound) SetHeight(h int64, chainType string) {
+	switch chainType {
+	case "BSC":
+		p.BscBlockHeight = h
+	case "ETH":
+		p.EthBlockHeight = h
+	default:
+		panic("unknown chain type")
+	}
+}
+
+func (p *PreviousTssBlockOutBound) GetHeight(chainType string) int64 {
+	switch chainType {
+	case "BSC":
+		return p.BscBlockHeight
+	case "ETH":
+		return p.EthBlockHeight
+	default:
+		panic("unknown chain type")
+	}
+}
 
 func readPassword() ([]byte, error) {
 	var fd int
@@ -106,9 +133,9 @@ func NewBridgeService(config config.Config) {
 		return
 	}
 
-	retryPools := oppycommon.NewRetryPools()
+	retryPools := joltcommon.NewRetryPools()
 
-	oppyBridge, err := cosbridge.NewOppyBridge(config.CosChain.GrpcAddress, config.CosChain.WsAddress, tssServer, tl, retryPools)
+	oppyBridge, err := cosbridge.NewJoltifyBridge(config.CosChain.GrpcAddress, config.CosChain.WsAddress, tssServer, tl, retryPools)
 	if err != nil {
 		log.Fatalln("fail to create the invoice oppy_bridge", err)
 		return
@@ -153,7 +180,7 @@ func NewBridgeService(config config.Config) {
 	}
 
 	// now we monitor the bsc transfer event
-	pubChainInstance, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddressBSC, config.PubChainConfig.WsAddressETH, tssServer, tl, &wg, retryPools)
+	pubChainInstance, err := pubchain.NewChainInstance(config.PubChainConfig.WsAddressBSC, config.PubChainConfig.WsAddressETH, tssServer, tl, &wg, oppyBridge.RetryOutboundReq)
 	if err != nil {
 		fmt.Printf("fail to connect the public pub_chain with address %v\n", config.PubChainConfig.WsAddressBSC)
 		cancel()
@@ -183,17 +210,6 @@ func NewBridgeService(config config.Config) {
 			pubChainInstance.AddInBoundItem(el)
 		}
 		fmt.Printf("we have loaded the unprocessed inbound tx\n")
-	}
-
-	// now we load the pending outboundtx
-	pendingManager := storage.NewPendingTxStateMgr(config.HomeDir)
-	pendingItems, err := pendingManager.LoadPendingItems()
-	if err != nil {
-		zlog.Logger.Error().Err(err).Msgf("fail to load the pending items!!")
-	}
-
-	if len(pendingItems) != 0 {
-		oppyBridge.Import(pendingItems)
 	}
 
 	moveFundMgr := storage.NewMoveFundStateMgr(config.HomeDir)
@@ -236,13 +252,6 @@ func NewBridgeService(config config.Config) {
 		zlog.Logger.Error().Err(err).Msgf("fail to save the outbound requests!!!")
 	}
 
-	exportedPending := oppyBridge.Export()
-
-	err = pendingManager.SavePendingItems(exportedPending)
-	if err != nil {
-		zlog.Logger.Error().Err(err).Msgf("fail to save the pending requests!!!")
-	}
-
 	// we now save the move fund items
 	pubItemsSave := pubChainInstance.ExportMoveFundItems()
 
@@ -254,11 +263,11 @@ func NewBridgeService(config config.Config) {
 	zlog.Logger.Info().Msgf("we quit the bridge gracefully")
 }
 
-func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.OppyChainInstance, pi *pubchain.Instance, metric *monitor.Metric, oppyRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList, oppyGrpc string) {
+func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbridge.JoltChainInstance, pi *pubchain.Instance, metric *monitor.Metric, oppyRollbackGap int64, pubRollbackGap int64, tl *tokenlist.TokenList, oppyGrpc string) {
 	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancelLocal()
 
-	err := oppyChain.AddSubscribe(ctxLocal)
+	err := joltifyChain.AddSubscribe(ctxLocal)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return
@@ -280,7 +289,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 		return
 	}
 
-	blockHeight, err := oppyChain.GetLastBlockHeightWithLock()
+	blockHeight, err := joltifyChain.GetLastBlockHeightWithLock()
 	if err != nil {
 		fmt.Printf("we fail to get the latest block height")
 		cancelSubscription()
@@ -288,7 +297,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 	}
 
 	previousTssBlockInbound := blockHeight
-	previousTssBlockOutBound := blockHeight
+
+	previousTssBlockOutBound := PreviousTssBlockOutBound{
+		blockHeight,
+		blockHeight,
+	}
+
 	firstTimeInbound := true
 	firstTimeOutbound := true
 	localSubmitLocker := sync.Mutex{}
@@ -315,12 +329,12 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 				return
 				// process the update of the validators
 
-			case vals := <-oppyChain.CurrentNewValidator:
-				oppyChain.ChannelQueueValidator <- vals
+			case vals := <-joltifyChain.CurrentNewValidator:
+				joltifyChain.ChannelQueueValidator <- vals
 
-			case vals := <-oppyChain.ChannelQueueValidator:
+			case vals := <-joltifyChain.ChannelQueueValidator:
 
-				height, err := oppyChain.GetLastBlockHeightWithLock()
+				height, err := joltifyChain.GetLastBlockHeightWithLock()
 				if err != nil {
 					continue
 				}
@@ -330,17 +344,17 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 					continue
 				}
 
-				err = oppyChain.HandleUpdateValidators(height, wg, inKeygenInProgress, false)
+				err = joltifyChain.HandleUpdateValidators(height, wg, inKeygenInProgress, false)
 				if err != nil {
 					zlog.Logger.Info().Msgf("error in handle update validator")
 					continue
 				}
 
 			// process the new joltify block, validator may need to submit the pool address
-			case block := <-oppyChain.CurrentNewBlockChan:
-				oppyChain.ChannelQueueNewBlock <- block
+			case block := <-joltifyChain.CurrentNewBlockChan:
+				joltifyChain.ChannelQueueNewBlock <- block
 
-			case block := <-oppyChain.ChannelQueueNewBlock:
+			case block := <-joltifyChain.ChannelQueueNewBlock:
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
@@ -363,7 +377,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 
 				currentProcessBlockHeight := block.Data.(testypes.EventDataNewBlock).Block.Height
 
-				ok, _ := oppyChain.CheckAndUpdatePool(grpcClient, latestHeight)
+				ok, _ := joltifyChain.CheckAndUpdatePool(grpcClient, latestHeight)
 				if !ok {
 					// it is okay to fail to submit a pool address as other nodes can submit, as long as 2/3 nodes submit, it is fine.
 					zlog.Logger.Warn().Msgf("we fail to submit the new pool address")
@@ -371,7 +385,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 
 				// now we check whether we need to update the pool
 				// we query the pool from the chain directly.
-				poolInfo, err := oppyChain.QueryLastPoolAddress(grpcClient)
+				poolInfo, err := joltifyChain.QueryLastPoolAddress(grpcClient)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msgf("error in get pool with error %v", err)
 					grpcClient.Close()
@@ -385,7 +399,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 
 				currentPool := pi.GetPool()
 
-				pools := oppyChain.GetPool()
+				pools := joltifyChain.GetPool()
 
 				// this means the pools has not been filled with two address
 				if currentPool[0] == nil {
@@ -394,7 +408,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 						if err != nil {
 							zlog.Log().Err(err).Msgf("fail to update the pool")
 						}
-						oppyChain.UpdatePool(el)
+						joltifyChain.UpdatePool(el)
 					}
 					grpcClient.Close()
 					continue
@@ -405,7 +419,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 					if err != nil {
 						zlog.Log().Err(err).Msgf("fail to update the pool")
 					}
-					previousPool := oppyChain.UpdatePool(poolInfo[0])
+					previousPool := joltifyChain.UpdatePool(poolInfo[0])
 					if previousPool.Pk != poolInfo[0].CreatePool.PoolPubKey {
 						// we force the first try of the tx to be run without blocking by the block wait
 						pi.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5)
@@ -418,15 +432,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 				processableBlockHeight := int64(0)
 				if currentProcessBlockHeight > oppyRollbackGap {
 					processableBlockHeight = currentProcessBlockHeight - oppyRollbackGap
-					processableBlock, err := oppyChain.GetBlockByHeight(grpcClient, processableBlockHeight)
+					processableBlock, err := joltifyChain.GetBlockByHeight(grpcClient, processableBlockHeight)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("error in get block to process %v", err)
 						grpcClient.Close()
 						continue
 					}
-					oppyChain.DeleteExpired(currentProcessBlockHeight)
 
-					amISigner, err := oppyChain.CheckWhetherSigner(pools[1].PoolInfo)
+					amISigner, err := joltifyChain.CheckWhetherSigner(pools[1].PoolInfo)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
 						grpcClient.Close()
@@ -441,33 +454,34 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 					if amISigner {
 						// here we process the outbound tx
 						for _, el := range processableBlock.Data.Txs {
-							oppyChain.CheckOutBoundTx(grpcClient, processableBlockHeight, el)
+							joltifyChain.CheckOutBoundTx(grpcClient, processableBlockHeight, el)
 						}
 					}
 				}
 
-				oppyChain.CurrentHeight = currentProcessBlockHeight
+				joltifyChain.CurrentHeight = currentProcessBlockHeight
 
 				// we update the token list, if the current block height refresh the update mark
-				err = tl.UpdateTokenList(oppyChain.CurrentHeight)
+				err = tl.UpdateTokenList(joltifyChain.CurrentHeight)
 				if err != nil {
 					zlog.Logger.Warn().Msgf("error in updating token list %v", err)
 				}
 
-				if currentProcessBlockHeight%pubchain.PRICEUPDATEGAP == 0 {
-					fee, _, _, _, err := pi.EthChain.GetFeeLimitWithLock()
-					if err == nil {
-						oppyChain.UpdatePubChainFee(fee.Int64(), "ETH")
-					} else {
-						zlog.Logger.Error().Err(err).Msg("fail to get the suggest gas price")
-					}
-					fee, _, _, _, err = pi.BSCChain.GetFeeLimitWithLock()
-					if err == nil {
-						oppyChain.UpdatePubChainFee(fee.Int64(), "BSC")
-					} else {
-						zlog.Logger.Error().Err(err).Msg("fail to get the suggest gas price")
-					}
-				}
+				// todo we will remove it later
+				//if currentProcessBlockHeight%pubchain.PRICEUPDATEGAP == 0 {
+				//	fee, _, _, _, err := pi.EthChain.GetFeeLimitWithLock()
+				//	if err == nil {
+				//		joltifyChain.UpdatePubChainFee(fee.Int64(), "ETH")
+				//	} else {
+				//		zlog.Logger.Error().Err(err).Msg("fail to get the suggest gas price")
+				//	}
+				//	fee, _, _, _, err = pi.BSCChain.GetFeeLimitWithLock()
+				//	if err == nil {
+				//		joltifyChain.UpdatePubChainFee(fee.Int64(), "BSC")
+				//	} else {
+				//		zlog.Logger.Error().Err(err).Msg("fail to get the suggest gas price")
+				//	}
+				//}
 
 				if failedInbound.Load() > 5 {
 					failedInbound.Store(0)
@@ -480,7 +494,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 					zlog.Logger.Warn().Msgf("to many errors for inbound, we wait for %v blocks to continue", inboundPauseHeight-latestHeight)
 					if latestHeight == inboundPauseHeight-1 {
 						zlog.Info().Msgf("we now load the onhold tx")
-						putOnHoldBlockInBoundBack(oppyGrpc, pi, oppyChain)
+						putOnHoldBlockInBoundBack(oppyGrpc, pi, joltifyChain)
 					}
 					grpcClient.Close()
 
@@ -490,7 +504,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 
 				if pi.IsEmpty() {
 					zlog.Logger.Debug().Msgf("the inbound queue is empty, we put all onhold back")
-					putOnHoldBlockInBoundBack(oppyGrpc, pi, oppyChain)
+					putOnHoldBlockInBoundBack(oppyGrpc, pi, joltifyChain)
 				}
 
 				// todo we need also to add the check to avoid send tx near the churn blocks
@@ -510,13 +524,13 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 					}
 					if inKeygenInProgress.Load() {
 						zlog.Warn().Msgf("we are in keygen process, we do not feed more tx")
-						metric.UpdateOutboundTxNum(float64(oppyChain.Size()))
+						metric.UpdateOutboundTxNum(float64(joltifyChain.Size()))
 						continue
 					}
 
 					zlog.Logger.Warn().Msgf("we feed the inbound tx now %v", pools[1].PoolInfo.CreatePool.String())
 
-					err = oppyChain.FeedTx(grpcClient, pools[1].PoolInfo, pi)
+					err = joltifyChain.FeedTx(grpcClient, pools[1].PoolInfo, pi)
 					if err != nil {
 						zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
 					}
@@ -545,7 +559,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 
 				// process the public chain new block event
 			case blockHead := <-pi.ChannelQueue:
-				pubchainProcess(pi, oppyChain, oppyGrpc, metric, blockHead, pubRollbackGap, failedOutbound, &outboundPauseHeight, outBoundWait, outBoundProcessDone, inKeygenInProgress, &firstTimeOutbound, &previousTssBlockOutBound)
+				pubchainProcess(pi, joltifyChain, oppyGrpc, metric, blockHead, pubRollbackGap, failedOutbound, &outboundPauseHeight, outBoundWait, outBoundProcessDone, inKeygenInProgress, &firstTimeOutbound, &previousTssBlockOutBound)
 
 			// process the in-bound top up event which will mint coin for users
 			case itemsRecv := <-pi.InboundReqChan:
@@ -553,17 +567,17 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 				go func() {
 					defer wg.Done()
 					defer inBoundProcessDone.Store(true)
-					processInbound(oppyGrpc, oppyChain, pi, itemsRecv, inBoundWait, failedInbound)
+					processInbound(oppyGrpc, joltifyChain, pi, itemsRecv, inBoundWait, failedInbound)
 				}()
 
-			case itemsRecv := <-oppyChain.OutboundReqChan:
+			case itemsRecv := <-joltifyChain.OutboundReqChan:
 				wg.Add(1)
 				go func() {
 					defer outBoundProcessDone.Store(true)
 					defer wg.Done()
 					// we must have at least one item in itemsRecv
 					chainInfo := pi.GetChainClient(itemsRecv[0].ChainType)
-					processEachOutBound(chainInfo, oppyGrpc, oppyChain, pi, itemsRecv, failedOutbound, outBoundWait, &localSubmitLocker)
+					processEachOutBound(chainInfo, oppyGrpc, joltifyChain, pi, itemsRecv, failedOutbound, outBoundWait, &localSubmitLocker)
 				}()
 
 			case <-time.After(time.Second * 20):
@@ -577,7 +591,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 					zlog.Logger.Error().Err(err).Msgf("fail to restart the pub chain")
 				}
 
-				err = oppyChain.RetryOppyChain()
+				err = joltifyChain.RetryOppyChain()
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msgf("fail to restart the joltify chain")
 				}
@@ -586,7 +600,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, oppyChain *cosbridge.
 	}(wg)
 }
 
-func processInbound(oppyGrpc string, oppyChain *cosbridge.OppyChainInstance, pi *pubchain.Instance, items []*oppycommon.InBoundReq, inBoundWait *atomic.Bool, failedInbound *atomic.Int32) {
+func processInbound(oppyGrpc string, oppyChain *cosbridge.JoltChainInstance, pi *pubchain.Instance, items []*joltcommon.InBoundReq, inBoundWait *atomic.Bool, failedInbound *atomic.Int32) {
 	grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")
@@ -594,12 +608,12 @@ func processInbound(oppyGrpc string, oppyChain *cosbridge.OppyChainInstance, pi 
 	}
 	defer grpcClient.Close()
 
-	itemsMap := make(map[string]*oppycommon.InBoundReq)
+	itemsMap := make(map[string]*joltcommon.InBoundReq)
 	for _, el := range items {
 		itemsMap[el.Hash().Hex()] = el
 	}
 
-	needToBeProcessed := make([]*oppycommon.InBoundReq, 0)
+	needToBeProcessed := make([]*joltcommon.InBoundReq, 0)
 	for _, item := range items {
 		// we need to check against the previous account sequence
 		index := item.Hash().Hex()
@@ -659,16 +673,16 @@ func processInbound(oppyGrpc string, oppyChain *cosbridge.OppyChainInstance, pi 
 	wg.Wait()
 }
 
-func processEachOutBound(chainInfo *pubchain.ChainInfo, oppyGrpc string, oppyChain *cosbridge.OppyChainInstance, pi *pubchain.Instance, items []*oppycommon.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
+func processEachOutBound(chainInfo *pubchain.ChainInfo, oppyGrpc string, oppyChain *cosbridge.JoltChainInstance, pi *pubchain.Instance, items []*joltcommon.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
 	checkWg := sync.WaitGroup{}
-	needToBeProcessed := make([]*oppycommon.OutBoundReq, 0)
+	needToBeProcessed := make([]*joltcommon.OutBoundReq, 0)
 	needToBeProcessedLock := sync.Mutex{}
 	for _, el := range items {
 		if el == nil {
 			continue
 		}
 		checkWg.Add(1)
-		go func(each *oppycommon.OutBoundReq) {
+		go func(each *joltcommon.OutBoundReq) {
 			defer checkWg.Done()
 			submittedTx, err := oppyChain.GetPubChainSubmittedTx(*each)
 			if err != nil {
@@ -706,7 +720,7 @@ func processEachOutBound(chainInfo *pubchain.ChainInfo, oppyGrpc string, oppyCha
 	defer close(tssReqChan)
 	for i, pItem := range needToBeProcessed {
 		tssWaitGroup.Add(1)
-		go func(index int, item *oppycommon.OutBoundReq) {
+		go func(index int, item *joltcommon.OutBoundReq) {
 			defer tssWaitGroup.Done()
 			toAddr, fromAddr, tokenAddr, amount, nonce := item.GetOutBoundInfo()
 			tssRespChan, err := bc.Subscribe(int64(index))
@@ -743,7 +757,7 @@ func processEachOutBound(chainInfo *pubchain.ChainInfo, oppyGrpc string, oppyCha
 						if err != nil {
 							panic("blockheigh convert should never fail")
 						}
-						errInner := oppyChain.SubmitOutboundTx(grpcClient, nil, item.Hash().Hex(), poolCreateHeight, txHash, item.FeeToValidator, item.ChainType, item.TxID, item.OutReceiverAddress.Bytes())
+						errInner := oppyChain.SubmitOutboundTx(grpcClient, nil, item.Hash().Hex(), poolCreateHeight, txHash, item.FeeToValidator, item.ChainType, item.TxID, item.OutReceiverAddress.Bytes(), item.NeedMint)
 						return errInner
 					}
 					err := backoff.Retry(op, bf)
@@ -803,7 +817,7 @@ func processEachOutBound(chainInfo *pubchain.ChainInfo, oppyGrpc string, oppyCha
 	tssWaitGroup.Wait()
 }
 
-func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain *cosbridge.OppyChainInstance) {
+func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain *cosbridge.JoltChainInstance) {
 	grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")
@@ -816,7 +830,7 @@ func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain
 	wgDump := &sync.WaitGroup{}
 	wgDump.Add(len(itemInbound))
 	for _, el := range itemInbound {
-		go func(each *oppycommon.InBoundReq) {
+		go func(each *joltcommon.InBoundReq) {
 			defer wgDump.Done()
 			err := oppyChain.CheckTxStatus(grpcClient, each.Hash().Hex(), 2)
 			if err == nil {
@@ -830,7 +844,7 @@ func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain
 	wgDump.Wait()
 }
 
-func putOnHoldBlockOutBoundBack(oppyGrpc string, chainInfo *pubchain.ChainInfo, oppyChain *cosbridge.OppyChainInstance) {
+func putOnHoldBlockOutBoundBack(oppyGrpc string, chainInfo *pubchain.ChainInfo, joltChain *cosbridge.JoltChainInstance) {
 	grpcClient, err := grpc.Dial(oppyGrpc, grpc.WithInsecure())
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")
@@ -839,20 +853,20 @@ func putOnHoldBlockOutBoundBack(oppyGrpc string, chainInfo *pubchain.ChainInfo, 
 	defer grpcClient.Close()
 
 	zlog.Logger.Debug().Msgf("we reload all the failed tx")
-	itemsOutBound := oppyChain.DumpQueue()
+	itemsOutBound := joltChain.DumpQueue()
 	wgDump := &sync.WaitGroup{}
 	wgDump.Add(len(itemsOutBound))
 	for _, el := range itemsOutBound {
-		go func(each *oppycommon.OutBoundReq) {
+		go func(each *joltcommon.OutBoundReq) {
 			defer wgDump.Done()
 			empty := common.Hash{}.Hex()
 			if each.SubmittedTxHash == empty {
-				oppyChain.AddItem(each)
+				joltChain.AddItem(each)
 				return
 			}
 			err := chainInfo.CheckTxStatus(each.SubmittedTxHash)
 			if err != nil {
-				oppyChain.AddItem(each)
+				joltChain.AddItem(each)
 				return
 			}
 			tick := html.UnescapeString("&#" + "127866" + ";")

@@ -6,23 +6,27 @@ import (
 )
 
 type MockTokenList struct {
-	oppyTokenList *sync.Map
+	joltTokenList *sync.Map
 	pubTokenList  *sync.Map
 }
 
 func (mt *MockTokenList) GetTokenInfoByAddressAndChainType(tokenAddr, chainType string) (TokenItem, bool) {
+	mt.pubTokenList.Range(func(key, value any) bool {
+		return true
+	})
+
 	tokenDenom, exist := mt.pubTokenList.Load(strings.ToLower(tokenAddr + ":" + chainType))
 	tokenDenomStr, _ := tokenDenom.(string)
 	return TokenItem{
 		TokenAddr: strings.ToLower(tokenAddr),
 		Denom:     strings.ToLower(tokenDenomStr),
 		Decimals:  18,
-		ChainType: "BSS",
+		ChainType: chainType,
 	}, exist
 }
 
 func (mt *MockTokenList) GetTokenInfoByDenomAndChainType(tokenDenom, chainType string) (TokenItem, bool) {
-	tokenAddr, exist := mt.oppyTokenList.Load(strings.ToLower(tokenDenom + ":" + chainType))
+	tokenAddr, exist := mt.joltTokenList.Load(strings.ToLower(tokenDenom + ":" + chainType))
 	tokenAddrStr, _ := tokenAddr.(string)
 	return TokenItem{
 		TokenAddr: strings.ToLower(tokenAddrStr),
@@ -48,7 +52,7 @@ func (mt *MockTokenList) GetAllExistedTokenAddresses(chainType string) []string 
 func CreateMockTokenlist(tokenAddr []string, tokenDenom []string, chainType []string) (*MockTokenList, error) {
 	mTokenList := MockTokenList{&sync.Map{}, &sync.Map{}}
 	for i, el := range tokenAddr {
-		mTokenList.oppyTokenList.Store(strings.ToLower(tokenDenom[i]+":"+chainType[i]), strings.ToLower(el))
+		mTokenList.joltTokenList.Store(strings.ToLower(tokenDenom[i]+":"+chainType[i]), strings.ToLower(el))
 		mTokenList.pubTokenList.Store(strings.ToLower(el+":"+chainType[i]), strings.ToLower(tokenDenom[i]))
 	}
 	return &mTokenList, nil

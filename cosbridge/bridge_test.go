@@ -124,7 +124,8 @@ func (b BridgeTestSuite) TestBridgeTx() {
 	}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	b.Require().NoError(err)
-	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl, rp)
 	b.Require().NoError(err)
 	oc.Keyring = b.validatorKey
 
@@ -185,6 +186,57 @@ func (b BridgeTestSuite) TestBridgeTx() {
 	b.Require().NoError(err)
 }
 
+func (b BridgeTestSuite) TestBatchGenSendTx() {
+
+	accs, err := generateRandomPrivKey(3)
+	b.Require().NoError(err)
+	tss := TssMock{
+		accs[0].sk,
+		b.network.Validators[0].ClientCtx.Keyring,
+		true,
+		true,
+	}
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
+	b.Require().NoError(err)
+
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl, rp)
+	b.Require().NoError(err)
+	oc.GrpcClient = b.network.Validators[0].ClientCtx
+
+	info, _ := b.network.Validators[0].ClientCtx.Keyring.Key("node0")
+	pk := info.GetPubKey()
+	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
+	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
+	b.Require().NoError(err)
+
+	operatorInfo, err := b.validatorKey.Key("operator")
+	b.Require().NoError(err)
+
+	signMsg := tssclient.TssSignigMsg{
+		Pk:          pkstr,
+		Signers:     nil,
+		BlockHeight: 10,
+		Version:     tssclient.TssVersion,
+	}
+
+	acc, err := queryAccount(oc.GrpcClient, valAddr.String(), "")
+	b.Require().NoError(err)
+
+	send := banktypes.NewMsgSend(valAddr, operatorInfo.GetAddress(), sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100))})
+	_, err = oc.batchGenSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 100000, &signMsg)
+	b.Require().NoError(err)
+
+	// pubkey is invalid
+	signMsg.Pk = pk.String()
+	_, err = oc.batchGenSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 100000, &signMsg)
+	b.Require().Error(err)
+
+	nodeID := oc.GetTssNodeID()
+	b.Require().Equal(nodeID, "mock")
+
+}
+
 func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 	accs, err := generateRandomPrivKey(3)
 	b.Require().NoError(err)
@@ -200,7 +252,8 @@ func (b BridgeTestSuite) TestCheckAndUpdatePool() {
 	}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	b.Require().NoError(err)
-	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl, rp)
 	b.Require().NoError(err)
 	oc.Keyring = b.validatorKey
 
@@ -234,12 +287,14 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	b.Require().NoError(err)
-	oc, err := NewOppyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl)
+
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(b.network.Validators[0].APIAddress, b.network.Validators[0].RPCAddress, &tss, tl, rp)
 	b.Require().NoError(err)
 
 	pool := common.PoolInfo{
 		Pk:         accs[0].pk,
-		CosAddress: accs[0].oppyAddr,
+		CosAddress: accs[0].joltAddr,
 		EthAddress: accs[0].commAddr,
 	}
 
@@ -260,7 +315,7 @@ func (b BridgeTestSuite) TestCheckOutBoundTx() {
 	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
 	b.Require().NoError(err)
 
-	send := banktypes.NewMsgSend(valAddr, accs[0].oppyAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
+	send := banktypes.NewMsgSend(valAddr, accs[0].joltAddr, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(1))})
 
 	acc, err := queryAccount(b.grpc, valAddr.String(), "")
 	b.Require().NoError(err)

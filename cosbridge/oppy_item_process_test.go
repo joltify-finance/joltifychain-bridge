@@ -4,14 +4,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"math/rand"
-	"sort"
 	"sync"
 	"testing"
-	"time"
-
-	"github.com/cosmos/cosmos-sdk/types/simulation"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -29,7 +23,7 @@ func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewOutboundReq(hex.EncodeToString([]byte(txid)), addr, addr, testCoin, "testAddr", int64(i), nil, nil, "BSC")
+		item := common.NewOutboundReq(hex.EncodeToString([]byte(txid)), addr, addr, testCoin, "testAddr", int64(i), nil, "BSC", true)
 		retReq[i] = &item
 	}
 	return retReq
@@ -38,10 +32,9 @@ func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
 func TestConfig(t *testing.T) {
 	reqs := createdTestOutBoundReqs(100)
 
-	oc := OppyChainInstance{
+	oc := JoltChainInstance{
 		RetryOutboundReq: &sync.Map{},
 		OutboundReqChan:  make(chan []*common.OutBoundReq, 10),
-		pendingTx:        &sync.Map{},
 	}
 
 	for _, el := range reqs {
@@ -72,47 +65,14 @@ func TestConfig(t *testing.T) {
 	item := oc.ExportItems()
 	assert.Equal(t, len(item), 100)
 
-	// we test imported data
-	data := createdTestPendingTxs(100)
-	oc.Import(data)
-	saved := make([]*OutboundTx, len(data))
-
-	for i, el := range data {
-		dat, ok := oc.pendingTx.Load(el.TxID)
-		assert.Equal(t, ok, true)
-		saved[i] = dat.(*OutboundTx)
-	}
-
-	for i := 0; i < 100; i++ {
-		assert.Equal(t, saved[i].OutReceiverAddress.String(), data[i].OutReceiverAddress.String())
-		assert.True(t, saved[i].Fee.IsEqual(data[i].Fee))
-		assert.Equal(t, saved[i].BlockHeight, data[i].BlockHeight)
-	}
-
-	exportedData := oc.Export()
-
-	sort.Slice(exportedData, func(i, j int) bool {
-		return exportedData[i].TxID < exportedData[j].TxID
-	})
-
-	sort.Slice(data, func(i, j int) bool {
-		return data[i].TxID < data[j].TxID
-	})
-
-	for i := 0; i < 100; i++ {
-		assert.Equal(t, exportedData[i].OutReceiverAddress.String(), data[i].OutReceiverAddress.String())
-		assert.True(t, exportedData[i].Fee.IsEqual(data[i].Fee))
-		assert.Equal(t, exportedData[i].BlockHeight, data[i].BlockHeight)
-	}
 }
 
 func TestAddAndDumpQueue(t *testing.T) {
 	reqs := createdTestOutBoundReqs(100)
 
-	oc := OppyChainInstance{
+	oc := JoltChainInstance{
 		RetryOutboundReq:     &sync.Map{},
 		OutboundReqChan:      make(chan []*common.OutBoundReq, 10),
-		pendingTx:            &sync.Map{},
 		onHoldRetryQueue:     []*common.OutBoundReq{},
 		onHoldRetryQueueLock: &sync.Mutex{},
 	}
@@ -126,25 +86,4 @@ func TestAddAndDumpQueue(t *testing.T) {
 	assert.Equal(t, len(oc.onHoldRetryQueue), 0)
 	outputQueue = oc.DumpQueue()
 	assert.Equal(t, len(outputQueue), 0)
-}
-
-func createdTestPendingTxs(n int) []*OutboundTx {
-	r := rand.New(rand.NewSource(time.Now().Unix()))
-	accs := simulation.RandomAccounts(r, n)
-	pendingTxs := make([]*OutboundTx, n)
-	for i := 0; i < n; i++ {
-		txid := fmt.Sprintf("testTXID %v", i)
-		testToken := sdk.NewCoin("testToken", sdk.NewInt(32))
-		testFee := sdk.NewCoin("testFee", sdk.NewInt(32))
-		tx := OutboundTx{
-			TxID:               txid,
-			OutReceiverAddress: ethcommon.HexToAddress(accs[i].Address.String()),
-			BlockHeight:        uint64(i),
-			Token:              testToken,
-			Fee:                testFee,
-			TokenAddr:          "testAddress",
-		}
-		pendingTxs[i] = &tx
-	}
-	return pendingTxs
 }

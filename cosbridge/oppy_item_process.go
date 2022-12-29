@@ -7,54 +7,39 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/common"
 )
 
-func (oc *OppyChainInstance) AddOnHoldQueue(item *common.OutBoundReq) {
-	oc.onHoldRetryQueueLock.Lock()
-	defer oc.onHoldRetryQueueLock.Unlock()
-	oc.onHoldRetryQueue = append(oc.onHoldRetryQueue, item)
+func (jc *JoltChainInstance) AddOnHoldQueue(item *common.OutBoundReq) {
+	jc.onHoldRetryQueueLock.Lock()
+	defer jc.onHoldRetryQueueLock.Unlock()
+	jc.onHoldRetryQueue = append(jc.onHoldRetryQueue, item)
 }
 
-func (oc *OppyChainInstance) DumpQueue() []*common.OutBoundReq {
-	oc.onHoldRetryQueueLock.Lock()
-	defer oc.onHoldRetryQueueLock.Unlock()
-	if len(oc.onHoldRetryQueue) == 0 {
+func (jc *JoltChainInstance) DumpQueue() []*common.OutBoundReq {
+	jc.onHoldRetryQueueLock.Lock()
+	defer jc.onHoldRetryQueueLock.Unlock()
+	if len(jc.onHoldRetryQueue) == 0 {
 		return []*common.OutBoundReq{}
 	}
-	ret := oc.onHoldRetryQueue
-	oc.onHoldRetryQueue = []*common.OutBoundReq{}
+	ret := jc.onHoldRetryQueue
+	jc.onHoldRetryQueue = []*common.OutBoundReq{}
 	return ret
 }
 
-func (oc *OppyChainInstance) ExportItems() []*common.OutBoundReq {
+func (jc *JoltChainInstance) ExportItems() []*common.OutBoundReq {
 	var items []*common.OutBoundReq
-	oc.RetryOutboundReq.Range(func(_, value interface{}) bool {
+	jc.RetryOutboundReq.Range(func(_, value interface{}) bool {
 		items = append(items, value.(*common.OutBoundReq))
 		return true
 	})
 	return items
 }
 
-func (oc *OppyChainInstance) Import(items []*OutboundTx) {
-	for _, el := range items {
-		oc.pendingTx.Store(el.TxID, el)
-	}
+func (jc *JoltChainInstance) AddItem(req *common.OutBoundReq) {
+	jc.RetryOutboundReq.Store(req.Index(), req)
 }
 
-func (oc *OppyChainInstance) Export() []*OutboundTx {
-	var exported []*OutboundTx
-	oc.pendingTx.Range(func(key, value any) bool {
-		exported = append(exported, value.(*OutboundTx))
-		return true
-	})
-	return exported
-}
-
-func (oc *OppyChainInstance) AddItem(req *common.OutBoundReq) {
-	oc.RetryOutboundReq.Store(req.Index(), req)
-}
-
-func (oc *OppyChainInstance) PopItem(n int, chainType string) []*common.OutBoundReq {
+func (jc *JoltChainInstance) PopItem(n int, chainType string) []*common.OutBoundReq {
 	var allkeys []string
-	oc.RetryOutboundReq.Range(func(key, value interface{}) bool {
+	jc.RetryOutboundReq.Range(func(key, value interface{}) bool {
 		req := value.(*common.OutBoundReq)
 		if req.ChainType != chainType {
 			return true
@@ -81,7 +66,7 @@ func (oc *OppyChainInstance) PopItem(n int, chainType string) []*common.OutBound
 	inboundReqs := make([]*common.OutBoundReq, returnNum)
 
 	for i := 0; i < returnNum; i++ {
-		el, loaded := oc.RetryOutboundReq.LoadAndDelete(allkeys[i])
+		el, loaded := jc.RetryOutboundReq.LoadAndDelete(allkeys[i])
 		if !loaded {
 			panic("should never fail")
 		}
@@ -91,18 +76,18 @@ func (oc *OppyChainInstance) PopItem(n int, chainType string) []*common.OutBound
 	return inboundReqs
 }
 
-func (oc *OppyChainInstance) IsEmpty() bool {
+func (jc *JoltChainInstance) IsEmpty() bool {
 	empty := true
-	oc.RetryOutboundReq.Range(func(key, value interface{}) bool {
+	jc.RetryOutboundReq.Range(func(key, value interface{}) bool {
 		empty = false
 		return false
 	})
 	return empty
 }
 
-func (oc *OppyChainInstance) Size() int {
+func (jc *JoltChainInstance) Size() int {
 	i := 0
-	oc.RetryOutboundReq.Range(func(key, value interface{}) bool {
+	jc.RetryOutboundReq.Range(func(key, value interface{}) bool {
 		i++
 		return true
 	})

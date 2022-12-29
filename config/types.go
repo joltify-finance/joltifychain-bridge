@@ -3,19 +3,16 @@ package config
 import "time"
 
 const (
-	OutBoundDenomFeeBSC = "abnb"
-	OutBoundDenomFeeETH = "aeth"
-	NativeSign          = "native"
+	NativeSign = "native"
 
 	TxTimeout                   = 300
 	GASFEERATIO                 = "5"
 	PubChainGASFEERATIO         = 3
-	FeeToValidatorGAP           = "0.3666666"
 	MoveFundPubChainGASFEERATIO = 1.1
 	MINCHECKBLOCKGAP            = 30
 )
 
-var ChainID = "oppyChain-1"
+var ChainID = "joltifymock-1"
 
 const (
 	QueryTimeOut = time.Second * 6

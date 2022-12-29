@@ -11,17 +11,17 @@ import (
 )
 
 // AddSubscribe add the subscribe to the chain
-func (oc *OppyChainInstance) AddSubscribe(ctx context.Context) error {
+func (jc *JoltChainInstance) AddSubscribe(ctx context.Context) error {
 	var err error
 	query := "complete_churn.churn = 'oppy_churn'"
-	oc.CurrentNewValidator, err = oc.WsClient.Subscribe(ctx, "oppyBridgeChurn", query, capacity)
+	jc.CurrentNewValidator, err = jc.WsClient.Subscribe(ctx, "oppyBridgeChurn", query, capacity)
 	if err != nil {
-		oc.logger.Error().Err(err).Msgf("Failed to subscribe to query with error %v", err)
+		jc.logger.Error().Err(err).Msgf("Failed to subscribe to query with error %v", err)
 		return err
 	}
 
 	query = "tm.event = 'NewBlock'"
-	oc.CurrentNewBlockChan, err = oc.WsClient.Subscribe(ctx, "oppyBridgeNewBlock", query, capacity)
+	jc.CurrentNewBlockChan, err = jc.WsClient.Subscribe(ctx, "oppyBridgeNewBlock", query, capacity)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return err
@@ -29,13 +29,13 @@ func (oc *OppyChainInstance) AddSubscribe(ctx context.Context) error {
 	return nil
 }
 
-func (oc *OppyChainInstance) ProcessNewBlockChainMoreThanOne() {
-	if len(oc.CurrentNewValidator) > 0 {
+func (jc *JoltChainInstance) ProcessNewBlockChainMoreThanOne() {
+	if len(jc.CurrentNewValidator) > 0 {
 		for {
 			quite := false
 			select {
-			case b := <-oc.CurrentNewValidator:
-				oc.ChannelQueueValidator <- b
+			case b := <-jc.CurrentNewValidator:
+				jc.ChannelQueueValidator <- b
 			default:
 				quite = true
 			}
@@ -47,27 +47,27 @@ func (oc *OppyChainInstance) ProcessNewBlockChainMoreThanOne() {
 }
 
 // UpdateSubscribe add the subscribe to the chain
-func (oc *OppyChainInstance) UpdateSubscribe(ctx context.Context) error {
+func (jc *JoltChainInstance) UpdateSubscribe(ctx context.Context) error {
 	query := "complete_churn.churn = 'oppy_churn'"
-	validator, err := oc.WsClient.Subscribe(ctx, "oppyBridgeChurn", query, capacity)
+	validator, err := jc.WsClient.Subscribe(ctx, "oppyBridgeChurn", query, capacity)
 	if err != nil {
-		oc.logger.Error().Err(err).Msgf("Failed to subscribe to query with error %v", err)
+		jc.logger.Error().Err(err).Msgf("Failed to subscribe to query with error %v", err)
 		return err
 	}
 
 	query = "tm.event = 'NewBlock'"
-	newOppyBlock, err := oc.WsClient.Subscribe(ctx, "oppyBridgeNewBlock", query, capacity)
+	newOppyBlock, err := jc.WsClient.Subscribe(ctx, "oppyBridgeNewBlock", query, capacity)
 	if err != nil {
 		fmt.Printf("fail to start the subscription")
 		return err
 	}
 
-	if len(oc.CurrentNewBlockChan) > 0 {
+	if len(jc.CurrentNewBlockChan) > 0 {
 		quite := false
 		for {
 			select {
-			case b := <-oc.CurrentNewBlockChan:
-				oc.ChannelQueueNewBlock <- b
+			case b := <-jc.CurrentNewBlockChan:
+				jc.ChannelQueueNewBlock <- b
 			default:
 				quite = true
 			}
@@ -76,31 +76,31 @@ func (oc *OppyChainInstance) UpdateSubscribe(ctx context.Context) error {
 			}
 		}
 	}
-	oc.ProcessNewBlockChainMoreThanOne()
+	jc.ProcessNewBlockChainMoreThanOne()
 
-	oc.CurrentNewBlockChan = newOppyBlock
-	oc.CurrentNewValidator = validator
+	jc.CurrentNewBlockChan = newOppyBlock
+	jc.CurrentNewValidator = validator
 	return nil
 }
 
-func (oc *OppyChainInstance) RetryOppyChain() error {
-	_, err1 := GetLastBlockHeight(oc.GrpcClient)
+func (jc *JoltChainInstance) RetryOppyChain() error {
+	_, err1 := GetLastBlockHeight(jc.GrpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
-	_, err2 := oc.WsClient.Status(ctx)
+	_, err2 := jc.WsClient.Status(ctx)
 	if err1 == nil && err2 == nil {
-		oc.logger.Info().Msgf("all good,we do not need to reset")
+		jc.logger.Info().Msgf("all good,we do not need to reset")
 		return nil
 	}
 
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second*10), 3)
 	op := func() error {
-		grpcClient, err := grpc.Dial(oc.grpcAddr, grpc.WithInsecure())
+		grpcClient, err := grpc.Dial(jc.grpcAddr, grpc.WithInsecure())
 		if err != nil {
 			return err
 		}
-		client, err := tmclienthttp.New(oc.httpAddr, "/websocket")
+		client, err := tmclienthttp.New(jc.httpAddr, "/websocket")
 		if err != nil {
 			return err
 		}
@@ -110,31 +110,31 @@ func (oc *OppyChainInstance) RetryOppyChain() error {
 			return err
 		}
 
-		oc.retryLock.Lock()
-		defer oc.retryLock.Unlock()
-		oc.logger.Warn().Msgf("we renewed the joltify client")
+		jc.retryLock.Lock()
+		defer jc.retryLock.Unlock()
+		jc.logger.Warn().Msgf("we renewed the joltify client")
 
-		err = oc.WsClient.Stop()
+		err = jc.WsClient.Stop()
 		if err != nil {
-			oc.logger.Error().Err(err).Msgf("we fail to stop the previous WS client")
+			jc.logger.Error().Err(err).Msgf("we fail to stop the previous WS client")
 		}
 
-		conn := oc.GrpcClient.(*grpc.ClientConn)
+		conn := jc.GrpcClient.(*grpc.ClientConn)
 		err = conn.Close()
 		if err != nil {
-			oc.logger.Error().Err(err).Msgf("we fail to stop the grpc connection")
+			jc.logger.Error().Err(err).Msgf("we fail to stop the grpc connection")
 		}
 
-		oc.GrpcClient = grpcClient
-		oc.WsClient = client
+		jc.GrpcClient = grpcClient
+		jc.WsClient = client
 		ctx2, cancel2 := context.WithTimeout(context.Background(), time.Second*2)
 		defer cancel2()
-		err = oc.UpdateSubscribe(ctx2)
+		err = jc.UpdateSubscribe(ctx2)
 		return err
 	}
 	err := backoff.Retry(op, bf)
 	if err != nil {
-		oc.logger.Error().Err(err).Msgf("we fail to reconnect the pubchain interface with retries")
+		jc.logger.Error().Err(err).Msgf("we fail to reconnect the pubchain interface with retries")
 	}
 	return err
 }

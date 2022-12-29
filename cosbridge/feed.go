@@ -10,12 +10,12 @@ import (
 )
 
 // FeedTx feed the tx with the given
-func (oc *OppyChainInstance) FeedTx(conn grpc1.ClientConn, lastPoolInfo *vaulttypes.PoolInfo, pi *pubchain.Instance) error {
-	// we always increase the account seq regardless the tx successful or not
+func (jc *JoltChainInstance) FeedTx(conn grpc1.ClientConn, lastPoolInfo *vaulttypes.PoolInfo, pi *pubchain.Instance) error {
+	// we always increase the Account seq regardless the tx successful or not
 
-	found, err := oc.CheckWhetherSigner(lastPoolInfo)
+	found, err := jc.CheckWhetherSigner(lastPoolInfo)
 	if err != nil {
-		oc.logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
+		jc.logger.Error().Err(err).Msg("fail to check whether we are the node submit the mint request")
 		return err
 	}
 	if !found {
@@ -26,13 +26,13 @@ func (oc *OppyChainInstance) FeedTx(conn grpc1.ClientConn, lastPoolInfo *vaultty
 	currentPool := lastPoolInfo.CreatePool.PoolAddr
 	acc, err := queryAccount(conn, currentPool.String(), "")
 	if err != nil {
-		oc.logger.Error().Err(err).Msgf("fail to query the account")
-		return errors.New("invalid account query")
+		jc.logger.Error().Err(err).Msgf("fail to query the Account")
+		return errors.New("invalid Account query")
 	}
 
 	inboundItems := pi.PopItem(pubchain.GroupSign)
 	if inboundItems == nil {
-		oc.logger.Info().Msgf("empty queue")
+		jc.logger.Info().Msgf("empty queue")
 		return nil
 	}
 

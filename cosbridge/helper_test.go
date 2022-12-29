@@ -3,6 +3,7 @@ package cosbridge
 import (
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -12,18 +13,22 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/joltify-finance/joltify_lending/testutil/network"
+	pricefeedtypes "github.com/joltify-finance/joltify_lending/x/third_party/pricefeed/types"
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 )
 
 type helperTestSuite struct {
 	suite.Suite
-	cfg         network.Config
-	network     *network.Network
-	validatorky keyring.Keyring
-	queryClient tmservice.ServiceClient
+	cfg          network.Config
+	network      *network.Network
+	validatorkey keyring.Keyring
+	queryClient  tmservice.ServiceClient
 }
 
 func (h *helperTestSuite) SetupSuite() {
@@ -33,15 +38,39 @@ func (h *helperTestSuite) SetupSuite() {
 	cfg.BondedTokens = sdk.NewInt(10000000000000000)
 	cfg.StakingTokens = sdk.NewInt(100000000000000000)
 	h.cfg = cfg
-	h.validatorky = keyring.NewInMemory()
+	h.validatorkey = keyring.NewInMemory()
 	// now we put the mock pool list in the test
 	state := vaulttypes.GenesisState{}
 	stateStaking := stakingtypes.GenesisState{}
 
+	// we add the price for the tokens
+	priceFeed := pricefeedtypes.GenesisState{}
+
+	bnbPrice := pricefeedtypes.PostedPrice{
+		MarketID:      "bnb:usd",
+		OracleAddress: sdk.AccAddress("mock"),
+		Price:         sdk.NewDecWithPrec(2571, 1),
+		Expiry:        time.Now().Add(time.Hour),
+	}
+
+	joltPrice := pricefeedtypes.PostedPrice{
+		MarketID:      "jolt:usd",
+		OracleAddress: sdk.AccAddress("mock"),
+		Price:         sdk.NewDecWithPrec(12, 1),
+		Expiry:        time.Now().Add(time.Hour),
+	}
+
+	priceFeed.PostedPrices = pricefeedtypes.PostedPrices{bnbPrice, joltPrice}
+	priceFeed.Params = pricefeedtypes.Params{Markets: pricefeedtypes.GenDefaultMarket()}
+
+	bufPriceFeed, err := cfg.Codec.MarshalJSON(&priceFeed)
+	h.Require().NoError(err)
+	cfg.GenesisState[pricefeedtypes.ModuleName] = bufPriceFeed
+
 	h.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[vaulttypes.ModuleName], &state))
 	h.Require().NoError(cfg.Codec.UnmarshalJSON(cfg.GenesisState[stakingtypes.ModuleName], &stateStaking))
 
-	validators, err := genNValidator(3, h.validatorky)
+	validators, err := genNValidator(3, h.validatorkey)
 	h.Require().NoError(err)
 	for i := 1; i < 5; i++ {
 		randPoolSk := ed25519.GenPrivKey()
@@ -84,7 +113,7 @@ func (h *helperTestSuite) SetupSuite() {
 	stateBank := banktypes.GenesisState{}
 	require.NoError(h.T(), cfg.Codec.UnmarshalJSON(cfg.GenesisState[banktypes.ModuleName], &stateBank))
 
-	stateBank.Balances = []banktypes.Balance{{Address: "oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7", Coins: sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100000))}}}
+	stateBank.Balances = []banktypes.Balance{{Address: "jolt1txtsnx4gr4effr8542778fsxc20j5vzqxet7t0", Coins: sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100000))}}}
 	bankBuf, err := cfg.Codec.MarshalJSON(&stateBank)
 	require.NoError(h.T(), err)
 	cfg.GenesisState[banktypes.ModuleName] = bankBuf
@@ -98,14 +127,85 @@ func (h *helperTestSuite) SetupSuite() {
 	h.queryClient = tmservice.NewServiceClient(h.network.Validators[0].ClientCtx)
 }
 
-func (h *helperTestSuite) TestQueryAccountAndBalance() {
-	oc, err := NewOppyBridge(h.network.Validators[0].APIAddress, h.network.Validators[0].RPCAddress, nil, nil)
+func (h *helperTestSuite) TestWaitandSend() {
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(h.network.Validators[0].APIAddress, h.network.Validators[0].RPCAddress, nil, nil, rp)
+	h.Require().NoError(err)
+	oc.GrpcClient = h.network.Validators[0].ClientCtx
+	info, _ := h.network.Validators[0].ClientCtx.Keyring.Key("node0")
+	pk := info.GetPubKey()
+	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
+	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
+	h.Require().NoError(err)
+	acc, err := queryAccount(oc.GrpcClient, valAddr.String(), "")
+	h.Require().NoError(err)
+	acc.GetSequence()
+
+	err = oc.waitAndSend(oc.GrpcClient, valAddr, acc.GetSequence())
 	h.Require().NoError(err)
 
-	oc.GrpcClient = h.network.Validators[0].ClientCtx
-	balance, err := queryBalance("oppy1txtsnx4gr4effr8542778fsxc20j5vzq7wu7r7", oc.GrpcClient)
+	err = oc.waitAndSend(oc.GrpcClient, valAddr, acc.GetSequence()-1)
+	h.Require().Error(err, "already passed")
+
+	err = oc.waitAndSend(oc.GrpcClient, sdk.AccAddress("mock"), acc.GetSequence()-1)
+	h.Require().Error(err, "invalid Account query")
+
+}
+
+func (h *helperTestSuite) TestBatchComposeAndSend() {
+
+	accs, err := generateRandomPrivKey(3)
 	h.Require().NoError(err)
-	h.Require().Equal(balance, sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100000))})
+	tss := TssMock{
+		accs[0].sk,
+		h.network.Validators[0].ClientCtx.Keyring,
+		true,
+		true,
+	}
+	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
+	h.Require().NoError(err)
+
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(h.network.Validators[0].APIAddress, h.network.Validators[0].RPCAddress, &tss, tl, rp)
+	h.Require().NoError(err)
+	oc.GrpcClient = h.network.Validators[0].ClientCtx
+
+	info, _ := h.network.Validators[0].ClientCtx.Keyring.Key("node0")
+	pk := info.GetPubKey()
+	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
+	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
+	h.Require().NoError(err)
+
+	operatorInfo, err := h.validatorkey.Key("operator")
+	h.Require().NoError(err)
+
+	signMsg := tssclient.TssSignigMsg{
+		Pk:          pkstr,
+		Signers:     nil,
+		BlockHeight: 10,
+		Version:     tssclient.TssVersion,
+	}
+
+	acc, err := queryAccount(oc.GrpcClient, valAddr.String(), "")
+	h.Require().NoError(err)
+
+	send := banktypes.NewMsgSend(valAddr, operatorInfo.GetAddress(), sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100))})
+	_, err = oc.batchComposeAndSend(oc.GrpcClient, []sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, valAddr)
+	h.Require().Error(err, "operator.info: key not found")
+
+	oc.Keyring = h.validatorkey
+	_, err = oc.batchComposeAndSend(oc.GrpcClient, []sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, valAddr)
+	h.Require().NoError(err)
+}
+
+func (h *helperTestSuite) TestQueryPrice() {
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(h.network.Validators[0].APIAddress, h.network.Validators[0].RPCAddress, nil, nil, rp)
+	h.Require().NoError(err)
+	oc.GrpcClient = h.network.Validators[0].ClientCtx
+	price, err := QueryTokenPrice(oc.GrpcClient, "", "ujolt")
+	h.Require().NoError(err)
+	h.Require().True(price.Equal(sdk.NewDecWithPrec(12, 1)))
 }
 
 func TestHelper(t *testing.T) {

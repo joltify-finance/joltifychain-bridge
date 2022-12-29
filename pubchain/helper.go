@@ -3,15 +3,23 @@ package pubchain
 import (
 	"context"
 	"errors"
+	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"math/big"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
+	grpc1 "github.com/gogo/protobuf/grpc"
+	pricefeedtypes "github.com/joltify-finance/joltify_lending/x/third_party/pricefeed/types"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
+	"google.golang.org/grpc"
+
 	zlog "github.com/rs/zerolog/log"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/cenkalti/backoff"
 	types2 "github.com/cosmos/cosmos-sdk/types"
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -94,6 +102,7 @@ func (c *ChainInfo) getTransactionReceiptWithLock(ctx context.Context, txHash co
 	return receipt, err
 }
 
+// todo will delet it
 func (c *ChainInfo) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
@@ -274,7 +283,7 @@ func (c *ChainInfo) CheckTxStatus(hashStr string) error {
 		return err
 	}
 	if status != 1 {
-		c.logger.Warn().Msgf("the tx is failed, we need to redo the tx")
+		c.logger.Warn().Msgf("the tx is failed, we need to redo the tx with status %v", status)
 		return errors.New("tx failed")
 	}
 	c.logger.Info().Msgf("we have successfully check the tx.")
@@ -332,4 +341,77 @@ func (pi *Instance) GetChainClient(chainType string) *ChainInfo {
 		return nil
 	}
 	return chainInfo
+}
+
+func inboundAdjust(amount sdk.Int, decimals int, precision int) sdk.Int {
+	delta := precision - decimals
+	if delta != 0 {
+		adjustedTokenAmount := bcommon.AdjustInt(amount, int64(delta))
+		return adjustedTokenAmount
+	}
+	return amount
+}
+func outboundAdjust(amount sdk.Int, decimals int, precision int) sdk.Int {
+	delta := decimals - precision
+	if delta != 0 {
+		adjustedTokenAmount := bcommon.AdjustInt(amount, int64(delta))
+		return adjustedTokenAmount
+	}
+	return amount
+}
+
+type Handler struct{}
+
+func NewJoltHandler() Handler {
+	return Handler{}
+}
+
+func (Handler) queryTokenPrice(grpcClient grpc1.ClientConn, grpcAddr string, denom string) (sdk.Dec, error) {
+	if grpcClient == nil {
+		grpcClient2, err := grpc.Dial(grpcAddr, grpc.WithInsecure())
+		if err != nil {
+			zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")
+			return sdk.Dec{}, err
+		}
+		defer grpcClient2.Close()
+		grpcClient = grpcClient2
+	}
+
+	qs := pricefeedtypes.NewQueryClient(grpcClient)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	var marketID string
+	if denom == "ujolt" {
+		marketID = "jolt:usd"
+	} else {
+		marketID = denom[1:] + ":usd"
+	}
+	req := pricefeedtypes.QueryPriceRequest{MarketId: marketID}
+
+	result, err := qs.Price(ctx, &req)
+	if err != nil {
+		return sdk.Dec{}, err
+	}
+	return result.Price.Price, nil
+}
+
+func (Handler) QueryJoltBlockHeight(grpcAddr string) (int64, error) {
+	grpcClient, err := grpc.Dial(grpcAddr, grpc.WithInsecure())
+	if err != nil {
+		zlog.Logger.Error().Err(err).Msgf("fail to dial the grpc end-point")
+		return 0, err
+	}
+	defer grpcClient.Close()
+
+	ts := tmservice.NewServiceClient(grpcClient)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	resp, err := ts.GetLatestBlock(ctx, &tmservice.GetLatestBlockRequest{})
+	if err != nil {
+		return 0, err
+	}
+	return resp.Block.Header.Height, nil
+
 }

@@ -107,7 +107,7 @@ func (tn TestHelperSuite) TestRecoverKeyFromTx() {
 
 	addr, err := tn.pubChain.retrieveAddrfromRawTx(tx)
 	tn.Require().NoError(err)
-	tn.Require().Equal("oppy196vj6jyqaqydjfqm5n58zegtrx2x02gcrdn996", addr.String())
+	tn.Require().Equal("jolt196vj6jyqaqydjfqm5n58zegtrx2x02gcm6y9dt", addr.String())
 }
 
 func TestHelper(t *testing.T) {

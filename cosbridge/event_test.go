@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"gitlab.com/joltify/joltifychain-bridge/common"
 	"strconv"
 	"sync"
 	"testing"
@@ -124,7 +125,9 @@ func (e EventTestSuite) TestSubscribe() {
 	}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	e.Require().NoError(err)
-	oc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
+
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl, rp)
 	e.Require().NoError(err)
 	defer func() {
 		err := oc.TerminateBridge()
@@ -149,7 +152,9 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 	}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	e.Require().NoError(err)
-	oc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
+
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl, rp)
 	e.Require().NoError(err)
 	defer func() {
 		err := oc.TerminateBridge()
@@ -194,7 +199,9 @@ func (e EventTestSuite) TestHandleUpdateEventKeyGenFail() {
 	}
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	e.Require().NoError(err)
-	oc, err := NewOppyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl)
+
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl, rp)
 	e.Require().NoError(err)
 	defer func() {
 		err := oc.TerminateBridge()

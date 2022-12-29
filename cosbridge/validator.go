@@ -22,15 +22,15 @@ import (
 )
 
 // InitValidators initialize the validators
-func (oc *OppyChainInstance) InitValidators(addr string) error {
-	ts := tmservice.NewServiceClient(oc.GrpcClient)
+func (jc *JoltChainInstance) InitValidators(addr string) error {
+	ts := tmservice.NewServiceClient(jc.GrpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 
 	for {
 		result, err := ts.GetSyncing(ctx, &tmservice.GetSyncingRequest{})
 		if err != nil {
-			oc.logger.Error().Err(err).Msgf("fail to sync the blocks")
+			jc.logger.Error().Err(err).Msgf("fail to sync the blocks")
 			return err
 		}
 		if !result.GetSyncing() {
@@ -45,7 +45,7 @@ func (oc *OppyChainInstance) InitValidators(addr string) error {
 		return err
 	}
 	config.ChainID = nodeInfo.DefaultNodeInfo.Network
-	oc.logger.Info().Msgf(">>>>>>>>>>>>>>>>node %v attached>>>>>>>> network %v \n", nodeInfo.GetDefaultNodeInfo().Moniker, nodeInfo.DefaultNodeInfo.Network)
+	jc.logger.Info().Msgf(">>>>>>>>>>>>>>>>node %v attached>>>>>>>> network %v \n", nodeInfo.GetDefaultNodeInfo().Moniker, nodeInfo.DefaultNodeInfo.Network)
 
 	restRes, err := rest.GetRequest(fmt.Sprintf("%s/status", addr))
 	if err != nil {
@@ -57,41 +57,41 @@ func (oc *OppyChainInstance) InitValidators(addr string) error {
 		return err
 	}
 
-	blockHeight, values, err := QueryTipValidator(oc.GrpcClient)
+	blockHeight, values, err := QueryTipValidator(jc.GrpcClient)
 	if err != nil {
-		oc.logger.Error().Err(err).Msg("fail to initialize the validator pool")
+		jc.logger.Error().Err(err).Msg("fail to initialize the validator pool")
 		return err
 	}
-	return oc.doInitValidator(info, blockHeight, values)
+	return jc.doInitValidator(info, blockHeight, values)
 }
 
 // UpdateLatestValidator update the validator set
-func (oc *OppyChainInstance) UpdateLatestValidator(validators []*vaulttypes.Validator, blockHeight int64) error {
-	return oc.validatorSet.UpdateValidatorSet(validators, blockHeight)
+func (jc *JoltChainInstance) UpdateLatestValidator(validators []*vaulttypes.Validator, blockHeight int64) error {
+	return jc.validatorSet.UpdateValidatorSet(validators, blockHeight)
 }
 
 // GetLastValidator get the last validator set
-func (oc *OppyChainInstance) GetLastValidator() ([]*validators.Validator, int64) {
-	allValidators, blockHeight := oc.validatorSet.GetActiveValidators()
+func (jc *JoltChainInstance) GetLastValidator() ([]*validators.Validator, int64) {
+	allValidators, blockHeight := jc.validatorSet.GetActiveValidators()
 	return allValidators, blockHeight
 }
 
 // QueryLastPoolAddress returns the latest two pool outReceiverAddress
-func (oc *OppyChainInstance) QueryLastPoolAddress(conn grpc1.ClientConn) ([]*vaulttypes.PoolInfo, error) {
+func (jc *JoltChainInstance) QueryLastPoolAddress(conn grpc1.ClientConn) ([]*vaulttypes.PoolInfo, error) {
 	poolInfo, err := queryLastValidatorSet(conn)
 	if err != nil {
-		oc.logger.Error().Err(err).Msg("fail to get the pool info")
+		jc.logger.Error().Err(err).Msg("fail to get the pool info")
 		return nil, err
 	}
 	return poolInfo, nil
 }
 
 // CheckWhetherSigner check whether the current signer is the
-func (oc *OppyChainInstance) CheckWhetherSigner(lastPoolInfo *vaulttypes.PoolInfo) (bool, error) {
+func (jc *JoltChainInstance) CheckWhetherSigner(lastPoolInfo *vaulttypes.PoolInfo) (bool, error) {
 	found := false
-	creator, err := oc.Keyring.Key("operator")
+	creator, err := jc.Keyring.Key("operator")
 	if err != nil {
-		oc.logger.Error().Err(err).Msg("fail to get the validator outReceiverAddress")
+		jc.logger.Error().Err(err).Msg("fail to get the validator outReceiverAddress")
 		return false, err
 	}
 	for _, eachValidator := range lastPoolInfo.CreatePool.Nodes {
@@ -105,7 +105,7 @@ func (oc *OppyChainInstance) CheckWhetherSigner(lastPoolInfo *vaulttypes.PoolInf
 }
 
 // CheckWhetherAlreadyExist check whether it is already existed
-func (oc *OppyChainInstance) CheckWhetherAlreadyExist(conn grpc1.ClientConn, index string) bool {
+func (jc *JoltChainInstance) CheckWhetherAlreadyExist(conn grpc1.ClientConn, index string) bool {
 	ret, err := queryGivenToeknIssueTx(conn, index)
 	if err != nil {
 		return false
@@ -117,11 +117,11 @@ func (oc *OppyChainInstance) CheckWhetherAlreadyExist(conn grpc1.ClientConn, ind
 }
 
 // CheckTxStatus check whether the tx has been done successfully
-func (oc *OppyChainInstance) CheckTxStatus(conn grpc1.ClientConn, index string, retryNum uint64) error {
+func (jc *JoltChainInstance) CheckTxStatus(conn grpc1.ClientConn, index string, retryNum uint64) error {
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), retryNum)
 
 	op := func() error {
-		if oc.CheckWhetherAlreadyExist(conn, index) {
+		if jc.CheckWhetherAlreadyExist(conn, index) {
 			return nil
 		}
 		return errors.New("fail to find the tx")
@@ -131,23 +131,23 @@ func (oc *OppyChainInstance) CheckTxStatus(conn grpc1.ClientConn, index string, 
 	return err
 }
 
-func (oc *OppyChainInstance) getValidators(height string) ([]*vaulttypes.Validator, error) {
-	vaultQuery := vaulttypes.NewQueryClient(oc.GrpcClient)
+func (jc *JoltChainInstance) getValidators(height string) ([]*vaulttypes.Validator, error) {
+	vaultQuery := vaulttypes.NewQueryClient(jc.GrpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 
 	q := vaulttypes.QueryGetValidatorsRequest{Height: height}
 	vaultResp, err := vaultQuery.GetValidators(ctx, &q)
 	if err != nil {
-		oc.logger.Error().Err(err).Msg("fail to query the validators")
+		jc.logger.Error().Err(err).Msg("fail to query the validators")
 		return nil, err
 	}
 	return vaultResp.Validators.AllValidators, nil
 }
 
-func (oc *OppyChainInstance) doInitValidator(i info, blockHeight int64, values []*tmservice.Validator) error {
-	oc.myValidatorInfo = i
-	oc.validatorSet = validators.NewValidator()
+func (jc *JoltChainInstance) doInitValidator(i info, blockHeight int64, values []*tmservice.Validator) error {
+	jc.myValidatorInfo = i
+	jc.validatorSet = validators.NewValidator()
 
 	encCfg := MakeEncodingConfig()
 	localVals := make([]*validators.Validator, len(values))
@@ -158,7 +158,7 @@ func (oc *OppyChainInstance) doInitValidator(i info, blockHeight int64, values [
 		}
 		adr, err := types.ConsAddressFromBech32(el.Address)
 		if err != nil {
-			oc.logger.Error().Err(err).Msg("fail to decode the outReceiverAddress")
+			jc.logger.Error().Err(err).Msg("fail to decode the outReceiverAddress")
 			return err
 		}
 		e := validators.Validator{
@@ -169,6 +169,6 @@ func (oc *OppyChainInstance) doInitValidator(i info, blockHeight int64, values [
 		localVals[index] = &e
 	}
 
-	oc.validatorSet.SetupValidatorSet(localVals, blockHeight)
+	jc.validatorSet.SetupValidatorSet(localVals, blockHeight)
 	return nil
 }

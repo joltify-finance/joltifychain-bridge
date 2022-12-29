@@ -2,14 +2,12 @@ package bridge
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"sync"
 	"time"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"gitlab.com/joltify/joltifychain-bridge/cosbridge"
 
 	"github.com/gorilla/mux"
@@ -24,11 +22,11 @@ type CosHTTPServer struct {
 	s         *http.Server
 	peerID    string
 	ctx       context.Context
-	cosBridge *cosbridge.OppyChainInstance
+	cosBridge *cosbridge.JoltChainInstance
 }
 
 // NewCosHttpServer should only listen to the loopback
-func NewCosHttpServer(ctx context.Context, tssAddr string, peerID string, oppyBridge *cosbridge.OppyChainInstance) *CosHTTPServer {
+func NewCosHttpServer(ctx context.Context, tssAddr string, peerID string, oppyBridge *cosbridge.JoltChainInstance) *CosHTTPServer {
 	hs := &CosHTTPServer{
 		logger: log.With().Str("module", "http").Logger(),
 		peerID: peerID,
@@ -65,45 +63,11 @@ func (t *CosHTTPServer) getP2pIDHandler(w http.ResponseWriter, _ *http.Request) 
 	}
 }
 
-func (t *CosHTTPServer) queryPendingTxHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	address := r.URL.Query().Get("address")
-
-	defer func() {
-		if err := r.Body.Close(); nil != err {
-			t.logger.Error().Err(err).Msg("fail to close request body")
-		}
-	}()
-
-	_, err := sdk.AccAddressFromBech32(address)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	result := t.cosBridge.QueryPendingTx(address)
-
-	retData, err := json.Marshal(result)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Add("Access-Control-Allow-Origin", "*")
-	_, err = w.Write(retData)
-	if err != nil {
-		t.logger.Error().Err(err).Msg("fail to write to response")
-	}
-}
-
 // NewHandler registers the API routes and returns a new HTTP handler
 func (t *CosHTTPServer) bridgeNewHandler() http.Handler {
 	router := mux.NewRouter()
 	router.Handle("/p2pid", http.HandlerFunc(t.getP2pIDHandler)).Methods(http.MethodGet)
 	router.Handle("/metrics", promhttp.Handler())
-	router.Handle("/pending_tx", http.HandlerFunc(t.queryPendingTxHandler)).Methods(http.MethodGet)
 	router.Use(logMiddleware())
 	return router
 }

@@ -10,8 +10,6 @@ import (
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 
-	"go.uber.org/atomic"
-
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -43,8 +41,8 @@ type tssPoolMsg struct {
 	blockHeight int64
 }
 
-// OppyChainInstance defines the types for joltify pub_chain side
-type OppyChainInstance struct {
+// JoltChainInstance defines the types for joltify pub_chain side
+type JoltChainInstance struct {
 	grpcAddr              string
 	httpAddr              string
 	grpcLock              *sync.RWMutex
@@ -62,10 +60,7 @@ type OppyChainInstance struct {
 	OutboundReqChan       chan []*bcommon.OutBoundReq
 	RetryOutboundReq      *sync.Map // if a tx fail to process, we need to put in this channel and wait for retry
 	CurrentHeight         int64
-	inBoundGas            *atomic.Int64
-	outBoundFeeMap        map[string]*atomic.Int64
 	TokenList             tokenlist.BridgeTokenListI
-	pendingTx             *sync.Map
 	ChannelQueueNewBlock  chan ctypes.ResultEvent
 	ChannelQueueValidator chan ctypes.ResultEvent
 	CurrentNewBlockChan   <-chan ctypes.ResultEvent
@@ -73,6 +68,7 @@ type OppyChainInstance struct {
 	retryLock             *sync.Mutex
 	onHoldRetryQueueLock  *sync.Mutex
 	onHoldRetryQueue      []*bcommon.OutBoundReq
+	FeeModule             map[string]*bcommon.FeeModule
 }
 
 // info the import structure of the cosmos validator info
@@ -96,17 +92,16 @@ type OutboundTx struct {
 	Token              sdk.Coin       `json:"token"`
 	TokenAddr          string         `json:"token_addr"`
 	Fee                sdk.Coin       `json:"fee"`
-	FeeWanted          sdk.Coin       `json:"fee_wanted"`
 	TxID               string         `json:"txid"`
 	ChainType          string         `json:"chain_type"`
 }
 
-// NewOppyBridge new the instance for the joltify pub_chain
-func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, retryPools *bcommon.RetryPools) (*OppyChainInstance, error) {
-	var oppyBridge OppyChainInstance
+// NewJoltifyBridge new the instance for the joltify pub_chain
+func NewJoltifyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, retryPools *bcommon.RetryPools) (*JoltChainInstance, error) {
+	var joltBridge JoltChainInstance
 	var err error
-	oppyBridge.logger = log.With().Str("module", "oppyChain").Logger()
-	oppyBridge.GrpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
+	joltBridge.logger = log.With().Str("module", "JoltifyChain").Logger()
+	joltBridge.GrpcClient, err = grpc.Dial(grpcAddr, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
@@ -120,33 +115,31 @@ func NewOppyBridge(grpcAddr, httpAddr string, tssServer tssclient.TssInstance, t
 		return nil, err
 	}
 
-	oppyBridge.WsClient = client
+	joltBridge.WsClient = client
 
-	oppyBridge.Keyring = keyring.NewInMemory()
+	joltBridge.Keyring = keyring.NewInMemory()
 
-	oppyBridge.tssServer = tssServer
+	joltBridge.tssServer = tssServer
 
-	oppyBridge.keyGenCache = []tssPoolMsg{}
-	oppyBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
-	oppyBridge.poolUpdateLocker = &sync.RWMutex{}
-	oppyBridge.inBoundGas = atomic.NewInt64(250000)
-	oppyBridge.outBoundFeeMap = make(map[string]*atomic.Int64)
-	oppyBridge.outBoundFeeMap["BSC"] = atomic.NewInt64(5000000000)
-	oppyBridge.outBoundFeeMap["ETH"] = atomic.NewInt64(5000000000)
+	joltBridge.keyGenCache = []tssPoolMsg{}
+	joltBridge.lastTwoPools = make([]*bcommon.PoolInfo, 2)
+	joltBridge.poolUpdateLocker = &sync.RWMutex{}
 
 	encode := MakeEncodingConfig()
-	oppyBridge.encoding = &encode
-	oppyBridge.OutboundReqChan = make(chan []*bcommon.OutBoundReq, reqCacheSize)
-	oppyBridge.RetryOutboundReq = retryPools.RetryOutboundReq
-	oppyBridge.TokenList = tl
-	oppyBridge.pendingTx = &sync.Map{}
-	oppyBridge.ChannelQueueNewBlock = make(chan ctypes.ResultEvent, channelSize)
-	oppyBridge.ChannelQueueValidator = make(chan ctypes.ResultEvent, channelSize)
-	oppyBridge.grpcLock = &sync.RWMutex{}
-	oppyBridge.grpcAddr = grpcAddr
-	oppyBridge.httpAddr = httpAddr
-	oppyBridge.retryLock = &sync.Mutex{}
-	oppyBridge.onHoldRetryQueueLock = &sync.Mutex{}
-	oppyBridge.onHoldRetryQueue = []*bcommon.OutBoundReq{}
-	return &oppyBridge, nil
+	joltBridge.encoding = &encode
+	joltBridge.OutboundReqChan = make(chan []*bcommon.OutBoundReq, reqCacheSize)
+	joltBridge.RetryOutboundReq = retryPools.RetryOutboundReq
+	joltBridge.TokenList = tl
+	joltBridge.ChannelQueueNewBlock = make(chan ctypes.ResultEvent, channelSize)
+	joltBridge.ChannelQueueValidator = make(chan ctypes.ResultEvent, channelSize)
+	joltBridge.grpcLock = &sync.RWMutex{}
+	joltBridge.grpcAddr = grpcAddr
+	joltBridge.httpAddr = httpAddr
+	joltBridge.retryLock = &sync.Mutex{}
+	joltBridge.onHoldRetryQueueLock = &sync.Mutex{}
+	joltBridge.onHoldRetryQueue = []*bcommon.OutBoundReq{}
+	joltBridge.FeeModule = make(map[string]*bcommon.FeeModule)
+	// we set the bridge fee
+	joltBridge.FeeModule = bcommon.InitFeeModule()
+	return &joltBridge, nil
 }

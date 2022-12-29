@@ -38,7 +38,7 @@ func (pi *Instance) ExportItems() []*common.InBoundReq {
 }
 
 func (pi *Instance) AddOutBoundItem(req *common.OutBoundReq) {
-	pi.RetryOutboundReq.Store(req.Index(), req)
+	pi.joltRetryOutBoundReq.Store(req.Index(), req)
 }
 
 func (pi *Instance) IsEmpty() bool {

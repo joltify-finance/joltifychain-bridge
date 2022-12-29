@@ -88,21 +88,21 @@ func createNreq(n int) ([]*common2.InBoundReq, []*common2.InBoundReq, error) {
 	reqs := make([]*common2.InBoundReq, n)
 	reqsSorted := make(sortInboundReq, n)
 	for i := 0; i < n; i++ {
-		req := common2.NewAccountInboundReq(accs[i].oppyAddr, accs[n].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte(strconv.Itoa(i)), int64(i))
-		req2 := common2.NewAccountInboundReq(accs[i].oppyAddr, accs[n].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte(strconv.Itoa(i)), int64(i))
+		req := common2.NewAccountInboundReq(accs[i].joltAddr, accs[n].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte(strconv.Itoa(i)), int64(i))
+		req2 := common2.NewAccountInboundReq(accs[i].joltAddr, accs[n].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte(strconv.Itoa(i)), int64(i))
 		reqs[i] = &req
 		reqsSorted[i] = &req2
 	}
 	sort.Slice(reqsSorted, func(i, j int) bool {
 		a := reqsSorted[i]
 		b := reqsSorted[j]
-		hash := crypto.Keccak256Hash(a.Address.Bytes(), a.TxID)
+		hash := crypto.Keccak256Hash(a.PoolCosAddress.Bytes(), a.TxID)
 		lower := hash.Big().String()
 		higher := strconv.FormatInt(a.BlockHeight, 10)
 		indexStr := higher + lower
 		aret, _ := new(big.Int).SetString(indexStr, 10)
 
-		hash2 := crypto.Keccak256Hash(b.Address.Bytes(), b.TxID)
+		hash2 := crypto.Keccak256Hash(b.PoolCosAddress.Bytes(), b.TxID)
 		lower2 := hash2.Big().String()
 		higher2 := strconv.FormatInt(b.BlockHeight, 10)
 		indexStr2 := higher2 + lower2
@@ -128,6 +128,6 @@ func TestCreateInstance(t *testing.T) {
 	returnedReqs := pi.PopItem(len(sortedReqs))
 
 	for i := 0; i < len(sortedReqs); i++ {
-		assert.True(t, returnedReqs[i].Address.Equals(sortedReqs[i].Address))
+		assert.True(t, returnedReqs[i].PoolCosAddress.Equals(sortedReqs[i].PoolCosAddress))
 	}
 }
