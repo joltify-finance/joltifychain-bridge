@@ -11,7 +11,7 @@ import (
 	"go.uber.org/atomic"
 )
 
-func pubchainProcess(pi *pubchain.Instance, joltChain *cosbridge.JoltChainInstance, oppyGrpc string, metric *monitor.Metric, blockHead *pubchain.BlockHead, pubRollbackGap int64, failedOutbound *atomic.Int32, outboundPauseHeight *uint64, outBoundWait *atomic.Bool, outBoundProcessDone, inKeygenInProgress *atomic.Bool, firstTimeOutbound *bool, previousTssBlockOutBound *PreviousTssBlockOutBound) {
+func pubchainProcess(pi *pubchain.Instance, joltChain *cosbridge.JoltChainInstance, oppyGrpc string, metric *monitor.Metric, blockHead *pubchain.BlockHead, pubRollbackGap int64, failedOutbound *atomic.Int32, outboundPauseHeight *OutboundPauseHeight, outBoundWait *atomic.Bool, outBoundProcessDone, inKeygenInProgress *atomic.Bool, firstTimeOutbound *bool, previousTssBlockOutBound *PreviousTssBlockOutBound) {
 	head := blockHead.Head
 	chainInfo := pi.GetChainClient(blockHead.ChainType)
 	if chainInfo == nil {
@@ -78,14 +78,14 @@ func pubchainProcess(pi *pubchain.Instance, joltChain *cosbridge.JoltChainInstan
 
 	if failedOutbound.Load() > 5 {
 		mid := (latestHeight.NumberU64() / uint64(ROUNDBLOCK)) + 1
-		*outboundPauseHeight = mid * uint64(ROUNDBLOCK)
+		outboundPauseHeight.SetHeight(mid*uint64(ROUNDBLOCK), chainInfo.ChainType)
 		failedOutbound.Store(0)
 		outBoundWait.Store(true)
 	}
 
-	if latestHeight.NumberU64() < *outboundPauseHeight {
-		zlog.Logger.Warn().Msgf("to many errors for outbound we wait for %v blocks to continue", *outboundPauseHeight-latestHeight.NumberU64())
-		if latestHeight.NumberU64() == *outboundPauseHeight-1 {
+	if latestHeight.NumberU64() < outboundPauseHeight.GetHeight(chainInfo.ChainType) {
+		zlog.Logger.Warn().Msgf("to many errors for outbound we wait for %v blocks to continue", outboundPauseHeight.GetHeight(chainInfo.ChainType)-latestHeight.NumberU64())
+		if latestHeight.NumberU64() == outboundPauseHeight.GetHeight(chainInfo.ChainType)-1 {
 			zlog.Info().Msgf("we now load the onhold tx")
 			putOnHoldBlockOutBoundBack(oppyGrpc, chainInfo, joltChain)
 		}

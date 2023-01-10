@@ -495,7 +495,7 @@ func (jc *JoltChainInstance) CheckOutBoundTx(conn grpc1.ClientConn, txBlockHeigh
 
 	tx, err := encodingConfig.TxConfig.TxDecoder()(rawTx)
 	if err != nil {
-		jc.logger.Info().Msgf("fail to decode the data and skip this tx")
+		jc.logger.Debug().Msgf("fail to decode the data and skip this tx")
 		return
 	}
 

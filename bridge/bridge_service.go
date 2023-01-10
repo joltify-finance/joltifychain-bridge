@@ -48,6 +48,35 @@ type PreviousTssBlockOutBound struct {
 	EthBlockHeight int64
 }
 
+//todo need outboundPause height for ETH
+
+type OutboundPauseHeight struct {
+	pauseBSC,
+	pauseETH uint64
+}
+
+func (p *OutboundPauseHeight) SetHeight(h uint64, chainType string) {
+	switch chainType {
+	case "BSC":
+		p.pauseBSC = h
+	case "ETH":
+		p.pauseETH = h
+	default:
+		panic("unknown chain type")
+	}
+}
+
+func (p *OutboundPauseHeight) GetHeight(chainType string) uint64 {
+	switch chainType {
+	case "BSC":
+		return p.pauseBSC
+	case "ETH":
+		return p.pauseETH
+	default:
+		panic("unknown chain type")
+	}
+}
+
 func (p *PreviousTssBlockOutBound) SetHeight(h int64, chainType string) {
 	switch chainType {
 	case "BSC":
@@ -309,7 +338,8 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 
 	failedInbound := atomic.NewInt32(0)
 	inboundPauseHeight := int64(0)
-	outboundPauseHeight := uint64(0)
+	outboundPauseHeight := OutboundPauseHeight{uint64(0), uint64(0)}
+
 	failedOutbound := atomic.NewInt32(0)
 	inBoundWait := atomic.NewBool(false)
 	outBoundWait := atomic.NewBool(false)
