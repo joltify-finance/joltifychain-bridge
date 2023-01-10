@@ -22,7 +22,7 @@ testnet: go.sum
 
 install: go.sum
 	go install   -ldflags "-X gitlab.com/joltify/joltifychain-bridge/pubchain.OppyContractAddressBSC=0x66fff09f83bfce2ed9240fa6a1f7e96ba166ddf7 \
-      -X gitlab.com/joltify/joltifychain-bridge/pubchain.OppyContractAddressETH=0x77406A7678338abb5eA7a78b766F7F1125782C61 \
+      -X gitlab.com/joltify/joltifychain-bridge/pubchain.OppyContractAddressETH=0x7e3fF6835Be51e22994c22Ca4Cc5622A0923b113 \
 	-X  gitlab.com/joltify/joltifychain-bridge/version.VERSION=$(VERSION) \
     	-X gitlab.com/joltify/joltifychain-bridge/version.COMMIT=$(COMMIT)" ./cmd/bridge_service.go
 
