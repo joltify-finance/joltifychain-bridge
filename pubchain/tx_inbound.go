@@ -224,7 +224,7 @@ func (pi *Instance) processDstInbound(txInfo *Erc20TxInfo, txHash, chainType str
 		return errors.New("fail to get the token price")
 	}
 
-	thisFeeModule, ok := feeModule[chainType]
+	thisFeeModule, ok := feeModule[txInfo.dstChainType]
 	if !ok {
 		panic("the fee module does not exist!!")
 	}
