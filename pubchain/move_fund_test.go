@@ -66,7 +66,8 @@ func (tn *TestNetTestSuite) SetupSuite() {
 		panic(err)
 	}
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg)
+	mockRetry := sync.Map{}
+	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg, &mockRetry)
 	if err != nil {
 		panic(err)
 	}
@@ -135,12 +136,12 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 	ret := tn.pubChain.MoveFound(100, tn.pubChain.BSCChain, &previous, tn.pubChain.BSCChain.Client)
 
 	if !ret {
-		item, height := tn.pubChain.PopMoveFundItemAfterBlock(101)
+		item, height := tn.pubChain.PopMoveFundItemAfterBlock(101, "BSC")
 		tn.Require().Equal(int64(0), height)
 		tn.Require().Nil(item)
-		item, _ = tn.pubChain.PopMoveFundItemAfterBlock(100 + config.MINCHECKBLOCKGAP + 100)
+		item, _ = tn.pubChain.PopMoveFundItemAfterBlock(100+config.MINCHECKBLOCKGAP+100, "BSC")
 		tn.Require().NotNil(item)
-		ret2 := tn.pubChain.MoveFound(100, tn.pubChain.BSCChain, item, tn.pubChain.BSCChain.Client)
+		ret2 := tn.pubChain.MoveFound(100, tn.pubChain.BSCChain, item.PoolInfo, tn.pubChain.BSCChain.Client)
 		tn.Require().True(ret2)
 	}
 }

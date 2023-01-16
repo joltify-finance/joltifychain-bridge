@@ -269,7 +269,6 @@ func (pi *Instance) processDstInbound(txInfo *Erc20TxInfo, txHash, chainType str
 }
 
 func (pi *Instance) processJoltifyInbound(memoInfo bcommon.BridgeMemo, chainType string, tx ethTypes.Transaction, txBlockHeight int64) {
-
 	dstAddr, err := types.AccAddressFromBech32(memoInfo.Dest)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to the acc address")
@@ -290,7 +289,6 @@ func (pi *Instance) processJoltifyInbound(memoInfo bcommon.BridgeMemo, chainType
 	item := bcommon.NewAccountInboundReq(dstAddr, *tx.To(), balance, tx.Hash().Bytes(), txBlockHeight)
 	// we add to the retry pool to  sort the tx
 	pi.AddInBoundItem(&item)
-
 }
 
 // UpdatePool update the tss pool address

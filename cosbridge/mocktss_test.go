@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/base64"
 	"errors"
+
 	"github.com/ethereum/go-ethereum/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 

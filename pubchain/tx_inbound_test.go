@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	grpc1 "github.com/gogo/protobuf/grpc"
 	"hash"
 	"math/big"
 	"strings"
 	"sync"
 	"testing"
+
+	grpc1 "github.com/gogo/protobuf/grpc"
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
 
@@ -161,7 +162,8 @@ func TestProcessInBound(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testDenom"}, []string{"testAddr"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pi, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tssServer, tl, &wg)
+	mockRetry := sync.Map{}
+	pi, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tssServer, tl, &wg, &mockRetry)
 	assert.Nil(t, err)
 
 	toStr := "FFcf8FDEE72ac11b5c542428B35EEF5769C409f0"
@@ -474,13 +476,14 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	assert.Nil(t, err)
 	_ = tl3
 	pi := Instance{
-		lastTwoPools:     make([]*common2.PoolInfo, 2),
-		poolLocker:       &sync.RWMutex{},
-		tokenAbi:         &tAbi,
-		InboundReqChan:   make(chan []*common2.InBoundReq, 1),
-		TokenList:        tl,
-		RetryInboundReq:  &sync.Map{},
-		RetryOutboundReq: &sync.Map{},
+		lastTwoPools:         make([]*common2.PoolInfo, 2),
+		poolLocker:           &sync.RWMutex{},
+		tokenAbi:             &tAbi,
+		InboundReqChan:       make(chan []*common2.InBoundReq, 1),
+		TokenList:            tl,
+		RetryInboundReq:      &sync.Map{},
+		RetryOutboundReq:     &sync.Map{},
+		joltRetryOutBoundReq: &sync.Map{},
 	}
 
 	poolInfo := vaulttypes.PoolInfo{
@@ -674,7 +677,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	assert.Nil(t, err)
 
 	pi.processEachBlock("ETH", &chainInfo, tBlock, 10, pi.FeeModule, "")
-	pi.RetryOutboundReq.Range(func(key, value any) bool {
+	pi.joltRetryOutBoundReq.Range(func(key, value any) bool {
 		counter++
 		return true
 	})
@@ -733,7 +736,7 @@ func TestProcessNativeInBoundOnBSC(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"native"}, []string{"abnb"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pi, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tssServer, tl, &wg)
+	pi, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tssServer, tl, &wg, nil)
 
 	poolInfo := common2.PoolInfo{
 		EthAddress: common.HexToAddress("0x1f65cc33558b6825db119e9fe4c73b436211667e"),

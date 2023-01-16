@@ -183,7 +183,6 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 
 	err = oc.FeedTx(f.grpc, &poolInfo, &pi)
 	f.Require().NoError(err)
-
 }
 
 func TestFedTransaction(t *testing.T) {

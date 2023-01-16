@@ -19,7 +19,7 @@ func (tn *TestRetrySuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, nil, nil, &wg)
+	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, nil, nil, &wg, nil)
 	if err != nil {
 		panic(err)
 	}

@@ -3,10 +3,11 @@ package pubchain
 import (
 	"context"
 	"errors"
-	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"math/big"
 	"sync"
 	"time"
+
+	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 
 	"github.com/ethereum/go-ethereum"
 	grpc1 "github.com/gogo/protobuf/grpc"
@@ -19,7 +20,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/cenkalti/backoff"
-	types2 "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -300,16 +300,16 @@ func (c *ChainInfo) checkEachTx(h common.Hash) (uint64, error) {
 	return receipt.Status, nil
 }
 
-func (pi *Instance) getBalance(value *big.Int, denom string) (types2.Coin, error) {
-	total := types2.NewCoin(denom, types2.NewIntFromBigInt(value))
+func (pi *Instance) getBalance(value *big.Int, denom string) (sdk.Coin, error) {
+	total := sdk.NewCoin(denom, sdk.NewIntFromBigInt(value))
 	if total.IsNegative() {
 		pi.logger.Error().Msg("incorrect amount")
-		return types2.Coin{}, errors.New("insufficient fund")
+		return sdk.Coin{}, errors.New("insufficient fund")
 	}
 	return total, nil
 }
 
-func (pi *Instance) retrieveAddrfromRawTx(tx *types.Transaction) (types2.AccAddress, error) { //nolint
+func (pi *Instance) retrieveAddrfromRawTx(tx *types.Transaction) (sdk.AccAddress, error) { //nolint
 	v, r, s := tx.RawSignatureValues()
 	signer := types.LatestSignerForChainID(tx.ChainId())
 	plainV := misc.RecoverRecID(tx.ChainId().Uint64(), v)
@@ -318,13 +318,13 @@ func (pi *Instance) retrieveAddrfromRawTx(tx *types.Transaction) (types2.AccAddr
 	sigPublicKey, err := crypto.Ecrecover(signer.Hash(tx).Bytes(), sigBytes)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to recover the public key")
-		return types2.AccAddress{}, err
+		return sdk.AccAddress{}, err
 	}
 
 	transferFrom, err := misc.EthSignPubKeyToOppyAddr(sigPublicKey)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to recover the joltify ReceiverAddress")
-		return types2.AccAddress{}, err
+		return sdk.AccAddress{}, err
 	}
 	return transferFrom, nil
 }
@@ -351,6 +351,7 @@ func inboundAdjust(amount sdk.Int, decimals int, precision int) sdk.Int {
 	}
 	return amount
 }
+
 func outboundAdjust(amount sdk.Int, decimals int, precision int) sdk.Int {
 	delta := decimals - precision
 	if delta != 0 {
@@ -413,5 +414,4 @@ func (Handler) QueryJoltBlockHeight(grpcAddr string) (int64, error) {
 		return 0, err
 	}
 	return resp.Block.Header.Height, nil
-
 }

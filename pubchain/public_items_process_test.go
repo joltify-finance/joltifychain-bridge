@@ -90,12 +90,15 @@ func TestConfig(t *testing.T) {
 		EthAddress: accs[1].commAddr,
 	}
 
-	oc.AddMoveFundItem(&pool, 10)
-	oc.AddMoveFundItem(&pool1, 11)
-	popedItem, _ := oc.PopMoveFundItemAfterBlock(15)
+	oc.AddMoveFundItem(&pool, 10, "BSC")
+	oc.AddMoveFundItem(&pool1, 11, "BSC")
+	popedItem, _ := oc.PopMoveFundItemAfterBlock(15, "BSC")
 	assert.Nil(t, popedItem)
-	popedItem, _ = oc.PopMoveFundItemAfterBlock(2000)
-	assert.Equal(t, popedItem.Pk, accs[0].pk)
+	popedItem, _ = oc.PopMoveFundItemAfterBlock(2000, "BSC")
+	assert.Equal(t, popedItem.PoolInfo.Pk, accs[0].pk)
+
+	popedItem, _ = oc.PopMoveFundItemAfterBlock(2000, "ETH")
+	assert.Nil(t, popedItem)
 
 	for _, el := range reqs {
 		oc.AddOnHoldQueue(el)

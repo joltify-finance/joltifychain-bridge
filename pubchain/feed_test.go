@@ -41,7 +41,8 @@ func TestFeedTx(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	assert.NilError(t, err)
 	wg := sync.WaitGroup{}
-	pi, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tssServer, tl, &wg)
+	mockRetryMap := sync.Map{}
+	pi, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tssServer, tl, &wg, &mockRetryMap)
 	assert.NilError(t, err)
 
 	bscChainClient, err := NewChainInfo(misc.WebsocketTest, "BSC", &wg)

@@ -149,11 +149,9 @@ func (h *helperTestSuite) TestWaitandSend() {
 
 	err = oc.waitAndSend(oc.GrpcClient, sdk.AccAddress("mock"), acc.GetSequence()-1)
 	h.Require().Error(err, "invalid Account query")
-
 }
 
 func (h *helperTestSuite) TestBatchComposeAndSend() {
-
 	accs, err := generateRandomPrivKey(3)
 	h.Require().NoError(err)
 	tss := TssMock{

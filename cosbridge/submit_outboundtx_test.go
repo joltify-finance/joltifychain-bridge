@@ -161,7 +161,7 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 		NeedMint:           true,
 	}
 	err = oc.SubmitOutboundTx(s.grpc, info, "incorrect_request_ID", 10, hex.EncodeToString([]byte("testpubtx")), sdk.NewCoins(sdk.NewCoin("abc", sdk.NewInt(32))), req.ChainType, req.TxID, req.OutReceiverAddress.Bytes(), req.NeedMint)
-	//we submit the incorrect req ID
+	// we submit the incorrect req ID
 	s.Require().Error(err)
 
 	err = oc.SubmitOutboundTx(s.grpc, info, req.Hash().Hex(), 10, hex.EncodeToString([]byte("testpubtx")), sdk.NewCoins(sdk.NewCoin("abc", sdk.NewInt(32))), "BSC", req.TxID, req.OutReceiverAddress.Bytes(), req.NeedMint)

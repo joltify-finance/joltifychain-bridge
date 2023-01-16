@@ -2,10 +2,11 @@ package cosbridge
 
 import (
 	"context"
-	"gitlab.com/joltify/joltifychain-bridge/common"
 	"strconv"
 	"testing"
 	"time"
+
+	"gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"

@@ -24,7 +24,7 @@ func TestCalculateFee(t *testing.T) {
 
 	val := new(big.Int).Exp(big.NewInt(10), new(big.Int).Abs(big.NewInt(18)), nil)
 	feePaid := price.Mul(fee.Amount.ToDec()).Quo(sdk.NewDecFromBigInt(val))
-	//expected := testToken.Amount.ToDec().Mul(bscFeeModule.FeeRatio).RoundInt()
+	// expected := testToken.Amount.ToDec().Mul(bscFeeModule.FeeRatio).RoundInt()
 	gap := feePaid.Sub(bscFeeModule.Floor).Abs()
 	assert.True(t, gap.LT(sdk.MustNewDecFromStr("0.000001")))
 }
@@ -47,7 +47,7 @@ func TestCalculateFeeCeil(t *testing.T) {
 
 	val := new(big.Int).Exp(big.NewInt(10), new(big.Int).Abs(big.NewInt(18)), nil)
 	feePaid := price.Mul(fee.Amount.ToDec()).Quo(sdk.NewDecFromBigInt(val))
-	//expected := testToken.Amount.ToDec().Mul(bscFeeModule.FeeRatio).RoundInt()
+	// expected := testToken.Amount.ToDec().Mul(bscFeeModule.FeeRatio).RoundInt()
 	gap := feePaid.Sub(bscFeeModule.Ceil).Abs()
 	assert.True(t, gap.LT(sdk.MustNewDecFromStr("0.000001")))
 
@@ -83,7 +83,7 @@ func TestCalculateFeeFloor(t *testing.T) {
 
 	val := new(big.Int).Exp(big.NewInt(10), new(big.Int).Abs(big.NewInt(18)), nil)
 	feePaid := price.Mul(fee.Amount.ToDec()).Quo(sdk.NewDecFromBigInt(val))
-	//expected := testToken.Amount.ToDec().Mul(bscFeeModule.FeeRatio).RoundInt()
+	// expected := testToken.Amount.ToDec().Mul(bscFeeModule.FeeRatio).RoundInt()
 	gap := feePaid.Sub(bscFeeModule.Floor).Abs()
 	assert.True(t, gap.LT(sdk.MustNewDecFromStr("0.000001")))
 

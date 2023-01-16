@@ -131,7 +131,7 @@ func (pi *Instance) SendNativeTokenForMoveFund(chainInfo *ChainInfo, signerPk st
 	}
 	blockHeight := int64(latest.NumberU64()) / ROUNDBLOCK
 	tick := html.UnescapeString("&#" + "128296" + ";")
-	pi.logger.Info().Msgf(">>>>>>%v we build tss at height %v>>>>>>>\n", tick, blockHeight)
+	pi.logger.Info().Msgf(">>>>>>%v we build tss at height %v for %v>>>>>>>\n", tick, blockHeight, chainInfo.ChainType)
 	txo, err := pi.composeTx(signerPk, sender, chainInfo.ChainID, blockHeight)
 	if err != nil {
 		return common.Hash{}, false, err

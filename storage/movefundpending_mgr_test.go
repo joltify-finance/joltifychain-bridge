@@ -17,8 +17,8 @@ func (s *PendingMoveFundMgrTestSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 }
 
-func createdTestMoveFundItems(n int) []*common.PoolInfo {
-	retReq := make([]*common.PoolInfo, n)
+func createdTestMoveFundItems(n int) []*common.MoveFundItem {
+	retReq := make([]*common.MoveFundItem, n)
 	for i := 0; i < n; i++ {
 		sk, err := crypto.GenerateKey()
 		if err != nil {
@@ -26,10 +26,13 @@ func createdTestMoveFundItems(n int) []*common.PoolInfo {
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
 		item := common.PoolInfo{
-			Height:     int64(i),
 			EthAddress: addr,
 		}
-		retReq[i] = &item
+		retReq[i] = &common.MoveFundItem{
+			PoolInfo:  &item,
+			ChainType: "BSC",
+			Height:    int64(i),
+		}
 	}
 	return retReq
 }

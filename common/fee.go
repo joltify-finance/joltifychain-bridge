@@ -7,7 +7,6 @@ import (
 )
 
 func doGetFee(price, ceil, floor, feeRatio types.Dec, transferAmount types.Int, decimal int64) types.Int {
-
 	feeAmount := transferAmount.ToDec().Mul(feeRatio).RoundInt()
 
 	val := new(big.Int).Exp(big.NewInt(10), new(big.Int).Abs(big.NewInt(decimal)), nil)
@@ -22,7 +21,6 @@ func doGetFee(price, ceil, floor, feeRatio types.Dec, transferAmount types.Int, 
 		return ceilAmount
 	}
 	return feeAmount
-
 }
 
 func CalculateFee(feeModule *FeeModule, price types.Dec, token types.Coin) (types.Coin, error) {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"html"
 	"math"
 	"math/big"
@@ -311,14 +312,14 @@ func (pi *Instance) doMoveBNBFunds(chainInfo *ChainInfo, previousPool *bcommon.P
 
 func (pi *Instance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64, chainType string) {
 	item := bcommon.MoveFundItem{PoolInfo: pool, ChainType: chainType, Height: height}
-	pi.moveFundReq.Store(height, &item)
+	index := fmt.Sprintf("%v:%v", height, chainType)
+	pi.moveFundReq.Store(index, &item)
 }
 
 func (pi *Instance) ExportMoveFundItems() []*bcommon.MoveFundItem {
 	var data []*bcommon.MoveFundItem
 	pi.moveFundReq.Range(func(key, value any) bool {
 		exported := value.(*bcommon.MoveFundItem)
-		exported.Height = key.(int64)
 		data = append(data, exported)
 		return true
 	})
@@ -329,15 +330,17 @@ func (pi *Instance) ExportMoveFundItems() []*bcommon.MoveFundItem {
 func (pi *Instance) PopMoveFundItemAfterBlock(currentBlockHeight int64, chainType string) (*bcommon.MoveFundItem, int64) {
 	min := int64(math.MaxInt64)
 	pi.moveFundReq.Range(func(key, value interface{}) bool {
-		h := key.(int64)
 		val := value.(*bcommon.MoveFundItem)
+		h := val.Height
 		if h <= min && val.ChainType == chainType {
 			min = h
 		}
 		return true
 	})
+
 	if min < math.MaxInt64 && (currentBlockHeight-min > config.MINCHECKBLOCKGAP) {
-		item, _ := pi.moveFundReq.LoadAndDelete(min)
+		index := fmt.Sprintf("%v:%v", min, chainType)
+		item, _ := pi.moveFundReq.LoadAndDelete(index)
 		return item.(*bcommon.MoveFundItem), min
 	}
 	return nil, 0

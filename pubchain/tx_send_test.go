@@ -128,7 +128,7 @@ func TestProcessOutBound(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg)
+	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg, nil)
 	assert.Nil(t, err)
 
 	poolInfo := vaulttypes.PoolInfo{
@@ -235,7 +235,8 @@ func TestSendToken(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg)
+	mockqueue := sync.Map{}
+	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg, &mockqueue)
 	assert.Nil(t, err)
 
 	// incorrect address
@@ -269,7 +270,7 @@ func TestSendNativeToken(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg)
+	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg, nil)
 	assert.Nil(t, err)
 
 	// incorrect address,thus it is clear to move fund
@@ -319,7 +320,7 @@ func TestSendNativeTokenBatch(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg)
+	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg, nil)
 	assert.Nil(t, err)
 
 	// now we test send the token with wrong nonce

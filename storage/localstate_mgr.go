@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -51,7 +50,7 @@ func (fsm *TxStateMgr) SaveOutBoundState(reqs []*common.OutBoundReq) error {
 		fsm.logger.Error().Err(err).Msgf("fail to marshal the outbound tx")
 		return err
 	}
-	return ioutil.WriteFile(filePathName, buf, 0o600)
+	return os.WriteFile(filePathName, buf, 0o600)
 }
 
 func (fsm *TxStateMgr) LoadOutBoundState() ([]*common.OutBoundReq, error) {
@@ -64,7 +63,7 @@ func (fsm *TxStateMgr) LoadOutBoundState() ([]*common.OutBoundReq, error) {
 		return nil, err
 	}
 	fsm.writeOutBoundLock.RLock()
-	input, err := ioutil.ReadFile(filePathName)
+	input, err := os.ReadFile(filePathName)
 	if err != nil {
 		fsm.writeOutBoundLock.RUnlock()
 		return nil, err
@@ -88,7 +87,7 @@ func (fsm *TxStateMgr) SaveInBoundState(reqs []*common.InBoundReq) error {
 		fsm.logger.Error().Err(err).Msgf("fail to marshal the outbound tx")
 		return err
 	}
-	return ioutil.WriteFile(filePathName, buf, 0o600)
+	return os.WriteFile(filePathName, buf, 0o600)
 }
 
 func (fsm *TxStateMgr) LoadInBoundState() ([]*common.InBoundReq, error) {
@@ -101,7 +100,7 @@ func (fsm *TxStateMgr) LoadInBoundState() ([]*common.InBoundReq, error) {
 		return nil, err
 	}
 	fsm.writeOutBoundLock.RLock()
-	input, err := ioutil.ReadFile(filePathName)
+	input, err := os.ReadFile(filePathName)
 	if err != nil {
 		fsm.writeOutBoundLock.RUnlock()
 		return nil, err

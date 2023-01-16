@@ -64,7 +64,6 @@ func TestConfig(t *testing.T) {
 	}
 	item := oc.ExportItems()
 	assert.Equal(t, len(item), 100)
-
 }
 
 func TestAddAndDumpQueue(t *testing.T) {

@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	grpc1 "github.com/gogo/protobuf/grpc"
 	"math/big"
 	"strings"
 	"sync"
 	"time"
+
+	grpc1 "github.com/gogo/protobuf/grpc"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"

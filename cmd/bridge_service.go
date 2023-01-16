@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"gitlab.com/joltify/joltifychain-bridge/bridge"
 	"gitlab.com/joltify/joltifychain-bridge/version"
 

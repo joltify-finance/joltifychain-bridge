@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -41,7 +40,7 @@ func (fsm *PendingMoveFundMgr) SavePendingItems(pendingTxsPub []*bcommon.MoveFun
 		return err
 	}
 
-	err = ioutil.WriteFile(pubfile, bufPub, 0o600)
+	err = os.WriteFile(pubfile, bufPub, 0o600)
 	if err != nil {
 		fsm.logger.Error().Err(err).Msgf("fail to load the pub move fund")
 		return err
@@ -65,7 +64,7 @@ func (fsm *PendingMoveFundMgr) LoadPendingItems() ([]*bcommon.MoveFundItem, erro
 	fsm.writePendingLock.RLock()
 	defer fsm.writePendingLock.RUnlock()
 	if len(pubFilePathName) != 0 {
-		inputPub, err := ioutil.ReadFile(pubFilePathName)
+		inputPub, err := os.ReadFile(pubFilePathName)
 		if err != nil {
 			fsm.logger.Error().Err(err).Msgf("fail to read the move fund on pub chain")
 		}

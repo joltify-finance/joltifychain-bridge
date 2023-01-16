@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"html"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -15,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	testypes "github.com/tendermint/tendermint/types" //nolint:gofumpt,golint,typecheck
+	tendertypes "github.com/tendermint/tendermint/types"
 
 	"github.com/cenkalti/backoff"
 	"github.com/pkg/errors"
@@ -38,6 +37,11 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/pubchain"
 )
 
+const (
+	BSC = "BSC"
+	ETH = "ETH"
+)
+
 // ROUNDBLOCK we may need to increase it as we increase the time for keygen/keysign and join party
 var (
 	ROUNDBLOCK = 100
@@ -48,7 +52,7 @@ type PreviousTssBlockOutBound struct {
 	EthBlockHeight int64
 }
 
-//todo need outboundPause height for ETH
+// todo need outboundPause height for ETH
 
 type OutboundPauseHeight struct {
 	pauseBSC,
@@ -57,9 +61,9 @@ type OutboundPauseHeight struct {
 
 func (p *OutboundPauseHeight) SetHeight(h uint64, chainType string) {
 	switch chainType {
-	case "BSC":
+	case BSC:
 		p.pauseBSC = h
-	case "ETH":
+	case ETH:
 		p.pauseETH = h
 	default:
 		panic("unknown chain type")
@@ -68,9 +72,9 @@ func (p *OutboundPauseHeight) SetHeight(h uint64, chainType string) {
 
 func (p *OutboundPauseHeight) GetHeight(chainType string) uint64 {
 	switch chainType {
-	case "BSC":
+	case BSC:
 		return p.pauseBSC
-	case "ETH":
+	case ETH:
 		return p.pauseETH
 	default:
 		panic("unknown chain type")
@@ -79,9 +83,9 @@ func (p *OutboundPauseHeight) GetHeight(chainType string) uint64 {
 
 func (p *PreviousTssBlockOutBound) SetHeight(h int64, chainType string) {
 	switch chainType {
-	case "BSC":
+	case BSC:
 		p.BscBlockHeight = h
-	case "ETH":
+	case ETH:
 		p.EthBlockHeight = h
 	default:
 		panic("unknown chain type")
@@ -90,9 +94,9 @@ func (p *PreviousTssBlockOutBound) SetHeight(h int64, chainType string) {
 
 func (p *PreviousTssBlockOutBound) GetHeight(chainType string) int64 {
 	switch chainType {
-	case "BSC":
+	case BSC:
 		return p.BscBlockHeight
-	case "ETH":
+	case ETH:
 		return p.EthBlockHeight
 	default:
 		panic("unknown chain type")
@@ -172,7 +176,7 @@ func NewBridgeService(config config.Config) {
 
 	keyringPath := path.Join(config.HomeDir, config.KeyringAddress)
 
-	dat, err := ioutil.ReadFile(keyringPath)
+	dat, err := os.ReadFile(keyringPath)
 	if err != nil {
 		log.Fatalln("error in read keyring file")
 		return
@@ -369,7 +373,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 					continue
 				}
 
-				_, ok := vals.Data.(testypes.EventDataNewBlock)
+				_, ok := vals.Data.(tendertypes.EventDataNewBlock)
 				if !ok {
 					continue
 				}
@@ -405,7 +409,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 					continue
 				}
 
-				currentProcessBlockHeight := block.Data.(testypes.EventDataNewBlock).Block.Height
+				currentProcessBlockHeight := block.Data.(tendertypes.EventDataNewBlock).Block.Height
 
 				ok, _ := joltifyChain.CheckAndUpdatePool(grpcClient, latestHeight)
 				if !ok {
@@ -452,11 +456,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 					previousPool := joltifyChain.UpdatePool(poolInfo[0])
 					if previousPool.Pk != poolInfo[0].CreatePool.PoolPubKey {
 						// we force the first try of the tx to be run without blocking by the block wait
-						pi.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5, "BSC")
-						pi.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5, "ETH")
+						pi.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5, BSC)
+						pi.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5, ETH)
 						theSecondPool := currentPool[1]
-						pi.AddMoveFundItem(theSecondPool, latestHeight-config.MINCHECKBLOCKGAP+10, "BSC")
-						pi.AddMoveFundItem(theSecondPool, latestHeight-config.MINCHECKBLOCKGAP+10, "ETH")
+						pi.AddMoveFundItem(theSecondPool, latestHeight-config.MINCHECKBLOCKGAP+10, BSC)
+						pi.AddMoveFundItem(theSecondPool, latestHeight-config.MINCHECKBLOCKGAP+10, ETH)
 					}
 				}
 
@@ -498,22 +502,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 				if err != nil {
 					zlog.Logger.Warn().Msgf("error in updating token list %v", err)
 				}
-
-				// todo we will remove it later
-				//if currentProcessBlockHeight%pubchain.PRICEUPDATEGAP == 0 {
-				//	fee, _, _, _, err := pi.EthChain.GetFeeLimitWithLock()
-				//	if err == nil {
-				//		joltifyChain.UpdatePubChainFee(fee.Int64(), "ETH")
-				//	} else {
-				//		zlog.Logger.Error().Err(err).Msg("fail to get the suggest gas price")
-				//	}
-				//	fee, _, _, _, err = pi.BSCChain.GetFeeLimitWithLock()
-				//	if err == nil {
-				//		joltifyChain.UpdatePubChainFee(fee.Int64(), "BSC")
-				//	} else {
-				//		zlog.Logger.Error().Err(err).Msg("fail to get the suggest gas price")
-				//	}
-				//}
 
 				if failedInbound.Load() > 5 {
 					failedInbound.Store(0)
@@ -578,14 +566,14 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 			case head := <-pi.EthChain.SubChannelNow:
 				block := pubchain.BlockHead{
 					Head:      head,
-					ChainType: "ETH",
+					ChainType: ETH,
 				}
 				pi.ChannelQueue <- &block
 
 			case head := <-pi.BSCChain.SubChannelNow:
 				block := pubchain.BlockHead{
 					Head:      head,
-					ChainType: "BSC",
+					ChainType: BSC,
 				}
 				pi.ChannelQueue <- &block
 

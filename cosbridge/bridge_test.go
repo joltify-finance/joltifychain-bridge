@@ -187,7 +187,6 @@ func (b BridgeTestSuite) TestBridgeTx() {
 }
 
 func (b BridgeTestSuite) TestBatchGenSendTx() {
-
 	accs, err := generateRandomPrivKey(3)
 	b.Require().NoError(err)
 	tss := TssMock{
@@ -234,7 +233,6 @@ func (b BridgeTestSuite) TestBatchGenSendTx() {
 
 	nodeID := oc.GetTssNodeID()
 	b.Require().Equal(nodeID, "mock")
-
 }
 
 func (b BridgeTestSuite) TestCheckAndUpdatePool() {

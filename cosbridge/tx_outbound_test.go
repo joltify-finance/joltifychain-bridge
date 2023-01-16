@@ -376,7 +376,7 @@ func (o OutBoundTestSuite) TestProcessToken() {
 	delta := sdk.NewInt(2)
 	o.Require().True(expected.Sub(tokens.Amount).Abs().LT(delta))
 
-	//we test the native token and too small amount
+	// we test the native token and too small amount
 
 	amount, ok = sdk.NewIntFromString("1200000")
 	o.Require().True(ok)

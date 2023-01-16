@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"gitlab.com/joltify/joltifychain-bridge/common"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
+
+	"gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"

@@ -2,6 +2,8 @@ package pubchain
 
 import (
 	"context"
+	"fmt"
+	"math/big"
 	"sync"
 	"testing"
 	"time"
@@ -21,7 +23,7 @@ func (tn *TestHelperSuite) SetupSuite() {
 	misc.SetupBech32Prefix()
 
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, nil, nil, &wg)
+	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, nil, nil, &wg, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -38,7 +40,8 @@ func (tn TestHelperSuite) TestAllWithLockOperations() {
 	ethAddr := common.HexToAddress("0xbDf7Fb0Ad9b0D722ea54D808b79751608E7AE991")
 	balance, err := tn.pubChain.BSCChain.getBalanceWithLock(ctx, ethAddr)
 	tn.Require().NoError(err)
-	tn.Require().True(balance.Int64() > 0)
+	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>%v\n", balance.String())
+	tn.Require().True(balance.Cmp(big.NewInt(0)) == 1)
 
 	nonce, err := tn.pubChain.BSCChain.getPendingNonceWithLock(ctx, ethAddr)
 	tn.Require().NoError(err)

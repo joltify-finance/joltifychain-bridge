@@ -23,7 +23,7 @@ func pubchainProcess(pi *pubchain.Instance, joltChain *cosbridge.JoltChainInstan
 		return
 	}
 
-	_, err = joltChain.GetLastBlockHeightWithLock()
+	joltBlockHeight, err := joltChain.GetLastBlockHeightWithLock()
 	if err != nil {
 		zlog.Error().Err(err).Msgf("we have reset the oppychain grpc as it is faild to be connected")
 		return
@@ -57,7 +57,7 @@ func pubchainProcess(pi *pubchain.Instance, joltChain *cosbridge.JoltChainInstan
 		zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
 	}
 	isMoveFund := false
-	previousMoveFundItem, height := pi.PopMoveFundItemAfterBlock(head.Number.Int64(), chainInfo.ChainType)
+	previousMoveFundItem, height := pi.PopMoveFundItemAfterBlock(joltBlockHeight, chainInfo.ChainType)
 
 	if previousMoveFundItem != nil {
 		// we move fund in the public chain
