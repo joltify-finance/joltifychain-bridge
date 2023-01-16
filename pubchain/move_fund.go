@@ -48,7 +48,7 @@ func (pi *Instance) MoveFound(height int64, chainInfo *ChainInfo, previousPool *
 		}
 		needMove, err := pi.needToMoveFund(tokenAddr, previousPool.EthAddress, ethClient)
 		if err != nil {
-			pi.AddMoveFundItem(previousPool, height+movefundretrygap)
+			pi.AddMoveFundItem(previousPool, height+movefundretrygap, chainInfo.ChainType)
 			return false
 		}
 		if needMove {
@@ -64,7 +64,7 @@ func (pi *Instance) MoveFound(height int64, chainInfo *ChainInfo, previousPool *
 		if err != nil {
 			pi.logger.Error().Err(err).Msgf("fail to move the native bnb")
 		}
-		pi.AddMoveFundItem(previousPool, height+movefundretrygap)
+		pi.AddMoveFundItem(previousPool, height+movefundretrygap, chainInfo.ChainType)
 		return false
 	}
 
@@ -72,7 +72,7 @@ func (pi *Instance) MoveFound(height int64, chainInfo *ChainInfo, previousPool *
 	defer cancel()
 	nonce, err := chainInfo.getPendingNonceWithLock(ctx, previousPool.EthAddress)
 	if err != nil {
-		pi.AddMoveFundItem(previousPool, height+movefundretrygap)
+		pi.AddMoveFundItem(previousPool, height+movefundretrygap, chainInfo.ChainType)
 		return false
 	}
 	tssReqChan := make(chan *TssReq, len(needToMove))
@@ -89,7 +89,7 @@ func (pi *Instance) MoveFound(height int64, chainInfo *ChainInfo, previousPool *
 			defer bc.Unsubscribe(int64(index))
 			ethClientLocal, err := ethclient.Dial(chainInfo.WsAddr)
 			if err != nil {
-				pi.AddMoveFundItem(previousPool, height)
+				pi.AddMoveFundItem(previousPool, height, chainInfo.ChainType)
 				zlog.Logger.Error().Err(err).Msg("fail to dial the websocket")
 			}
 
@@ -153,14 +153,14 @@ func (pi *Instance) MoveFound(height int64, chainInfo *ChainInfo, previousPool *
 
 	if !emptyERC20Tokens.IsSet() {
 		// we add this account to "retry" to ensure it is the empty account in the next balance check
-		pi.AddMoveFundItem(previousPool, height+movefundretrygap)
+		pi.AddMoveFundItem(previousPool, height+movefundretrygap, chainInfo.ChainType)
 		return false
 	}
 	bnbIsMoved, isEmpty, errMoveBnb := pi.doMoveBNBFunds(chainInfo, previousPool, currentPool[1].EthAddress)
 	if isEmpty {
 		return true
 	}
-	pi.AddMoveFundItem(previousPool, height+movefundretrygap)
+	pi.AddMoveFundItem(previousPool, height+movefundretrygap, chainInfo.ChainType)
 	if err != nil || !bnbIsMoved {
 		zlog.Log().Err(errMoveBnb).Msgf("fail to move the fund from %v to %v for bnb", previousPool.EthAddress.String(), currentPool[1].EthAddress.String())
 		return false
@@ -251,7 +251,7 @@ func (pi *Instance) doMoveBNBFunds(chainInfo *ChainInfo, previousPool *bcommon.P
 	adjGas := int64(float32(gas) * config.MoveFundPubChainGASFEERATIO)
 	fee := new(big.Int).Mul(price, big.NewInt(adjGas))
 
-	// this indicate we have the leftover that smaller than the fee
+	// this indicates we have the leftover that smaller than the fee
 	if balanceBnB.Cmp(fee) != 1 {
 		return true, true, nil
 	}
@@ -293,7 +293,7 @@ func (pi *Instance) doMoveBNBFunds(chainInfo *ChainInfo, previousPool *bcommon.P
 		return false, false, errCheck
 	}
 	tick = html.UnescapeString("&#" + "127974" + ";")
-	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain (%v): %v with hash %v", tick, chainInfo.ChainType, balanceBnB.String(), bnbTxHash)
+	zlog.Logger.Info().Msgf(" %v we have moved the fund in the public chain (%v): %v with hash %v", tick, chainInfo.ChainType, balanceBnB.String(), bnbTxHash)
 
 	ctx2, cancel2 := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel2()
@@ -309,14 +309,15 @@ func (pi *Instance) doMoveBNBFunds(chainInfo *ChainInfo, previousPool *bcommon.P
 	return true, false, nil
 }
 
-func (pi *Instance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64) {
-	pi.moveFundReq.Store(height, pool)
+func (pi *Instance) AddMoveFundItem(pool *bcommon.PoolInfo, height int64, chainType string) {
+	item := bcommon.MoveFundItem{PoolInfo: pool, ChainType: chainType, Height: height}
+	pi.moveFundReq.Store(height, &item)
 }
 
-func (pi *Instance) ExportMoveFundItems() []*bcommon.PoolInfo {
-	var data []*bcommon.PoolInfo
+func (pi *Instance) ExportMoveFundItems() []*bcommon.MoveFundItem {
+	var data []*bcommon.MoveFundItem
 	pi.moveFundReq.Range(func(key, value any) bool {
-		exported := value.(*bcommon.PoolInfo)
+		exported := value.(*bcommon.MoveFundItem)
 		exported.Height = key.(int64)
 		data = append(data, exported)
 		return true
@@ -325,18 +326,19 @@ func (pi *Instance) ExportMoveFundItems() []*bcommon.PoolInfo {
 }
 
 // PopMoveFundItemAfterBlock pop up the item after the given block duration
-func (pi *Instance) PopMoveFundItemAfterBlock(currentBlockHeight int64) (*bcommon.PoolInfo, int64) {
+func (pi *Instance) PopMoveFundItemAfterBlock(currentBlockHeight int64, chainType string) (*bcommon.MoveFundItem, int64) {
 	min := int64(math.MaxInt64)
 	pi.moveFundReq.Range(func(key, value interface{}) bool {
 		h := key.(int64)
-		if h <= min {
+		val := value.(*bcommon.MoveFundItem)
+		if h <= min && val.ChainType == chainType {
 			min = h
 		}
 		return true
 	})
 	if min < math.MaxInt64 && (currentBlockHeight-min > config.MINCHECKBLOCKGAP) {
 		item, _ := pi.moveFundReq.LoadAndDelete(min)
-		return item.(*bcommon.PoolInfo), min
+		return item.(*bcommon.MoveFundItem), min
 	}
 	return nil, 0
 }

@@ -14,8 +14,12 @@ type PoolInfo struct {
 	CosAddress types.AccAddress     `json:"oppy_address"`
 	EthAddress common.Address       `json:"eth_address"`
 	PoolInfo   *vaulttypes.PoolInfo `json:"pool_info"`
-	// the height is only useful in saving the tx
-	Height int64 `json:"height"`
+}
+
+type MoveFundItem struct {
+	PoolInfo  *PoolInfo `json:"pool_info"`
+	ChainType string    `json:"chain_type"`
+	Height    int64     `json:"height"`
 }
 
 // OutBoundReq is the entity for the outbound tx
