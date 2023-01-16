@@ -57,17 +57,17 @@ func pubchainProcess(pi *pubchain.Instance, joltChain *cosbridge.JoltChainInstan
 		zlog.Logger.Error().Err(err).Msg("fail to process the inbound block")
 	}
 	isMoveFund := false
-	previousPool, height := pi.PopMoveFundItemAfterBlock(head.Number.Int64())
+	previousMoveFundItem, height := pi.PopMoveFundItemAfterBlock(head.Number.Int64(), chainInfo.ChainType)
 
-	if previousPool != nil {
+	if previousMoveFundItem != nil {
 		// we move fund in the public chain
 		ethClient, err := ethclient.Dial(chainInfo.WsAddr)
 		if err != nil {
-			pi.AddMoveFundItem(previousPool, height)
+			pi.AddMoveFundItem(previousMoveFundItem.PoolInfo, height, chainInfo.ChainType)
 			zlog.Logger.Error().Err(err).Msg("fail to dial the websocket")
 		}
 		if ethClient != nil {
-			isMoveFund = pi.MoveFound(height, chainInfo, previousPool, ethClient)
+			isMoveFund = pi.MoveFound(height, chainInfo, previousMoveFundItem.PoolInfo, ethClient)
 			ethClient.Close()
 		}
 	}

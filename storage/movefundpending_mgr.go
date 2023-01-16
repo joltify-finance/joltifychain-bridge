@@ -30,7 +30,7 @@ func NewMoveFundStateMgr(folder string) *PendingMoveFundMgr {
 	}
 }
 
-func (fsm *PendingMoveFundMgr) SavePendingItems(pendingTxsPub []*bcommon.PoolInfo) error {
+func (fsm *PendingMoveFundMgr) SavePendingItems(pendingTxsPub []*bcommon.MoveFundItem) error {
 	fsm.writePendingLock.Lock()
 	defer fsm.writePendingLock.Unlock()
 
@@ -50,8 +50,8 @@ func (fsm *PendingMoveFundMgr) SavePendingItems(pendingTxsPub []*bcommon.PoolInf
 	return nil
 }
 
-func (fsm *PendingMoveFundMgr) LoadPendingItems() ([]*bcommon.PoolInfo, error) {
-	var moveFundPendingPub []*bcommon.PoolInfo
+func (fsm *PendingMoveFundMgr) LoadPendingItems() ([]*bcommon.MoveFundItem, error) {
+	var moveFundPendingPub []*bcommon.MoveFundItem
 	if len(fsm.folder) < 1 {
 		return nil, errors.New("base file path is invalid")
 	}

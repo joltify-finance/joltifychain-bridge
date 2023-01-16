@@ -250,7 +250,7 @@ func NewBridgeService(config config.Config) {
 
 	if len(pubItems) != 0 {
 		for _, item := range pubItems {
-			pubChainInstance.AddMoveFundItem(item, item.Height)
+			pubChainInstance.AddMoveFundItem(item.PoolInfo, item.Height, item.ChainType)
 		}
 	}
 
@@ -452,9 +452,11 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 					previousPool := joltifyChain.UpdatePool(poolInfo[0])
 					if previousPool.Pk != poolInfo[0].CreatePool.PoolPubKey {
 						// we force the first try of the tx to be run without blocking by the block wait
-						pi.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5)
+						pi.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5, "BSC")
+						pi.AddMoveFundItem(previousPool, latestHeight-config.MINCHECKBLOCKGAP+5, "ETH")
 						theSecondPool := currentPool[1]
-						pi.AddMoveFundItem(theSecondPool, latestHeight-config.MINCHECKBLOCKGAP+10)
+						pi.AddMoveFundItem(theSecondPool, latestHeight-config.MINCHECKBLOCKGAP+10, "BSC")
+						pi.AddMoveFundItem(theSecondPool, latestHeight-config.MINCHECKBLOCKGAP+10, "ETH")
 					}
 				}
 
