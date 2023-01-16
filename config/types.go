@@ -8,7 +8,7 @@ const (
 	TxTimeout                   = 300
 	GASFEERATIO                 = "5"
 	PubChainGASFEERATIO         = 3
-	MoveFundPubChainGASFEERATIO = 1
+	MoveFundPubChainGASFEERATIO = 1.1
 	MINCHECKBLOCKGAP            = 30
 )
 
