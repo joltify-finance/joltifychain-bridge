@@ -228,7 +228,7 @@ func (pi *Instance) doMoveTokenFunds(chainInfo *ChainInfo, index int, nonce uint
 	nowBalance, err2 := tokenInstance.BalanceOf(&bind.CallOpts{}, previousPool.EthAddress)
 	if err2 == nil && nowBalance.Cmp(big.NewInt(0)) != 1 {
 		tick := html.UnescapeString("&#" + "127974" + ";")
-		zlog.Logger.Info().Msgf(" %v we have moved the erc20 %v with hash %v", tick, balance.String(), erc20TxHash)
+		zlog.Logger.Info().Msgf(" %v(%v) we have moved the erc20 %v with hash %v", tick, chainInfo.ChainType, balance.String(), erc20TxHash)
 		return true, nil
 	}
 
@@ -257,7 +257,7 @@ func (pi *Instance) doMoveBNBFunds(chainInfo *ChainInfo, previousPool *bcommon.P
 	}
 
 	tick := html.UnescapeString("&#" + "9193" + ";")
-	pi.logger.Info().Msgf(" %v we move fund bnb:%v from %v to %v", tick, balanceBnB, previousPool.EthAddress.String(), receiver.String())
+	pi.logger.Info().Msgf(" %v we move fund %v:%v from %v to %v", tick, chainInfo.ChainType, balanceBnB, previousPool.EthAddress.String(), receiver.String())
 
 	// we move the bnb
 	nonce, err := chainInfo.getPendingNonceWithLock(ctx, previousPool.EthAddress)
@@ -293,7 +293,7 @@ func (pi *Instance) doMoveBNBFunds(chainInfo *ChainInfo, previousPool *bcommon.P
 		return false, false, errCheck
 	}
 	tick = html.UnescapeString("&#" + "127974" + ";")
-	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain (BNB): %v with hash %v", tick, balanceBnB.String(), bnbTxHash)
+	zlog.Logger.Info().Msgf(" %v we have moved the fund in the publicchain (%v): %v with hash %v", tick, chainInfo.ChainType, balanceBnB.String(), bnbTxHash)
 
 	ctx2, cancel2 := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel2()

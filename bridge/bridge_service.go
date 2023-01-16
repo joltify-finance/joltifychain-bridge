@@ -558,7 +558,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 						continue
 					}
 
-					zlog.Logger.Warn().Msgf("we feed the inbound tx now %v", pools[1].PoolInfo.CreatePool.String())
+					zlog.Logger.Warn().Msgf("we feed the inbound tx now %v", pools[1].PoolInfo.CreatePool.PoolAddr.String())
 
 					err = joltifyChain.FeedTx(grpcClient, pools[1].PoolInfo, pi)
 					if err != nil {
