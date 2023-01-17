@@ -4,31 +4,33 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"gitlab.com/joltify/joltifychain/joltifychain-bridge/config"
 	"os"
 	"path"
 
-	"github.com/joltgeorge/tss/keygen"
+	"github.com/joltify-finance/tss/keysign"
+	"gitlab.com/joltify/joltifychain-bridge/config"
+
+	"github.com/joltify-finance/tss/keygen"
 
 	golog "github.com/ipfs/go-log"
 
-	"github.com/joltgeorge/tss/common"
+	"github.com/joltify-finance/tss/common"
 	"github.com/libp2p/go-libp2p-peerstore/addr"
 
-	tsslib "github.com/joltgeorge/tss/tss"
+	tsslib "github.com/joltify-finance/tss/tss"
 
 	"github.com/tendermint/tendermint/crypto/ed25519"
 )
 
-//TssVersion that we apply to
+// TssVersion that we apply to
 const TssVersion = "0.14.0"
 
-//BridgeTssServer the entity of tss server
+// BridgeTssServer the entity of tss server
 type BridgeTssServer struct {
 	ts *tsslib.TssServer
 }
 
-//StartTssServer start the tss server
+// StartTssServer start the tss server
 func StartTssServer(baseFolder string, tssConfig config.TssConfig) (*BridgeTssServer, CosPrivKey, error) {
 	golog.SetAllLoggers(golog.LevelInfo)
 	_ = golog.SetLogLevel("tss-lib", "INFO")
@@ -80,8 +82,8 @@ func StartTssServer(baseFolder string, tssConfig config.TssConfig) (*BridgeTssSe
 	return &tc, key, err
 }
 
-//Keygen generate the tss key
-func (tc *BridgeTssServer) Keygen(keys []string, blockHeight int64, version string) (keygen.Response, error) {
+// KeyGen generate the tss key
+func (tc *BridgeTssServer) KeyGen(keys []string, blockHeight int64, version string) (keygen.Response, error) {
 	req := keygen.NewRequest(keys, blockHeight, version)
 	resp, err := tc.ts.Keygen(req)
 	if err != nil {
@@ -90,12 +92,22 @@ func (tc *BridgeTssServer) Keygen(keys []string, blockHeight int64, version stri
 	return resp, nil
 }
 
-//GetTssNodeID get the tss node ID
+// KeySign generates the signature
+func (tc *BridgeTssServer) KeySign(pk string, msgs []string, blockHeight int64, signers []string, version string) (keysign.Response, error) {
+	req := keysign.NewRequest(pk, msgs, blockHeight, signers, version)
+	resp, err := tc.ts.KeySign(req)
+	if err != nil {
+		return keysign.Response{}, err
+	}
+	return resp, nil
+}
+
+// GetTssNodeID get the tss node ID
 func (tc *BridgeTssServer) GetTssNodeID() string {
 	return tc.ts.GetLocalPeerID()
 }
 
-//Stop stop the tss server
+// Stop stop the tss server
 func (tc *BridgeTssServer) Stop() {
 	tc.ts.Stop()
 }

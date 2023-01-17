@@ -1,6 +1,10 @@
-module = gitlab.com/joltify/joltifyBridge
+module = gitlab.com/joltify/joltifychain-bridge
 
 .PHONY: clear tools install test test-watch lint-pre lint lint-verbose protob build docker-gitlab-login docker-gitlab-push docker-gitlab-build
+
+
+VERSION := $(shell echo $(shell git describe --tags --first-parent) | sed 's/^v//')
+COMMIT := $(shell git log -1 --format='%H')
 
 all: lint build
 
@@ -8,8 +12,19 @@ clear:
 	clear
 
 
+BUILD_FLAGS := -ldflags '$(ldflags)'
+
+testnet: go.sum
+	go install   -ldflags "-X gitlab.com/joltify/joltifychain-bridge/pubchain.OppyContractAddressBSC=0x94277968dff216265313657425d9d7577ad32dd1 \
+      -X gitlab.com/joltify/joltifychain-bridge/pubchain.OppyContractAddressETH=0x395931E1f64f1DC1889cbC3208dD746667C31126 \
+    	-X  gitlab.com/joltify/joltifychain-bridge/version.VERSION=$(VERSION) \
+    	-X gitlab.com/joltify/joltifychain-bridge/version.COMMIT=$(COMMIT)" ./cmd/bridge_service.go
+
 install: go.sum
-	go install ./cmd/joltifyBridge.go ./cmd/http.go
+	go install   -ldflags "-X gitlab.com/joltify/joltifychain-bridge/pubchain.OppyContractAddressBSC=0x66fff09f83bfce2ed9240fa6a1f7e96ba166ddf7 \
+      -X gitlab.com/joltify/joltifychain-bridge/pubchain.OppyContractAddressETH=0xBEB4144ae1a5Cd8Ee7E1B96F9CDDd9A1A1C844C3 \
+	-X  gitlab.com/joltify/joltifychain-bridge/version.VERSION=$(VERSION) \
+    	-X gitlab.com/joltify/joltifychain-bridge/version.COMMIT=$(COMMIT)" ./cmd/bridge_service.go
 
 go.sum: go.mod
 	@echo "--> Ensure dependencies have not been modified"
@@ -22,21 +37,31 @@ test-watch: clear
 	@gow -c test -tags testnet -mod=readonly ./...
 
 lint-pre:
-	@gofumpt -l cmd common keygen keysign messages p2p storage tss # for display
-	@test -z "$(shell gofumpt -l cmd common keygen keysign messages p2p storage tss)" # cause error
+	@gofumpt -l  cmd config oppybridge monitor storage validators bridge common misc pubchain tssclient
+	#@test -z "$(shell gofumpt -l  cmd config cosbridge monitor storage validators bridge common misc pubchain tssclient)" # cause error
 	@go mod verify
 
 lint: lint-pre
-	@golangci-lint run
+		@golangci-lint run --out-format=tab  -v --timeout 3600s -c ./.golangci.yml
 
 lint-verbose: lint-pre
 	@golangci-lint run -v
 
-protob:
-	protoc --go_out=module=$(module):. ./messages/*.proto
+#protob:
+#	protoc --go_out=module=$(module):. ./messages/*.proto
 
-build: protob
-	go build ./...
+
+
+build: go.sum
+	go build -ldflags "-X gitlab.com/joltify/joltifychain-bridge/pubchain.OppyContractAddressBSC=0x66fff09f83bfce2ed9240fa6a1f7e96ba166ddf7 \
+      -X gitlab.com/joltify/joltifychain-bridge/pubchain.OppyContractAddressETH=0x77406A7678338abb5eA7a78b766F7F1125782C61 \
+	-X  gitlab.com/joltify/joltifychain-bridge/version.VERSION=$(VERSION) \
+    	-X gitlab.com/joltify/joltifychain-bridge/version.COMMIT=$(COMMIT)" ./cmd/bridge_service.go
+
+
+
+format:
+	@gofumpt -l -w .
 
 # ------------------------------- GitLab ------------------------------- #
 docker-gitlab-login:

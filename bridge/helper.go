@@ -1,56 +1,36 @@
 package bridge
 
 import (
-	"context"
-
-	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	"google.golang.org/grpc"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
+	"gitlab.com/joltify/joltifychain-bridge/common"
+	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
-func QueryAccount(addr string, grpcClient *grpc.ClientConn) (authtypes.AccountI, error) {
-	accQuery := authtypes.NewQueryClient(grpcClient)
-	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-	defer cancel()
-	accResp, err := accQuery.Account(ctx, &authtypes.QueryAccountRequest{Address: addr})
-	if err != nil {
-		return nil, err
+func NeedUpdate(qcPools []*vaulttypes.PoolInfo, curPools []*common.PoolInfo) bool {
+	// in the cached address, the latest is at index 1 while the query latest pool has the latest at index 0
+	if curPools[0] == nil || curPools[1] == nil {
+		return true
 	}
-
-	// acc := accResp.Account.GetCachedValue().(authtypes.AccountI)
-	encCfg := MakeEncodingConfig()
-	var acc authtypes.AccountI
-	if err := encCfg.InterfaceRegistry.UnpackAny(accResp.Account, &acc); err != nil {
-		return nil, err
+	var qPools []common.PoolInfo
+	for i := 0; i < 2; i++ {
+		pk := qcPools[i].GetCreatePool().GetPoolPubKey()
+		ethAddr, err := misc.PoolPubKeyToEthAddress(pk)
+		if err != nil {
+			return false
+		}
+		addr, err := misc.PoolPubKeyToOppyAddress(pk)
+		if err != nil {
+			return false
+		}
+		v1 := common.PoolInfo{
+			Pk:         pk,
+			CosAddress: addr,
+			EthAddress: ethAddr,
+		}
+		qPools = append(qPools, v1)
 	}
-	return acc, nil
-}
-
-func QueryHistoricalValidator(grpcClient *grpc.ClientConn) (int64, []*tmservice.Validator, error) {
-	ts := tmservice.NewServiceClient(grpcClient)
-	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-	defer cancel()
-
-	resp, err := ts.GetLatestValidatorSet(ctx, &tmservice.GetLatestValidatorSetRequest{})
-	if err != nil {
-		return 0, nil, err
+	if qPools[0].CosAddress.Equals(curPools[1].CosAddress) && qPools[1].CosAddress.Equals(curPools[0].CosAddress) {
+		return false
 	}
-
-	//for i, el := range resp.Validators {
-	//	fmt.Printf("%v========%v\n", i, el.GetAddress())
-	//}
-	return resp.BlockHeight, resp.Validators, nil
-}
-
-func GetLastBlockHeight(grpcClient *grpc.ClientConn) (int64, error) {
-	ts := tmservice.NewServiceClient(grpcClient)
-
-	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-	defer cancel()
-
-	resp, err := ts.GetLatestBlock(ctx, &tmservice.GetLatestBlockRequest{})
-	if err != nil {
-		return 0, err
-	}
-	return resp.Block.Header.Height, nil
+	return true
 }

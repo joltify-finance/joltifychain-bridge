@@ -8,43 +8,44 @@ import (
 	maddr "github.com/multiformats/go-multiaddr"
 )
 
-type InvoiceChainConfig struct {
+type CosChainConfig struct {
 	GrpcAddress string
 	WsAddress   string
 	WsEndpoint  string
-	RPCAddress  string
+	HTTPAddress string
+	RollbackGap int
 }
 
 type PubChainConfig struct {
-	WsAddress    string
-	TokenAddress string
+	WsAddressBSC string
+	WsAddressETH string
+	RollbackGap  int
 }
 
 type (
-	addrList  []maddr.Multiaddr
+	AddrList  []maddr.Multiaddr
 	TssConfig struct {
 		// Party Timeout defines how long do we wait for the party to form
 		PartyTimeout time.Duration
-		// KeyGenTimeoutSeconds defines how long do we wait the keygen parties to pass messages along
+		// KeyGenTimeoutSeconds defines how long do we wait the keygen parties to pass proto along
 		KeyGenTimeout time.Duration
 		// KeySignTimeoutSeconds defines how long do we wait keysign
 		KeySignTimeout time.Duration
 		// Pre-parameter define the pre-parameter generations timeout
 		PreParamTimeout time.Duration
 		// enable the tss monitor
-		EnableMonitor bool
 
 		// Config is configuration for Tss P2P
 		RendezvousString string
 		Port             int
-		BootstrapPeers   addrList
+		BootstrapPeers   AddrList
 		ExternalIP       string
-		HttpAddr         string
+		HTTPAddr         string
 	}
 )
 
 // String implement fmt.Stringer
-func (al *addrList) String() string {
+func (al *AddrList) String() string {
 	addresses := make([]string, len(*al))
 	for i, addr := range *al {
 		addresses[i] = addr.String()
@@ -53,7 +54,7 @@ func (al *addrList) String() string {
 }
 
 // Set add the given value to addList
-func (al *addrList) Set(value string) error {
+func (al *AddrList) Set(value string) error {
 	addr, err := maddr.NewMultiaddr(value)
 	if err != nil {
 		return err
@@ -63,30 +64,41 @@ func (al *addrList) Set(value string) error {
 }
 
 type Config struct {
-	InvoiceChainConfig InvoiceChainConfig
+	CosChain           CosChainConfig
 	PubChainConfig     PubChainConfig
 	TssConfig          TssConfig
 	KeyringAddress     string
 	HomeDir            string
+	TokenListPath      string
+	Version            bool
+	TokenListUpdateGap int
+	EnableMonitor      bool
 }
 
 func DefaultConfig() Config {
 	var config Config
-	flag.StringVar(&config.InvoiceChainConfig.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for invoice chain")
-	flag.StringVar(&config.InvoiceChainConfig.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for invoice chain")
-	flag.StringVar(&config.InvoiceChainConfig.RPCAddress, "rpc-port", "http://localhost:26657", "rpc address for invoice chain")
-	flag.StringVar(&config.InvoiceChainConfig.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for invoice chain")
-	flag.StringVar(&config.PubChainConfig.WsAddress, "pub-ws-endpoint", "ws://10.1.194.26:8456/", "endpoint for public chain listener")
-	flag.StringVar(&config.PubChainConfig.TokenAddress, "pub-token-addr", "0x6ca715403f18259e971cbfe74aee60bea3781ba6", "monitored token address")
+	flag.BoolVar(&config.Version, "v", false, "version of the joltifyChain")
+	flag.StringVar(&config.CosChain.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for joltify pub_chain")
+	flag.StringVar(&config.CosChain.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for joltify pub_chain")
+	flag.StringVar(&config.CosChain.HTTPAddress, "http-port", "http://localhost:26657", "ws address for joltify pub_chain")
+	flag.StringVar(&config.CosChain.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for joltify pub_chain")
+	flag.IntVar(&config.CosChain.RollbackGap, "joltify-rollback-gap", 1, "delay the transaction process to prevent chain rollback")
+	flag.StringVar(&config.PubChainConfig.WsAddressBSC, "pub-ws-endpoint", "ws://127.0.0.1:8456/", "endpoint for public pub_chain listener")
+	flag.StringVar(&config.PubChainConfig.WsAddressETH, "pub-ws-ETHendpoint", "ws://127.0.0.1:8546/", "endpoint for public pub_chain listener")
+	flag.IntVar(&config.PubChainConfig.RollbackGap, "pubchain-rollback-gap", 1, "delay the transaction process to prevent chain rollback")
 	flag.StringVar(&config.KeyringAddress, "key", "./keyring.key", "operator key path")
-	flag.StringVar(&config.HomeDir, "home", "/root/.joltifyChain/config", "home director for bridge")
-	flag.StringVar(&config.TssConfig.HttpAddr, "tss-http-port", "0.0.0.0:8321", "tss http port for info only")
+	flag.StringVar(&config.HomeDir, "home", "/root/.joltify/config", "home director for joltify bridge")
+	flag.StringVar(&config.TokenListPath, "token-list", "tokenlist.json", "file path to load token white list")
+	flag.IntVar(&config.TokenListUpdateGap, "tokenlist-update-gap", 30, "gap to update the token list")
+	flag.StringVar(&config.TssConfig.HTTPAddr, "tss-http-port", "0.0.0.0:8321", "tss http port for info only")
 
 	// we setup the Tss parameter configuration
 	flag.DurationVar(&config.TssConfig.KeyGenTimeout, "gentimeout", 30*time.Second, "keygen timeout")
-	flag.DurationVar(&config.TssConfig.KeySignTimeout, "signtimeout", 30*time.Second, "keysign timeout")
+	flag.DurationVar(&config.TssConfig.KeySignTimeout, "signtimeout", 50*time.Second, "keysign timeout")
+	flag.DurationVar(&config.TssConfig.PartyTimeout, "joinpartytimeout", 45*time.Second, "join party timeout")
+
 	flag.DurationVar(&config.TssConfig.PreParamTimeout, "preparamtimeout", 5*time.Minute, "pre-parameter generation timeout")
-	flag.BoolVar(&config.TssConfig.EnableMonitor, "enablemonitor", true, "enable the tss monitor")
+	flag.BoolVar(&config.EnableMonitor, "enablemonitor", true, "enable the joltifyChain monitor")
 
 	// we setup the p2p network configuration
 	flag.StringVar(&config.TssConfig.RendezvousString, "rendezvous", "joltifyChainTss",

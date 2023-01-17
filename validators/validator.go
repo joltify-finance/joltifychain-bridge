@@ -3,11 +3,13 @@ package validators
 import (
 	"sync"
 
+	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
+	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
+
 	"github.com/cosmos/cosmos-sdk/types"
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
-//NewValidator initialize a validator set
+// NewValidator initialize a validator set
 func NewValidator() *ValidatorSet {
 	return &ValidatorSet{
 		&sync.RWMutex{},
@@ -16,7 +18,7 @@ func NewValidator() *ValidatorSet {
 	}
 }
 
-//SetupValidatorSet set up the validator set
+// SetupValidatorSet set up the validator set
 func (v *ValidatorSet) SetupValidatorSet(validators []*Validator, blockHeight int64) {
 	v.locker = &sync.RWMutex{}
 	v.locker.Lock()
@@ -34,31 +36,31 @@ func (v *ValidatorSet) SetupValidatorSet(validators []*Validator, blockHeight in
 	}
 }
 
-//UpdateValidatorSet updates the validator set
-func (v *ValidatorSet) UpdateValidatorSet(validatorUpdates []*tmtypes.Validator, blockHeight int64) error {
+// UpdateValidatorSet updates the validator set
+func (v *ValidatorSet) UpdateValidatorSet(validatorUpdates []*vaulttypes.Validator, blockHeight int64) error {
 	v.locker.Lock()
 	defer v.locker.Unlock()
 	v.blockHeight = blockHeight
+	newValidatorSet := make(map[string]*Validator)
 	for _, el := range validatorUpdates {
-		addr, err := types.ConsAddressFromHex(el.Address.String())
-		if err != nil {
-			return err
+		cosPubkey := ed25519.PubKey{
+			Key: el.GetPubkey(),
 		}
-		if el.VotingPower == 0 {
-			delete(v.activeValidators, addr.String())
-		} else {
-			localVal := Validator{
-				addr,
-				el.PubKey.Bytes(),
-				el.VotingPower,
-			}
-			v.activeValidators[addr.String()] = &localVal
+
+		addr := types.GetConsAddress(&cosPubkey)
+
+		localVal := Validator{
+			addr,
+			cosPubkey.Bytes(),
+			el.Power,
 		}
+		newValidatorSet[addr.String()] = &localVal
 	}
+	v.activeValidators = newValidatorSet
 	return nil
 }
 
-//GetActiveValidators get the active validators
+// GetActiveValidators get the active validators
 func (v *ValidatorSet) GetActiveValidators() ([]*Validator, int64) {
 	v.locker.RLock()
 	defer v.locker.RUnlock()
