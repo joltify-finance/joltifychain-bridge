@@ -244,13 +244,10 @@ func (pi *Instance) doMoveBNBFunds(chainInfo *ChainInfo, previousPool *bcommon.P
 		return false, false, err
 	}
 
-	_, price, _, gas, err := chainInfo.GetFeeLimitWithLock()
+	fee, _, _, err := chainInfo.GetFeeLimitWithLock()
 	if err != nil {
 		return false, false, err
 	}
-
-	adjGas := int64(float32(gas) * config.MoveFundPubChainGASFEERATIO)
-	fee := new(big.Int).Mul(price, big.NewInt(adjGas))
 
 	// this indicates we have the leftover that smaller than the fee
 	if balanceBnB.Cmp(fee) != 1 {

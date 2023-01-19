@@ -5,11 +5,9 @@ import "time"
 const (
 	NativeSign = "native"
 
-	TxTimeout                   = 300
-	GASFEERATIO                 = "5"
-	PubChainGASFEERATIO         = 3
-	MoveFundPubChainGASFEERATIO = 1.1
-	MINCHECKBLOCKGAP            = 30
+	GASFEERATIO      = "5"
+	DEFAULTNATIVEGAS = 21000
+	MINCHECKBLOCKGAP = 30
 )
 
 var ChainID = "joltifymock-1"

@@ -59,7 +59,7 @@ func (pi *Instance) waitToSend(chainInfo *ChainInfo, poolAddress common.Address,
 
 // SendNativeTokenBatch sends the native token to the public chain
 func (pi *Instance) SendNativeTokenBatch(chainInfo *ChainInfo, index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, bool, error) {
-	totalFee, gasPrice, adjGas, _, err := chainInfo.GetFeeLimitWithLock()
+	totalFee, gasPrice, gas, err := chainInfo.GetFeeLimitWithLock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
 		return common.Hash{}, false, err
@@ -76,7 +76,7 @@ func (pi *Instance) SendNativeTokenBatch(chainInfo *ChainInfo, index int, sender
 	txo.Value = amount
 
 	var data []byte
-	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: uint64(adjGas), To: &receiver, Value: txo.Value, Data: data})
+	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: uint64(gas), To: &receiver, Value: txo.Value, Data: data})
 
 	signedTx, err := txo.Signer(sender, tx)
 	if err != nil {
@@ -106,14 +106,12 @@ func (pi *Instance) SendNativeTokenForMoveFund(chainInfo *ChainInfo, signerPk st
 	if nonce == nil {
 		return common.Hash{}, false, errors.New("invalid nonce")
 	}
-	_, price, _, gas, err := chainInfo.GetFeeLimitWithLock()
+	fee, price, gas, err := chainInfo.GetFeeLimitWithLock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
 		return common.Hash{}, false, err
 	}
 
-	adjGas := int64(float32(gas) * config.MoveFundPubChainGASFEERATIO)
-	fee := new(big.Int).Mul(price, big.NewInt(adjGas))
 	// this statement is useful in processing the tiny leftover
 	if amount.Cmp(fee) != 1 {
 		return common.Hash{}, true, nil
@@ -142,7 +140,7 @@ func (pi *Instance) SendNativeTokenForMoveFund(chainInfo *ChainInfo, signerPk st
 	txo.Value = sendAmount
 
 	var data []byte
-	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: price, Gas: uint64(adjGas), To: &receiver, Value: sendAmount, Data: data})
+	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: price, Gas: uint64(gas), To: &receiver, Value: sendAmount, Data: data})
 
 	signedTx, err := txo.Signer(sender, tx)
 	if err != nil {
