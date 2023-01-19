@@ -16,7 +16,7 @@ BUILD_FLAGS := -ldflags '$(ldflags)'
 
 testnet: go.sum
 	go install   -ldflags "-X gitlab.com/joltify/joltifychain-bridge/pubchain.OppyContractAddressBSC=0x94277968dff216265313657425d9d7577ad32dd1 \
-      -X gitlab.com/joltify/joltifychain-bridge/pubchain.OppyContractAddressETH=0x395931E1f64f1DC1889cbC3208dD746667C31126 \
+      -X gitlab.com/joltify/joltifychain-bridge/pubchain.OppyContractAddressETH=0x7bb22d0A13220AC6E4337eF8519Fc6Af0B66EDd9\
     	-X  gitlab.com/joltify/joltifychain-bridge/version.VERSION=$(VERSION) \
     	-X gitlab.com/joltify/joltifychain-bridge/version.COMMIT=$(COMMIT)" ./cmd/bridge_service.go
 

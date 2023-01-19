@@ -2,7 +2,6 @@ package pubchain
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"sync"
 	"testing"
@@ -40,7 +39,6 @@ func (tn TestHelperSuite) TestAllWithLockOperations() {
 	ethAddr := common.HexToAddress("0xbDf7Fb0Ad9b0D722ea54D808b79751608E7AE991")
 	balance, err := tn.pubChain.BSCChain.getBalanceWithLock(ctx, ethAddr)
 	tn.Require().NoError(err)
-	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>%v\n", balance.String())
 	tn.Require().True(balance.Cmp(big.NewInt(0)) == 1)
 
 	nonce, err := tn.pubChain.BSCChain.getPendingNonceWithLock(ctx, ethAddr)
@@ -53,7 +51,6 @@ func (tn TestHelperSuite) TestAllWithLockOperations() {
 
 	_, err = tn.pubChain.BSCChain.GetGasPriceWithLock()
 	tn.Require().NoError(err)
-
 	// now we test the operations with closed client to focue renew
 	tn.pubChain.BSCChain.Client.Close()
 	balance, err = tn.pubChain.BSCChain.getBalanceWithLock(ctx, ethAddr)
@@ -71,10 +68,10 @@ func (tn TestHelperSuite) TestAllWithLockOperations() {
 	tn.Require().NoError(err)
 
 	tn.pubChain.BSCChain.Client.Close()
-	_, _, _, _, err = tn.pubChain.BSCChain.GetFeeLimitWithLock()
+	_, _, _, err = tn.pubChain.BSCChain.GetFeeLimitWithLock()
 	tn.Require().Error(err)
 	tn.pubChain.wg.Wait()
-	_, _, _, _, err = tn.pubChain.BSCChain.GetFeeLimitWithLock()
+	_, _, _, err = tn.pubChain.BSCChain.GetFeeLimitWithLock()
 	tn.Require().NoError(err)
 
 	tn.pubChain.BSCChain.Client.Close()

@@ -9,7 +9,6 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 
-	"github.com/ethereum/go-ethereum"
 	grpc1 "github.com/gogo/protobuf/grpc"
 	pricefeedtypes "github.com/joltify-finance/joltify_lending/x/third_party/pricefeed/types"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
@@ -102,25 +101,16 @@ func (c *ChainInfo) getTransactionReceiptWithLock(ctx context.Context, txHash co
 	return receipt, err
 }
 
-// todo will delet it
-func (c *ChainInfo) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, uint64, error) {
+// GetFeeLimitWithLock returns fee, gasprice, gaslimit and error code
+func (c *ChainInfo) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
 	c.ChainLocker.RLock()
 	gasPrice, err1 := c.Client.SuggestGasPrice(ctx)
-	mockMsg := ethereum.CallMsg{
-		From:     common.HexToAddress("0x2cDaa3f15f3db73a6E75c462975EBFca9B5A56ce"),
-		To:       nil,
-		GasPrice: gasPrice,
-		Value:    big.NewInt(2),
-		// Data:     []byte("hello"),
-	}
-	gas, err2 := c.Client.EstimateGas(ctx, mockMsg)
 	c.ChainLocker.RUnlock()
-	if err1 != nil || err2 != nil {
+	if err1 != nil {
 		// we reset the ethcliet
 		c.logger.Error().Err(err1).Msgf("error of the gas price estimate")
-		c.logger.Error().Err(err2).Msgf("error of the gas estimate")
 		c.wg.Add(1)
 		go func() {
 			defer c.wg.Done()
@@ -129,12 +119,10 @@ func (c *ChainInfo) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, uint64, er
 				c.logger.Error().Err(err).Msgf("we fail to restart the eth client")
 			}
 		}()
-		return big.NewInt(0), big.NewInt(0), 0, 0, errors.New("fail to get the fee")
+		return big.NewInt(0), big.NewInt(0), 0, errors.New("fail to get the fee")
 	}
-
-	adjGas := int64(float32(gas) * config.PubChainGASFEERATIO)
-	totalFee := new(big.Int).Mul(gasPrice, big.NewInt(adjGas))
-	return totalFee, gasPrice, adjGas, gas, nil
+	totalFee := new(big.Int).Mul(gasPrice, big.NewInt(config.DEFAULTNATIVEGAS))
+	return totalFee, gasPrice, config.DEFAULTNATIVEGAS, nil
 }
 
 func (c *ChainInfo) GetGasPriceWithLock() (*big.Int, error) {
