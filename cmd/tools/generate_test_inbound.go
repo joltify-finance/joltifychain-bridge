@@ -46,7 +46,7 @@ func main() {
 				break
 			}
 		}
-		item := common.NewAccountInboundReq(acc, itemsIn[0].ToPoolAddr, coin, txID, height)
+		item := common.NewAccountInboundReq(acc, coin, txID, height)
 		exportedInboundReq = append(exportedInboundReq, &item)
 
 		current, ok := balance[item.Coin.Denom]

@@ -22,8 +22,8 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
-// CheckTxStatus check whether the tx has been done successfully
-func (pi *Instance) waitToSend(chainInfo *ChainInfo, poolAddress common.Address, targetNonce uint64) error {
+// waitToSend waits for its trun to send the message
+func (pi *Instance) waitToSend(chainInfo *Erc20ChainInfo, poolAddress common.Address, targetNonce uint64) error {
 	bf := backoff.NewExponentialBackOff()
 	bf.MaxElapsedTime = time.Minute * 2
 	bf.MaxInterval = time.Second * 20
@@ -58,7 +58,7 @@ func (pi *Instance) waitToSend(chainInfo *ChainInfo, poolAddress common.Address,
 }
 
 // SendNativeTokenBatch sends the native token to the public chain
-func (pi *Instance) SendNativeTokenBatch(chainInfo *ChainInfo, index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, bool, error) {
+func (pi *Instance) SendNativeTokenBatch(chainInfo *Erc20ChainInfo, index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, bool, error) {
 	totalFee, gasPrice, gas, err := chainInfo.GetFeeLimitWithLock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
@@ -102,7 +102,7 @@ func (pi *Instance) SendNativeTokenBatch(chainInfo *ChainInfo, index int, sender
 }
 
 // SendNativeTokenForMoveFund sends the native token to the public chain
-func (pi *Instance) SendNativeTokenForMoveFund(chainInfo *ChainInfo, signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int) (common.Hash, bool, error) {
+func (pi *Instance) SendNativeTokenForMoveFund(chainInfo *Erc20ChainInfo, signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int) (common.Hash, bool, error) {
 	if nonce == nil {
 		return common.Hash{}, false, errors.New("invalid nonce")
 	}
@@ -166,7 +166,7 @@ func (pi *Instance) SendNativeTokenForMoveFund(chainInfo *ChainInfo, signerPk st
 }
 
 // SendTokenBatch sends the token to the public chain
-func (pi *Instance) SendTokenBatch(chainInfo *ChainInfo, index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
+func (pi *Instance) SendTokenBatch(chainInfo *Erc20ChainInfo, index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
 	txo, err := pi.composeTxBatch(index, sender, chainInfo.ChainID, tssReqChan, tssRespChan)
 	if err != nil {
 		return common.Hash{}, err
@@ -205,7 +205,7 @@ func (pi *Instance) SendTokenBatch(chainInfo *ChainInfo, index int, sender, rece
 }
 
 // SendToken sends the token to the public chain
-func (pi *Instance) SendToken(chainInfo *ChainInfo, signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string) (common.Hash, error) {
+func (pi *Instance) SendToken(chainInfo *Erc20ChainInfo, signerPk string, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tokenAddr string) (common.Hash, error) {
 	if signerPk == "" {
 		lastPool := pi.GetPool()[1]
 		signerPk = lastPool.Pk
@@ -259,7 +259,7 @@ func (pi *Instance) SendToken(chainInfo *ChainInfo, signerPk string, sender, rec
 }
 
 // ProcessOutBound send the money to public chain
-func (pi *Instance) ProcessOutBound(chainInfo *ChainInfo, index int, toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, nonce uint64, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (string, error) {
+func (pi *Instance) ProcessOutBound(chainInfo *Erc20ChainInfo, index int, toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, nonce uint64, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (string, error) {
 	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v of %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18), tokenAddr)
 	var txHash common.Hash
 	var err error

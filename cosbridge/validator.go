@@ -3,14 +3,13 @@ package cosbridge
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
-	"github.com/cenkalti/backoff"
+	"gitlab.com/joltify/joltifychain-bridge/common"
+
 	grpc1 "github.com/gogo/protobuf/grpc"
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
-	"gitlab.com/joltify/joltifychain-bridge/config"
 	"gitlab.com/joltify/joltifychain-bridge/validators"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
@@ -23,7 +22,9 @@ import (
 
 // InitValidators initialize the validators
 func (jc *JoltChainInstance) InitValidators(addr string) error {
-	ts := tmservice.NewServiceClient(jc.GrpcClient)
+	jc.CosHandler.GrpcLock.Lock()
+	defer jc.CosHandler.GrpcLock.Unlock()
+	ts := tmservice.NewServiceClient(jc.CosHandler.GrpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 
@@ -44,7 +45,6 @@ func (jc *JoltChainInstance) InitValidators(addr string) error {
 	if err != nil {
 		return err
 	}
-	config.ChainID = nodeInfo.DefaultNodeInfo.Network
 	jc.logger.Info().Msgf(">>>>>>>>>>>>>>>>node %v attached>>>>>>>> network %v \n", nodeInfo.GetDefaultNodeInfo().Moniker, nodeInfo.DefaultNodeInfo.Network)
 
 	restRes, err := rest.GetRequest(fmt.Sprintf("%s/status", addr))
@@ -57,7 +57,7 @@ func (jc *JoltChainInstance) InitValidators(addr string) error {
 		return err
 	}
 
-	blockHeight, values, err := QueryTipValidator(jc.GrpcClient)
+	blockHeight, values, err := QueryTipValidator(jc.CosHandler.GrpcClient)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to initialize the validator pool")
 		return err
@@ -89,7 +89,7 @@ func (jc *JoltChainInstance) QueryLastPoolAddress(conn grpc1.ClientConn) ([]*vau
 // CheckWhetherSigner check whether the current signer is the
 func (jc *JoltChainInstance) CheckWhetherSigner(lastPoolInfo *vaulttypes.PoolInfo) (bool, error) {
 	found := false
-	creator, err := jc.Keyring.Key("operator")
+	creator, err := jc.CosHandler.GetKey("operator")
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to get the validator outReceiverAddress")
 		return false, err
@@ -104,52 +104,16 @@ func (jc *JoltChainInstance) CheckWhetherSigner(lastPoolInfo *vaulttypes.PoolInf
 	return found, nil
 }
 
-// CheckWhetherAlreadyExist check whether it is already existed
-func (jc *JoltChainInstance) CheckWhetherAlreadyExist(conn grpc1.ClientConn, index string) bool {
-	ret, err := queryGivenToeknIssueTx(conn, index)
-	if err != nil {
-		return false
-	}
-	if ret != nil {
-		return true
-	}
-	return false
-}
-
-// CheckTxStatus check whether the tx has been done successfully
-func (jc *JoltChainInstance) CheckTxStatus(conn grpc1.ClientConn, index string, retryNum uint64) error {
-	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), retryNum)
-
-	op := func() error {
-		if jc.CheckWhetherAlreadyExist(conn, index) {
-			return nil
-		}
-		return errors.New("fail to find the tx")
-	}
-
-	err := backoff.Retry(op, bf)
-	return err
-}
-
 func (jc *JoltChainInstance) getValidators(height string) ([]*vaulttypes.Validator, error) {
-	vaultQuery := vaulttypes.NewQueryClient(jc.GrpcClient)
-	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
-	defer cancel()
-
-	q := vaulttypes.QueryGetValidatorsRequest{Height: height}
-	vaultResp, err := vaultQuery.GetValidators(ctx, &q)
-	if err != nil {
-		jc.logger.Error().Err(err).Msg("fail to query the validators")
-		return nil, err
-	}
-	return vaultResp.Validators.AllValidators, nil
+	v, err := jc.CosHandler.GetValidators(height)
+	return v, err
 }
 
 func (jc *JoltChainInstance) doInitValidator(i info, blockHeight int64, values []*tmservice.Validator) error {
 	jc.myValidatorInfo = i
 	jc.validatorSet = validators.NewValidator()
 
-	encCfg := MakeEncodingConfig()
+	encCfg := common.MakeEncodingConfig()
 	localVals := make([]*validators.Validator, len(values))
 	for index, el := range values {
 		var pk cryptotypes.PubKey

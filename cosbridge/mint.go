@@ -3,6 +3,8 @@ package cosbridge
 import (
 	"html"
 
+	"google.golang.org/grpc"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	grpc1 "github.com/gogo/protobuf/grpc"
 	"gitlab.com/joltify/joltifychain-bridge/common"
@@ -12,13 +14,20 @@ import (
 )
 
 func prepareIssueTokenRequest(item *common.InBoundReq, creatorAddr, index string) (*vaulttypes.MsgCreateIssueToken, error) {
-	userAddr, _, coin, _ := item.GetInboundReqInfo()
-
+	userAddr, coin, _ := item.GetInboundReqInfo()
 	a, err := vaulttypes.NewMsgCreateIssueToken(creatorAddr, index, coin.String(), userAddr.String())
 	if err != nil {
 		return nil, err
 	}
 	return a, nil
+}
+
+func (jc *JoltChainInstance) CheckWhetherAlreadyExist(client *grpc.ClientConn, index string) bool {
+	return jc.CosHandler.CheckWhetherIssueTokenAlreadyExist(client, index)
+}
+
+func (jc *JoltChainInstance) CheckIssueTokenTxStatus(client *grpc.ClientConn, index string, retryNum uint64) error {
+	return jc.CosHandler.CheckIssueTokenTxStatus(client, index, retryNum)
 }
 
 // DoProcessInBound mint the token in joltify chain
@@ -56,7 +65,7 @@ func (jc *JoltChainInstance) DoProcessInBound(conn grpc1.ClientConn, items []*co
 	// as in a group, the accseq MUST has been sorted.
 	accSeq, accNum, poolAddress, _ := items[0].GetAccountInfo()
 	// for batchsigning, the signMsgs for all the members in the group is the same
-	txHashes, err := jc.batchComposeAndSend(conn, issueReqs, accSeq, accNum, signMsgs[0], poolAddress)
+	txHashes, err := jc.CosHandler.BatchComposeAndSend(conn, issueReqs, accSeq, accNum, signMsgs[0], poolAddress.String())
 	if err != nil {
 		jc.logger.Error().Msgf("we fail to process one or more txs")
 	}

@@ -5,7 +5,7 @@ import "time"
 const (
 	NativeSign = "native"
 
-	GASFEERATIO      = "5"
+	GASFEERATIO      = "2"
 	DEFAULTNATIVEGAS = 21000
 	MINCHECKBLOCKGAP = 30
 )

@@ -1,4 +1,4 @@
-package cosbridge
+package common
 
 import (
 	"github.com/cosmos/cosmos-sdk/codec"

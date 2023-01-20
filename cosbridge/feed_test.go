@@ -8,9 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/types/simulation"
-	"github.com/ethereum/go-ethereum/crypto"
 	grpc1 "github.com/gogo/protobuf/grpc"
 	"gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/pubchain"
@@ -109,12 +107,7 @@ func createdTestInBoundReqs(n int) []*common.InBoundReq {
 	for i := 0; i < n; i++ {
 		txid := fmt.Sprintf("testTXID %v", i)
 		testCoin := sdk.NewCoin("test", sdk.NewInt(32))
-		sk, err := crypto.GenerateKey()
-		if err != nil {
-			panic(err)
-		}
-		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewAccountInboundReq(accs[i].Address, addr, testCoin, []byte(txid), int64(i))
+		item := common.NewAccountInboundReq(accs[i].Address, testCoin, []byte(txid), int64(i))
 		retReq[i] = &item
 	}
 	return retReq
@@ -135,11 +128,10 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 	f.Require().NoError(err)
 
 	rp := common.NewRetryPools()
-	oc, err := NewJoltifyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, &tss, tl, rp)
+	oc, err := NewJoltifyBridge(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, f.network.Validators[0].ClientCtx, &tss, tl, rp)
 	f.Require().NoError(err)
-	oc.Keyring = f.validatorky
-	oc.GrpcClient = f.network.Validators[0].ClientCtx
-	info, err := oc.Keyring.Key("operator")
+	oc.CosHandler.Keyring = f.validatorky
+	info, err := oc.CosHandler.GetKey("operator")
 	f.Require().NoError(err)
 	poolInfo := vaulttypes.PoolInfo{
 		BlockHeight: "100",
@@ -149,7 +141,7 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 		},
 	}
 
-	acc, err := queryAccount(f.grpc, f.network.Validators[0].Address.String(), "")
+	acc, err := common.QueryAccount(f.grpc, f.network.Validators[0].Address.String(), "")
 	f.Require().NoError(err)
 	_ = acc
 	pi := pubchain.Instance{
@@ -170,15 +162,15 @@ func (f FeedtransactionTestSuite) TestFeedTransactions() {
 	value := <-pi.InboundReqChan
 	f.Require().Equal(value[0].TxID, reqs[0].TxID)
 
-	info, err = oc.Keyring.Key("operator")
+	info, err = oc.CosHandler.GetKey("operator")
 	f.Require().NoError(err)
-	err = oc.Keyring.Delete("operator")
+	err = oc.CosHandler.DeleteKey("operator")
 	f.Require().NoError(err)
 
 	err = oc.FeedTx(f.grpc, &poolInfo, &pi)
 	f.Require().Error(err)
 
-	_, _, err = oc.Keyring.NewMnemonic("operator", keyring.English, sdk.FullFundraiserPath, keyring.DefaultBIP39Passphrase, hd.Secp256k1)
+	_, err = oc.CosHandler.NewMnemonic("operator")
 	f.Require().NoError(err)
 
 	err = oc.FeedTx(f.grpc, &poolInfo, &pi)

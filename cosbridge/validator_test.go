@@ -5,6 +5,10 @@ import (
 	"testing"
 	"time"
 
+	cossubmit "gitlab.com/joltify/joltifychain-bridge/cos_submit"
+
+	"gitlab.com/joltify/joltifychain-bridge/common"
+
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -126,9 +130,10 @@ func (v *ValidatorTestSuite) SetupSuite() {
 }
 
 func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
-	oc := new(JoltChainInstance)
-	oc.GrpcClient = v.network.Validators[0].ClientCtx
-	err := oc.InitValidators(v.network.Validators[0].APIAddress)
+	rp := common.NewRetryPools()
+	oc, err := NewJoltifyBridge(v.network.Validators[0].APIAddress, v.network.Validators[0].RPCAddress, v.network.Validators[0].ClientCtx, nil, nil, rp)
+	v.Require().NoError(err)
+	err = oc.InitValidators(v.network.Validators[0].APIAddress)
 	v.Require().Nil(err)
 
 	validators, _ := oc.GetLastValidator()
@@ -137,16 +142,16 @@ func (v ValidatorTestSuite) TestValidatorInitAndUpdate() {
 
 func (v ValidatorTestSuite) TestQueryPool() {
 	oc := new(JoltChainInstance)
-	oc.GrpcClient = v.network.Validators[0].ClientCtx
 	_, err := oc.QueryLastPoolAddress(v.grpc)
 	v.Require().NoError(err)
 }
 
 func (v ValidatorTestSuite) TestCheckWhetherSigner() {
 	oc := new(JoltChainInstance)
-	oc.GrpcClient = v.network.Validators[0].ClientCtx
-	oc.Keyring = v.validatorky
-	blockHeight, err := GetLastBlockHeight(oc.GrpcClient)
+	a, err := cossubmit.NewCosOperations(v.network.Validators[0].APIAddress, v.network.Validators[0].RPCAddress, v.network.Validators[0].ClientCtx, v.validatorky, "joltify", nil)
+	v.Require().NoError(err)
+	oc.CosHandler = a
+	blockHeight, err := common.GetLastBlockHeight(a.GrpcClient)
 	v.Require().NoError(err)
 	v.Require().GreaterOrEqual(blockHeight, int64(1))
 
@@ -158,10 +163,10 @@ func (v ValidatorTestSuite) TestCheckWhetherSigner() {
 	v.Require().NoError(err)
 	v.Require().True(ret)
 
-	err = oc.Keyring.Delete("operator")
+	err = oc.CosHandler.DeleteKey("operator")
 	v.Require().NoError(err)
 
-	_, _, err = oc.Keyring.NewMnemonic("operator", keyring.English, sdk.FullFundraiserPath, keyring.DefaultBIP39Passphrase, hd.Secp256k1)
+	_, err = oc.CosHandler.NewMnemonic("operator")
 	v.Require().NoError(err)
 	ret, err = oc.CheckWhetherSigner(lastPoolInfo)
 	v.Require().NoError(err)
@@ -170,23 +175,4 @@ func (v ValidatorTestSuite) TestCheckWhetherSigner() {
 
 func TestInitValidator(t *testing.T) {
 	suite.Run(t, new(ValidatorTestSuite))
-}
-
-func (v ValidatorTestSuite) TestOppyChainBridge_CheckWhetherAlreadyExist() {
-	oc := new(JoltChainInstance)
-	oc.GrpcClient = v.network.Validators[0].ClientCtx
-	ret := oc.CheckWhetherAlreadyExist(v.grpc, "testindex")
-	v.Require().True(ret)
-
-	ret = oc.CheckWhetherAlreadyExist(v.grpc, "testindexnoexist")
-	v.Require().False(ret)
-}
-
-func (v ValidatorTestSuite) TestCheckTxStatus() {
-	oc := new(JoltChainInstance)
-	oc.GrpcClient = v.network.Validators[0].ClientCtx
-	err := oc.CheckTxStatus(oc.GrpcClient, "testindex", 1)
-	v.Require().NoError(err)
-	err = oc.CheckTxStatus(oc.GrpcClient, "testindexnoexist", 1)
-	v.Require().Error(err)
 }

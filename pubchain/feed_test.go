@@ -5,13 +5,15 @@ import (
 	"sync"
 	"testing"
 
+	"gitlab.com/joltify/joltifychain-bridge/config"
+	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	"gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
 	"gotest.tools/assert"
 )
 
@@ -42,10 +44,17 @@ func TestFeedTx(t *testing.T) {
 	assert.NilError(t, err)
 	wg := sync.WaitGroup{}
 	mockRetryMap := sync.Map{}
-	pi, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tssServer, tl, &wg, &mockRetryMap)
-	assert.NilError(t, err)
+	cfg := config.Config{}
+	cfg.PubChainConfig.WsAddressBSC = misc.WebsocketTest
+	cfg.PubChainConfig.WsAddressETH = misc.WebsocketTest
 
-	bscChainClient, err := NewChainInfo(misc.WebsocketTest, "BSC", &wg)
+	pi := &Instance{
+		joltRetryOutBoundReq: &mockRetryMap,
+		TokenList:            tl,
+		tssServer:            &tssServer,
+	}
+
+	bscChainClient, err := NewErc20ChainInfo(misc.WebsocketTest, "BSC", &wg)
 	assert.NilError(t, err)
 	pi.BSCChain = bscChainClient
 
@@ -59,10 +68,10 @@ func TestFeedTx(t *testing.T) {
 	toAddr, err := misc.PoolPubKeyToEthAddress("joltpub1addwnpepqgknlvjpa7237gnrm2kakjd37xagm7435hmk6zqf5248dnext9cfshhe990")
 	assert.NilError(t, err)
 
-	a1 := common.NewOutboundReq("test1", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, "BSC", true)
-	a2 := common.NewOutboundReq("test2", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, "BSC", true)
-	a3 := common.NewOutboundReq("test3", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, "BSC", true)
-	a4 := common.NewOutboundReq("test4", acc[0].commAddr, toAddr, sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, "BSC", true)
+	a1 := common.NewOutboundReq("test1", acc[0].commAddr.Bytes(), toAddr.Bytes(), sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, "BSC", true)
+	a2 := common.NewOutboundReq("test2", acc[0].commAddr.Bytes(), toAddr.Bytes(), sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, "BSC", true)
+	a3 := common.NewOutboundReq("test3", acc[0].commAddr.Bytes(), toAddr.Bytes(), sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, "BSC", true)
+	a4 := common.NewOutboundReq("test4", acc[0].commAddr.Bytes(), toAddr.Bytes(), sdk.NewCoin("test", sdk.NewInt(1)), AddrPUSD, 125, nil, "BSC", true)
 	testOutBoundReqs := []*common.OutBoundReq{&a1, &a2, &a3, &a4}
 
 	err = pi.FeedTx(&poolInfo, testOutBoundReqs, "BSC")

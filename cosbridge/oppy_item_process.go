@@ -13,6 +13,24 @@ func (jc *JoltChainInstance) AddOnHoldQueue(item *common.OutBoundReq) {
 	jc.onHoldRetryQueue = append(jc.onHoldRetryQueue, item)
 }
 
+func (jc *JoltChainInstance) RetrieveItemsWithType(chainType string) []*common.OutBoundReq {
+	jc.onHoldRetryQueueLock.Lock()
+	defer jc.onHoldRetryQueueLock.Unlock()
+	if len(jc.onHoldRetryQueue) == 0 {
+		return []*common.OutBoundReq{}
+	}
+	var ret, newQueue []*common.OutBoundReq
+	for _, el := range jc.onHoldRetryQueue {
+		if el.ChainType == chainType {
+			ret = append(ret, el)
+		} else {
+			newQueue = append(newQueue, el)
+		}
+	}
+	jc.onHoldRetryQueue = newQueue
+	return ret
+}
+
 func (jc *JoltChainInstance) DumpQueue() []*common.OutBoundReq {
 	jc.onHoldRetryQueueLock.Lock()
 	defer jc.onHoldRetryQueueLock.Unlock()

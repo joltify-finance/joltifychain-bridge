@@ -24,7 +24,7 @@ func createdTestOutBoundReqs(n int) []*OutBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := NewOutboundReq(hex.EncodeToString([]byte(txid)), addr, addr, testCoin, addr.Hex(), int64(i), nil, "BSC", true)
+		item := NewOutboundReq(hex.EncodeToString([]byte(txid)), addr.Bytes(), addr.Bytes(), testCoin, addr.Hex(), int64(i), nil, "BSC", true)
 		retReq[i] = &item
 	}
 	return retReq
@@ -37,12 +37,12 @@ func createdTestInBoundReqs(n int) []*InBoundReq {
 	for i := 0; i < n; i++ {
 		txid := fmt.Sprintf("testTXID %v", i)
 		testCoin := sdk.NewCoin("test", sdk.NewInt(32))
-		sk, err := crypto.GenerateKey()
-		if err != nil {
-			panic(err)
-		}
-		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := NewAccountInboundReq(accs[i].Address, addr, testCoin, []byte(txid), int64(i))
+		//sk, err := crypto.GenerateKey()
+		//if err != nil {
+		//	panic(err)
+		//}
+		//addr := crypto.PubkeyToAddress(sk.PublicKey)
+		item := NewAccountInboundReq(accs[i].Address, testCoin, []byte(txid), int64(i))
 		retReq[i] = &item
 	}
 	return retReq
@@ -53,7 +53,7 @@ func TestOutBoundTx(t *testing.T) {
 	index := outboundreqs[0].Index()
 	assert.NotNil(t, index)
 	addr := common.Address{}
-	outboundreqs[0].SetItemNonce(addr, 23)
+	outboundreqs[0].SetItemNonce(addr.Bytes(), 23, "", 0)
 	h := outboundreqs[0].Hash()
 	assert.NotNil(t, h.Bytes())
 	_, _, _, _, nonce := outboundreqs[0].GetOutBoundInfo()
@@ -68,6 +68,6 @@ func TestInBoundTx(t *testing.T) {
 	seq, num, _, _ := outboundreqs[0].GetAccountInfo()
 	assert.Equal(t, seq, uint64(100))
 	assert.Equal(t, num, uint64(2))
-	_, _, coin, _ := outboundreqs[0].GetInboundReqInfo()
+	_, coin, _ := outboundreqs[0].GetInboundReqInfo()
 	assert.Equal(t, coin.Amount.String(), "32")
 }

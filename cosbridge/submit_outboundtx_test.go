@@ -112,12 +112,12 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	s.Require().NoError(err)
 	rp := common.NewRetryPools()
-	oc, err := NewJoltifyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, &tss, tl, rp)
+	oc, err := NewJoltifyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, s.network.Validators[0].ClientCtx, &tss, tl, rp)
 	s.Require().NoError(err)
-	oc.Keyring = s.validatorky
+	oc.CosHandler.Keyring = s.validatorky
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	oc.GrpcClient = s.network.Validators[0].ClientCtx
+	oc.CosHandler.GrpcClient = s.network.Validators[0].ClientCtx
 	defer func() {
 		err := oc.TerminateBridge()
 		if err != nil {
@@ -136,13 +136,13 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	info, _ := s.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()
 	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
-	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
+	valAddr, err := misc.PoolPubKeyToJoltifyAddress(pkstr)
 	s.Require().NoError(err)
 
-	acc, err := queryAccount(s.grpc, valAddr.String(), "")
+	acc, err := common.QueryAccount(s.grpc, valAddr.String(), "")
 	s.Require().NoError(err)
 
-	operatorInfo, _ := oc.Keyring.Key("operator")
+	operatorInfo, _ := oc.CosHandler.GetKey("operator")
 
 	send := banktypes.NewMsgSend(valAddr, operatorInfo.GetAddress(), sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100))})
 
@@ -150,23 +150,26 @@ func (s SubmitOutBoundTestSuite) TestSubmitOutboundTx() {
 	s.Require().NoError(err)
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	s.Require().NoError(err)
-	ret, _, err := oc.BroadcastTx(context.Background(), s.grpc, txBytes, false)
+	ret, _, err := oc.CosHandler.BroadcastTx(context.Background(), s.grpc, txBytes, false)
 	s.Require().NoError(err)
 	s.Require().True(ret)
 
 	req := common.OutBoundReq{
 		TxID:               hex.EncodeToString([]byte("testreq")),
-		OutReceiverAddress: accs[0].commAddr,
+		OutReceiverAddress: accs[0].commAddr.Bytes(),
 		ChainType:          "BSC",
 		NeedMint:           true,
 	}
-	err = oc.SubmitOutboundTx(s.grpc, info, "incorrect_request_ID", 10, hex.EncodeToString([]byte("testpubtx")), sdk.NewCoins(sdk.NewCoin("abc", sdk.NewInt(32))), req.ChainType, req.TxID, req.OutReceiverAddress.Bytes(), req.NeedMint)
+	err = oc.SubmitOutboundTx(s.grpc, info, "incorrect_request_ID", 10, hex.EncodeToString([]byte("testpubtx")), sdk.NewCoins(sdk.NewCoin("abc", sdk.NewInt(32))), req.ChainType, req.TxID, req.OutReceiverAddress, req.NeedMint)
 	// we submit the incorrect req ID
 	s.Require().Error(err)
 
-	err = oc.SubmitOutboundTx(s.grpc, info, req.Hash().Hex(), 10, hex.EncodeToString([]byte("testpubtx")), sdk.NewCoins(sdk.NewCoin("abc", sdk.NewInt(32))), "BSC", req.TxID, req.OutReceiverAddress.Bytes(), req.NeedMint)
+	err = oc.SubmitOutboundTx(s.grpc, info, req.Hash().Hex(), 10, hex.EncodeToString([]byte("testpubtx")), sdk.NewCoins(sdk.NewCoin("abc", sdk.NewInt(32))), "BSC", req.TxID, req.OutReceiverAddress, req.NeedMint)
 	s.Require().NoError(err)
-	_, err = oc.GetPubChainSubmittedTx(req)
+
+	validators, err := queryLastValidatorSet(oc.CosHandler.GrpcClient)
+	s.Require().NoError(err)
+	_, err = oc.GetPubChainSubmittedTx(req, len(validators))
 	s.Require().NoError(err)
 }
 

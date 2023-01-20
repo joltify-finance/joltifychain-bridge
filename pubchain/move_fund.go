@@ -12,8 +12,13 @@ import (
 	"sync"
 	"time"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"gitlab.com/joltify/joltifychain-bridge/tssclient"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	grpc1 "github.com/gogo/protobuf/grpc"
 	"gitlab.com/joltify/joltifychain-bridge/config"
 	"gitlab.com/joltify/joltifychain-bridge/generated"
 
@@ -24,10 +29,79 @@ import (
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 )
 
+func (pi *Instance) MoveFundCosmos(height int64, grpcClient grpc1.ClientConn, previousPool *bcommon.PoolInfo) bool {
+	currentPool := pi.GetPool()
+	// if we restart the bridge, pubchain go routine may run before joltify go routine which acquire the pool info
+	if currentPool[1] == nil {
+		zlog.Warn().Msgf("the current pool has not been set, move fund can not start")
+		return false
+	}
+
+	fromAtomAddress := sdk.MustBech32ifyAddressBytes("cosmos", previousPool.CosAddress)
+	acc, err := bcommon.QueryAccount(pi.CosChain.CosHandler.GrpcClient, fromAtomAddress, "")
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("fail to query the Account")
+		return false
+	}
+
+	roundBlockHeight := height / ROUNDBLOCK
+
+	signMsg := tssclient.TssSignigMsg{
+		Pk:          previousPool.PoolInfo.CreatePool.PoolPubKey,
+		Signers:     nil,
+		BlockHeight: roundBlockHeight,
+		Version:     tssclient.TssVersion,
+	}
+
+	from := fromAtomAddress
+	to := sdk.MustBech32ifyAddressBytes("cosmos", currentPool[1].CosAddress)
+
+	balance, err := bcommon.QueryBalance(nil, from, pi.CosChain.CosHandler.GrpcAddr, "uatom")
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("fail to query the Account Atom Balance")
+		return false
+	}
+
+	if balance.Amount.IsZero() {
+		tick := html.UnescapeString("&#" + "9193" + ";")
+		pi.logger.Info().Msgf(" %v atom has already moved", tick)
+		return true
+	}
+
+	tick := html.UnescapeString("&#" + "9193" + ";")
+	pi.logger.Info().Msgf(" %v we move fund %v:%v from %v to %v", tick, "cosmos", balance, from, to)
+
+	sendMsg := banktypes.MsgSend{
+		FromAddress: from,
+		ToAddress:   to,
+		Amount:      sdk.NewCoins(sdk.NewCoin(balance.Denom, balance.Amount)),
+	}
+
+	previousPoolAddr := sdk.MustBech32ifyAddressBytes("cosmos", previousPool.CosAddress)
+	ret, err := pi.CosChain.CosHandler.BatchComposeAndSend(grpcClient, []sdk.Msg{&sendMsg}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, previousPoolAddr)
+	if err != nil {
+		pi.logger.Error().Err(err).Msg("fail to move the atom")
+		pi.AddMoveFundItem(previousPool, height+movefundretrygap, pi.CosChain.ChainType)
+		return false
+	}
+
+	txHash := ret[acc.GetSequence()]
+
+	err = pi.CosChain.CosHandler.QueryTxStatus(pi.CosChain.CosHandler.GrpcClient, txHash, 10)
+	if err != nil {
+		pi.logger.Error().Err(err).Msgf("fail to find the successful submited tx %v", txHash)
+		pi.AddMoveFundItem(previousPool, height+movefundretrygap, pi.CosChain.ChainType)
+		return false
+	}
+	zlog.Logger.Info().Msgf("the move fund request has been submitted by others")
+
+	return true
+}
+
 // MoveFound moves the fund for the public chain
 // our strategy is we need to run move fund at least twice to ensure the account is empty, even if
 // we move the fund success this round, we still need to run it again to 100% ensure the old pool is empty
-func (pi *Instance) MoveFound(height int64, chainInfo *ChainInfo, previousPool *bcommon.PoolInfo, ethClient *ethclient.Client) bool {
+func (pi *Instance) MoveFound(height int64, chainInfo *Erc20ChainInfo, previousPool *bcommon.PoolInfo, ethClient *ethclient.Client) bool {
 	// we get the latest pool address and move funds to the latest pool
 	currentPool := pi.GetPool()
 	emptyERC20Tokens := atomic.NewBool(true)
@@ -169,7 +243,7 @@ func (pi *Instance) MoveFound(height int64, chainInfo *ChainInfo, previousPool *
 	return true
 }
 
-func (pi *Instance) moveERC20Token(chainInfo *ChainInfo, index int, nonce uint64, sender, receiver common.Address, balance *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
+func (pi *Instance) moveERC20Token(chainInfo *Erc20ChainInfo, index int, nonce uint64, sender, receiver common.Address, balance *big.Int, tokenAddr string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, error) {
 	txHash, err := pi.SendTokenBatch(chainInfo, index, sender, receiver, balance, big.NewInt(int64(nonce)), tokenAddr, tssReqChan, tssRespChan)
 	if err != nil {
 		if err.Error() == alreadyKnown {
@@ -200,7 +274,7 @@ func (pi *Instance) needToMoveFund(tokenAddr string, poolAddr common.Address, et
 	return false, nil
 }
 
-func (pi *Instance) doMoveTokenFunds(chainInfo *ChainInfo, index int, nonce uint64, previousPool *bcommon.PoolInfo, receiver common.Address, tokenAddr string, ethClient *ethclient.Client, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (bool, error) {
+func (pi *Instance) doMoveTokenFunds(chainInfo *Erc20ChainInfo, index int, nonce uint64, previousPool *bcommon.PoolInfo, receiver common.Address, tokenAddr string, ethClient *ethclient.Client, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (bool, error) {
 	tokenInstance, err := generated.NewToken(common.HexToAddress(tokenAddr), ethClient)
 	if err != nil {
 		return false, err
@@ -236,7 +310,7 @@ func (pi *Instance) doMoveTokenFunds(chainInfo *ChainInfo, index int, nonce uint
 	return false, errors.New("we failed to move fund for this token")
 }
 
-func (pi *Instance) doMoveBNBFunds(chainInfo *ChainInfo, previousPool *bcommon.PoolInfo, receiver common.Address) (bool, bool, error) {
+func (pi *Instance) doMoveBNBFunds(chainInfo *Erc20ChainInfo, previousPool *bcommon.PoolInfo, receiver common.Address) (bool, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel()
 	balanceBnB, err := chainInfo.getBalanceWithLock(ctx, previousPool.EthAddress)

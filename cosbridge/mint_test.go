@@ -106,7 +106,7 @@ func (v *MintTestSuite) SetupSuite() {
 func (m MintTestSuite) TestPrepareIssueTokenRequest() {
 	accs, err := generateRandomPrivKey(3)
 	m.Require().NoError(err)
-	tx := common.NewAccountInboundReq(accs[0].joltAddr, accs[1].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(2))
+	tx := common.NewAccountInboundReq(accs[0].joltAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(2))
 	_, err = prepareIssueTokenRequest(&tx, accs[2].commAddr.String(), "1")
 	m.Require().EqualError(err, "decoding bech32 failed: string not all lowercase or all uppercase")
 
@@ -196,12 +196,11 @@ func (m MintTestSuite) TestProcessInbound() {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	m.Require().NoError(err)
 	rp := common.NewRetryPools()
-	oc, err := NewJoltifyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, &tss, tl, rp)
+	oc, err := NewJoltifyBridge(m.network.Validators[0].APIAddress, m.network.Validators[0].RPCAddress, m.network.Validators[0].ClientCtx, &tss, tl, rp)
 	m.Require().NoError(err)
-	oc.Keyring = m.validatorky
+	oc.CosHandler.Keyring = m.validatorky
 
 	// we need to add this as it seems the rpcaddress is incorrect
-	oc.GrpcClient = m.network.Validators[0].ClientCtx
 	defer func() {
 		err := oc.TerminateBridge()
 		if err != nil {
@@ -218,12 +217,12 @@ func (m MintTestSuite) TestProcessInbound() {
 	info, _ := m.network.Validators[0].ClientCtx.Keyring.Key("node0")
 	pk := info.GetPubKey()
 	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
-	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
+	valAddr, err := misc.PoolPubKeyToJoltifyAddress(pkstr)
 	m.Require().NoError(err)
 
-	acc, err := queryAccount(m.grpc, valAddr.String(), m.network.Validators[0].RPCAddress)
+	acc, err := common.QueryAccount(m.grpc, valAddr.String(), m.network.Validators[0].RPCAddress)
 	m.Require().NoError(err)
-	tx := common.NewAccountInboundReq(valAddr, accs[0].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100))
+	tx := common.NewAccountInboundReq(valAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte("test"), int64(100))
 
 	tx.SetAccountInfo(0, 0, accs[0].joltAddr, accs[0].pk)
 
@@ -233,7 +232,7 @@ func (m MintTestSuite) TestProcessInbound() {
 	m.Require().NoError(err)
 	txBytes, err := oc.encoding.TxConfig.TxEncoder()(txBuilder.GetTx())
 	m.Require().NoError(err)
-	ret, _, err := oc.BroadcastTx(context.Background(), m.grpc, txBytes, false)
+	ret, _, err := oc.CosHandler.BroadcastTx(context.Background(), m.grpc, txBytes, false)
 	m.Require().NoError(err)
 	m.Require().True(ret)
 

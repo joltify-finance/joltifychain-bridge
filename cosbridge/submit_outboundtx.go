@@ -10,7 +10,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	grpc1 "github.com/gogo/protobuf/grpc"
 
-	"gitlab.com/joltify/joltifychain-bridge/common"
+	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 )
@@ -19,12 +19,12 @@ import (
 func (jc *JoltChainInstance) SubmitOutboundTx(conn grpc1.ClientConn, operator keyring.Info, requestID string, blockHeight int64, pubchainTx string, fee sdk.Coins, chainType, inTxHash string, receiverAddress sdk.AccAddress, needMint bool) error {
 	var err error
 	if operator == nil {
-		operator, err = jc.Keyring.Key("operator")
+		operator, err = jc.CosHandler.GetKey("operator")
 		if err != nil {
 			return err
 		}
 	}
-	acc, err := queryAccount(conn, operator.GetAddress().String(), "")
+	acc, err := bcommon.QueryAccount(conn, operator.GetAddress().String(), "")
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to query the Account")
 		return err
@@ -43,7 +43,7 @@ func (jc *JoltChainInstance) SubmitOutboundTx(conn grpc1.ClientConn, operator ke
 		ReceiverAddress: receiverAddress,
 	}
 
-	ok, _, err := jc.composeAndSend(conn, operator, &outboundMsg, accSeq, accNum, nil, operator.GetAddress())
+	ok, _, err := jc.CosHandler.ComposeAndSend(conn, operator, &outboundMsg, accSeq, accNum, nil, operator.GetAddress().String())
 	if !ok || err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to submit the outbound tx record")
 		return errors.New("fail to broadcast the outbound tx record")
@@ -52,10 +52,11 @@ func (jc *JoltChainInstance) SubmitOutboundTx(conn grpc1.ClientConn, operator ke
 }
 
 // GetPubChainSubmittedTx get the submitted mint tx
-func (jc *JoltChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (string, error) {
+func (jc *JoltChainInstance) GetPubChainSubmittedTx(req bcommon.OutBoundReq, validatorNum int) (string, error) {
 	reqStr := req.Hash().Hex()
 	jc.logger.Info().Msgf("we check the hash %v\n", reqStr)
-	vaultQuery := vaulttypes.NewQueryClient(jc.GrpcClient)
+
+	vaultQuery := vaulttypes.NewQueryClient(jc.CosHandler.GrpcClient)
 	ctx, cancel := context.WithTimeout(context.Background(), grpcTimeout)
 	defer cancel()
 	outboundTxRequest := vaulttypes.QueryGetOutboundTxRequest{RequestID: reqStr}
@@ -64,8 +65,7 @@ func (jc *JoltChainInstance) GetPubChainSubmittedTx(req common.OutBoundReq) (str
 		return "", err
 	}
 
-	validators, _ := jc.GetLastValidator()
-	min := float32(len(validators)*2) / float32(3)
+	min := float32(validatorNum*2) / float32(3)
 
 	target := ""
 	for key, value := range resp.OutboundTx.Items {

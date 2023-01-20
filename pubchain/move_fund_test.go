@@ -66,10 +66,24 @@ func (tn *TestNetTestSuite) SetupSuite() {
 		panic(err)
 	}
 	wg := sync.WaitGroup{}
-	mockRetry := sync.Map{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg, &mockRetry)
-	if err != nil {
-		panic(err)
+	cfg := config.Config{}
+	cfg.PubChainConfig.WsAddressBSC = misc.WebsocketTest
+	cfg.PubChainConfig.WsAddressETH = misc.WebsocketTest
+
+	bscChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressBSC, "BSC", &wg)
+	tn.Require().NoError(err)
+
+	ethChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressETH, "ETH", &wg)
+	tn.Require().NoError(err)
+
+	pubChain := &Instance{
+		wg:           &wg,
+		BSCChain:     bscChainClient,
+		EthChain:     ethChainClient,
+		TokenList:    tl,
+		lastTwoPools: make([]*bcommon.PoolInfo, 2),
+		poolLocker:   &sync.RWMutex{},
+		tssServer:    &tss,
 	}
 
 	tn.pubChain = pubChain
@@ -82,7 +96,7 @@ func (tn TestNetTestSuite) TestProcessNewBlock() {
 	number, err := tn.pubChain.BSCChain.Client.BlockNumber(ctx)
 	tn.Require().NoError(err)
 	tn.pubChain.BSCChain.ChainLocker.Unlock()
-	err = tn.pubChain.ProcessNewBlock("BSC", tn.pubChain.BSCChain, big.NewInt(int64(number)), tn.pubChain.FeeModule, "")
+	err = tn.pubChain.ProcessNewERC20Block("BSC", tn.pubChain.BSCChain, big.NewInt(int64(number)), tn.pubChain.FeeModule, "")
 	tn.Require().NoError(err)
 }
 
@@ -111,7 +125,7 @@ func (tn TestNetTestSuite) TestDoMoveFund() {
 
 	ethAddr, err := misc.PoolPubKeyToEthAddress(previouspool)
 	tn.Require().NoError(err)
-	oppyAddr, err := misc.PoolPubKeyToOppyAddress(previouspool)
+	oppyAddr, err := misc.PoolPubKeyToJoltifyAddress(previouspool)
 	tn.Require().NoError(err)
 
 	previous := bcommon.PoolInfo{

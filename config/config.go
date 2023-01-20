@@ -10,8 +10,6 @@ import (
 
 type CosChainConfig struct {
 	GrpcAddress string
-	WsAddress   string
-	WsEndpoint  string
 	HTTPAddress string
 	RollbackGap int
 }
@@ -66,6 +64,7 @@ func (al *AddrList) Set(value string) error {
 type Config struct {
 	CosChain           CosChainConfig
 	PubChainConfig     PubChainConfig
+	AtomChain          CosChainConfig
 	TssConfig          TssConfig
 	KeyringAddress     string
 	HomeDir            string
@@ -79,10 +78,10 @@ func DefaultConfig() Config {
 	var config Config
 	flag.BoolVar(&config.Version, "v", false, "version of the joltifyChain")
 	flag.StringVar(&config.CosChain.GrpcAddress, "grpc-port", "127.0.0.1:9090", "address for joltify pub_chain")
-	flag.StringVar(&config.CosChain.WsAddress, "ws-port", "tcp://localhost:26657", "ws address for joltify pub_chain")
 	flag.StringVar(&config.CosChain.HTTPAddress, "http-port", "http://localhost:26657", "ws address for joltify pub_chain")
-	flag.StringVar(&config.CosChain.WsEndpoint, "ws-endpoint", "/websocket", "endpoint for joltify pub_chain")
 	flag.IntVar(&config.CosChain.RollbackGap, "joltify-rollback-gap", 1, "delay the transaction process to prevent chain rollback")
+	flag.StringVar(&config.AtomChain.GrpcAddress, "grpc-port-atom", "127.0.0.1:9091", "address for atom pub_chain")
+	flag.StringVar(&config.AtomChain.HTTPAddress, "http-port-atom", "http://localhost:26658", "ws address for atom pub_chain")
 	flag.StringVar(&config.PubChainConfig.WsAddressBSC, "pub-ws-endpoint", "ws://127.0.0.1:8456/", "endpoint for public pub_chain listener")
 	flag.StringVar(&config.PubChainConfig.WsAddressETH, "pub-ws-ETHendpoint", "ws://127.0.0.1:8546/", "endpoint for public pub_chain listener")
 	flag.IntVar(&config.PubChainConfig.RollbackGap, "pubchain-rollback-gap", 1, "delay the transaction process to prevent chain rollback")

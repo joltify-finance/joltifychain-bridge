@@ -18,7 +18,7 @@ func NeedUpdate(qcPools []*vaulttypes.PoolInfo, curPools []*common.PoolInfo) boo
 		if err != nil {
 			return false
 		}
-		addr, err := misc.PoolPubKeyToOppyAddress(pk)
+		addr, err := misc.PoolPubKeyToJoltifyAddress(pk)
 		if err != nil {
 			return false
 		}

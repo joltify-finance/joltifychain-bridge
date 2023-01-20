@@ -55,8 +55,16 @@ func InitFeeModule() map[string]*FeeModule {
 		Ceil:      types.NewDecWithPrec(1000, 0),
 		Floor:     types.NewDecWithPrec(10, 2),
 	}
+
+	atomFeeModule := FeeModule{
+		ChainType: "ATOM",
+		FeeRatio:  types.NewDecWithPrec(1, 4),
+		Ceil:      types.NewDecWithPrec(1000, 0),
+		Floor:     types.NewDecWithPrec(10, 2),
+	}
 	ret := make(map[string]*FeeModule)
 	ret[ethFeeModule.ChainType] = &ethFeeModule
 	ret[bscFeeModule.ChainType] = &bscFeeModule
+	ret[atomFeeModule.ChainType] = &atomFeeModule
 	return ret
 }

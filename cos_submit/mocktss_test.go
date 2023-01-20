@@ -1,4 +1,4 @@
-package cosbridge
+package cossubmit
 
 import (
 	"crypto/ecdsa"

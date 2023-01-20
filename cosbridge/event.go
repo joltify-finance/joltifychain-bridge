@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	capacity = 10000
 	maxretry = 5
 )
 
@@ -85,7 +84,7 @@ func (jc *JoltChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 		defer inKeygenProcess.Store(false)
 		retry := 0
 		for retry = 0; retry < maxretry; retry++ {
-			resp, err := jc.tssServer.KeyGen(pubKeys, blockHeight, tssclient.TssVersion)
+			resp, err := jc.CosHandler.KeyGen(pubKeys, blockHeight, tssclient.TssVersion)
 			if err != nil {
 				jc.logger.Error().Err(err).Msgf("fail to do the keygen with retry %v", retry)
 				if mock {
@@ -118,7 +117,7 @@ func (jc *JoltChainInstance) HandleUpdateValidators(height int64, wg *sync.WaitG
 
 		// now we put the tss key on pub_chain
 		// fixme we need to allow user to choose the name of the key
-		creator, err := jc.Keyring.Key("operator")
+		creator, err := jc.CosHandler.GetKey("operator")
 		if err != nil {
 			jc.logger.Error().Msgf("fail to get the operator key :%v", err)
 			errKeygen = err

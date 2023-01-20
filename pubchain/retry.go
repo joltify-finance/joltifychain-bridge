@@ -12,7 +12,7 @@ import (
 )
 
 // UpdateSubscription start the subscription of the token
-func (c *ChainInfo) UpdateSubscription(ctx context.Context) error {
+func (c *Erc20ChainInfo) UpdateSubscription(ctx context.Context) error {
 	blockEvent := make(chan *types.Header, sbchannelsize)
 	handler, err := c.Client.SubscribeNewHead(ctx, blockEvent)
 	if err != nil {
@@ -43,7 +43,7 @@ func (c *ChainInfo) UpdateSubscription(ctx context.Context) error {
 }
 
 // StartSubscription start the subscription of the token
-func (c *ChainInfo) StartSubscription(ctx context.Context, wg *sync.WaitGroup) error {
+func (c *Erc20ChainInfo) StartSubscription(ctx context.Context, wg *sync.WaitGroup) error {
 	c.SubChannelNow = make(chan *types.Header, sbchannelsize)
 	handler, err := c.Client.SubscribeNewHead(ctx, c.SubChannelNow)
 	if err != nil {
@@ -61,7 +61,7 @@ func (c *ChainInfo) StartSubscription(ctx context.Context, wg *sync.WaitGroup) e
 	return nil
 }
 
-func (c *ChainInfo) RetryPubChain() error {
+func (c *Erc20ChainInfo) RetryPubChain() error {
 	err := c.CheckChainHealthWithLock()
 	if err == nil {
 		c.logger.Info().Msgf("all good we do not need to reset")

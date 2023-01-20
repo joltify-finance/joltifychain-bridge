@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/base64"
+	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -140,21 +141,24 @@ func TestMakeSignature(t *testing.T) {
 	assert.True(t, bytes.Equal(out, sigBytes))
 }
 
-func SetupBech32PrefixOppy() {
-	config := types.GetConfig()
-	config.SetBech32PrefixForAccount("oppy", "oppypub")
-	config.SetBech32PrefixForValidator("oppyvaloper", "oppyvpub")
-	config.SetBech32PrefixForConsensusNode("oppyvalcons", "oppycpub")
-}
-
 func TestPubkeyToOppyAddress(t *testing.T) {
 	SetupBech32Prefix()
 	poolkey := "joltpub1addwnpepqgqd9v2x3axlkkmv5zj8hr6z7pl4fyt8xmhdmfx5kzql2uu6xfdwcn7eqpx"
-	addr, err := PoolPubKeyToOppyAddress(poolkey)
+	addr, err := PoolPubKeyToJoltifyAddress(poolkey)
 	assert.NoError(t, err)
 	assert.Equal(t, "jolt106q2q2k37jum8zua08yp7lr6llygl3m8axx6dm", addr.String())
 
 	poolkeyWrong := "joltpub1addwnpepqgqd9v2x3axlkkmv5zj8hr6z7pl4fyt8xmhdmfx5kzql2uu6xfdwcn7eqp0"
-	_, err = PoolPubKeyToOppyAddress(poolkeyWrong)
+	_, err = PoolPubKeyToJoltifyAddress(poolkeyWrong)
 	assert.Error(t, err)
+}
+
+func TestConverAddr(t *testing.T) {
+	SetupBech32Prefix()
+	a := "jolt1txtsnx4gr4effr8542778fsxc20j5vzqxet7t0"
+	addr, err := types.AccAddressFromBech32(a)
+	assert.NoError(t, err)
+	b, err := types.Bech32ifyAddressBytes("cosmos", addr)
+	assert.NoError(t, err)
+	fmt.Printf(">>>>>%v\n", b)
 }

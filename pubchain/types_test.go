@@ -88,8 +88,8 @@ func createNreq(n int) ([]*common2.InBoundReq, []*common2.InBoundReq, error) {
 	reqs := make([]*common2.InBoundReq, n)
 	reqsSorted := make(sortInboundReq, n)
 	for i := 0; i < n; i++ {
-		req := common2.NewAccountInboundReq(accs[i].joltAddr, accs[n].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte(strconv.Itoa(i)), int64(i))
-		req2 := common2.NewAccountInboundReq(accs[i].joltAddr, accs[n].commAddr, sdk.NewCoin("test", sdk.NewInt(1)), []byte(strconv.Itoa(i)), int64(i))
+		req := common2.NewAccountInboundReq(accs[i].joltAddr.Bytes(), sdk.NewCoin("test", sdk.NewInt(1)), []byte(strconv.Itoa(i)), int64(i))
+		req2 := common2.NewAccountInboundReq(accs[i].joltAddr.Bytes(), sdk.NewCoin("test", sdk.NewInt(1)), []byte(strconv.Itoa(i)), int64(i))
 		reqs[i] = &req
 		reqsSorted[i] = &req2
 	}

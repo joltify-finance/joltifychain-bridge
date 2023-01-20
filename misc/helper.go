@@ -25,8 +25,8 @@ func SetupBech32Prefix() {
 	config.SetBech32PrefixForConsensusNode("joltvalcons", "joltcpub")
 }
 
-// PoolPubKeyToOppyAddress return the joltify encoded pubkey
-func PoolPubKeyToOppyAddress(pk string) (types.AccAddress, error) {
+// PoolPubKeyToJoltifyAddress return the joltify encoded pubkey
+func PoolPubKeyToJoltifyAddress(pk string) (types.AccAddress, error) {
 	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, pk) //nolint
 	if err != nil {
 		return types.AccAddress{}, err

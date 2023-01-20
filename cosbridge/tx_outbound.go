@@ -14,26 +14,38 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
-func (jc *JoltChainInstance) processOutBoundRequest(msg *banktypes.MsgSend, txID string, txBlockHeight int64, currEthAddr ethcommon.Address, memo bcommon.BridgeMemo) error {
+func (jc *JoltChainInstance) processOutBoundRequest(msg *banktypes.MsgSend, txID string, txBlockHeight int64, currentPool *bcommon.PoolInfo, memo bcommon.BridgeMemo) error {
 	tokenItem, tokenExist := jc.TokenList.GetTokenInfoByDenomAndChainType(msg.Amount[0].GetDenom(), memo.ChainType)
 	if !tokenExist {
 		return errors.New("token is not on our token list")
 	}
 
-	item := jc.processDemonAndFee(txID, msg.FromAddress, tokenItem.TokenAddr, txBlockHeight, ethcommon.HexToAddress(memo.Dest), msg.Amount[0].GetDenom(), msg.Amount[0].Amount, memo.ChainType)
+	item := jc.processDemonAndFee(txID, msg.FromAddress, tokenItem.TokenAddr, txBlockHeight, memo.Dest, msg.Amount[0].GetDenom(), msg.Amount[0].Amount, memo.ChainType)
 	// since the cosmos address is different from the eth address, we need to derive the eth address from the public key
 	if item != nil {
-		item.Token.Amount = outboundAdjust(item.Token.Amount, tokenItem.Decimals, types.Precision)
-		itemReq := bcommon.NewOutboundReq(txID, item.OutReceiverAddress, currEthAddr, item.Token, tokenItem.TokenAddr, txBlockHeight, types.Coins{item.Fee}, memo.ChainType, false)
+		var itemReq bcommon.OutBoundReq
+		switch memo.ChainType {
+		case "ATOM":
+			a, err := bcommon.AddressStringToBytes("cosmos", item.OutReceiverAddress)
+			if err != nil {
+				return err
+			}
+			itemReq = bcommon.NewOutboundReq(txID, a.Bytes(), currentPool.CosAddress.Bytes(), item.Token, tokenItem.TokenAddr, txBlockHeight, types.Coins{item.Fee}, memo.ChainType, false)
+		default:
+			// we only adjust token amount for erc20 tokens as atom is always 6 decimal
+			item.Token.Amount = outboundAdjust(item.Token.Amount, tokenItem.Decimals, types.Precision)
+			a := ethcommon.HexToAddress(item.OutReceiverAddress)
+			itemReq = bcommon.NewOutboundReq(txID, a.Bytes(), currentPool.EthAddress.Bytes(), item.Token, tokenItem.TokenAddr, txBlockHeight, types.Coins{item.Fee}, memo.ChainType, false)
+		}
 		jc.AddItem(&itemReq)
-		jc.logger.Info().Msgf("Outbound Transaction in Block %v (Current Block %v) with fee %v paid to validators", txBlockHeight, jc.CurrentHeight, types.Coins{item.Fee})
+		jc.logger.Info().Msgf("chain %v Outbound Transaction in Block %v (Current Block %v) with fee %v paid to validators", memo.ChainType, txBlockHeight, jc.CurrentHeight, types.Coins{item.Fee})
 		return nil
 	}
 	return nil
 }
 
 // processMsg handle the oppychain transactions
-func (jc *JoltChainInstance) processMsg(txBlockHeight int64, address []types.AccAddress, curEthAddr ethcommon.Address, memo bcommon.BridgeMemo, msg *banktypes.MsgSend, txHash []byte) error {
+func (jc *JoltChainInstance) processMsg(txBlockHeight int64, address []types.AccAddress, currentPool *bcommon.PoolInfo, memo bcommon.BridgeMemo, msg *banktypes.MsgSend, txHash []byte) error {
 	if msg.Amount.IsZero() {
 		return errors.New("zero amount")
 	}
@@ -51,14 +63,14 @@ func (jc *JoltChainInstance) processMsg(txBlockHeight int64, address []types.Acc
 		return errors.New("not a top up message to the pool")
 	}
 
-	err = jc.processOutBoundRequest(msg, txID, txBlockHeight, curEthAddr, memo)
+	err = jc.processOutBoundRequest(msg, txID, txBlockHeight, currentPool, memo)
 	if err != nil {
 		return fmt.Errorf("fail to process the outbound erc20 request %w", err)
 	}
 	return nil
 }
 
-func (jc *JoltChainInstance) processDemonAndFee(txID, fromAddress string, tokenAddr string, blockHeight int64, receiverAddr ethcommon.Address, demonName string, demonAmount types.Int, chainType string) *OutboundTx {
+func (jc *JoltChainInstance) processDemonAndFee(txID, fromAddress string, tokenAddr string, blockHeight int64, receiverAddr string, demonName string, demonAmount types.Int, chainType string) *OutboundTx {
 	token := types.Coin{
 		Denom:  demonName,
 		Amount: demonAmount,
@@ -69,9 +81,9 @@ func (jc *JoltChainInstance) processDemonAndFee(txID, fromAddress string, tokenA
 		panic("the fee module does not exist!!")
 	}
 
-	jc.grpcLock.Lock()
-	price, err := QueryTokenPrice(jc.GrpcClient, jc.grpcAddr, token.GetDenom())
-	jc.grpcLock.Unlock()
+	jc.CosHandler.GrpcLock.Lock()
+	price, err := QueryTokenPrice(jc.CosHandler.GrpcClient, jc.CosHandler.GrpcAddr, token.GetDenom())
+	jc.CosHandler.GrpcLock.Unlock()
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to get the token price")
 		return nil
@@ -123,7 +135,7 @@ func (jc *JoltChainInstance) UpdatePool(pool *vaulttypes.PoolInfo) *bcommon.Pool
 		return nil
 	}
 
-	addr, err := misc.PoolPubKeyToOppyAddress(poolPubKey)
+	addr, err := misc.PoolPubKeyToJoltifyAddress(poolPubKey)
 	if err != nil {
 		fmt.Printf("fail to convert the eth address to joltify address %v", poolPubKey)
 		return nil

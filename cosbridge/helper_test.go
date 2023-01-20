@@ -19,8 +19,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
-	"gitlab.com/joltify/joltifychain-bridge/tokenlist"
-	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 )
 
 type helperTestSuite struct {
@@ -127,81 +125,11 @@ func (h *helperTestSuite) SetupSuite() {
 	h.queryClient = tmservice.NewServiceClient(h.network.Validators[0].ClientCtx)
 }
 
-func (h *helperTestSuite) TestWaitandSend() {
-	rp := common.NewRetryPools()
-	oc, err := NewJoltifyBridge(h.network.Validators[0].APIAddress, h.network.Validators[0].RPCAddress, nil, nil, rp)
-	h.Require().NoError(err)
-	oc.GrpcClient = h.network.Validators[0].ClientCtx
-	info, _ := h.network.Validators[0].ClientCtx.Keyring.Key("node0")
-	pk := info.GetPubKey()
-	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
-	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
-	h.Require().NoError(err)
-	acc, err := queryAccount(oc.GrpcClient, valAddr.String(), "")
-	h.Require().NoError(err)
-	acc.GetSequence()
-
-	err = oc.waitAndSend(oc.GrpcClient, valAddr, acc.GetSequence())
-	h.Require().NoError(err)
-
-	err = oc.waitAndSend(oc.GrpcClient, valAddr, acc.GetSequence()-1)
-	h.Require().Error(err, "already passed")
-
-	err = oc.waitAndSend(oc.GrpcClient, sdk.AccAddress("mock"), acc.GetSequence()-1)
-	h.Require().Error(err, "invalid Account query")
-}
-
-func (h *helperTestSuite) TestBatchComposeAndSend() {
-	accs, err := generateRandomPrivKey(3)
-	h.Require().NoError(err)
-	tss := TssMock{
-		accs[0].sk,
-		h.network.Validators[0].ClientCtx.Keyring,
-		true,
-		true,
-	}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
-	h.Require().NoError(err)
-
-	rp := common.NewRetryPools()
-	oc, err := NewJoltifyBridge(h.network.Validators[0].APIAddress, h.network.Validators[0].RPCAddress, &tss, tl, rp)
-	h.Require().NoError(err)
-	oc.GrpcClient = h.network.Validators[0].ClientCtx
-
-	info, _ := h.network.Validators[0].ClientCtx.Keyring.Key("node0")
-	pk := info.GetPubKey()
-	pkstr := legacybech32.MustMarshalPubKey(legacybech32.AccPK, pk) // nolint
-	valAddr, err := misc.PoolPubKeyToOppyAddress(pkstr)
-	h.Require().NoError(err)
-
-	operatorInfo, err := h.validatorkey.Key("operator")
-	h.Require().NoError(err)
-
-	signMsg := tssclient.TssSignigMsg{
-		Pk:          pkstr,
-		Signers:     nil,
-		BlockHeight: 10,
-		Version:     tssclient.TssVersion,
-	}
-
-	acc, err := queryAccount(oc.GrpcClient, valAddr.String(), "")
-	h.Require().NoError(err)
-
-	send := banktypes.NewMsgSend(valAddr, operatorInfo.GetAddress(), sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100))})
-	_, err = oc.batchComposeAndSend(oc.GrpcClient, []sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, valAddr)
-	h.Require().Error(err, "operator.info: key not found")
-
-	oc.Keyring = h.validatorkey
-	_, err = oc.batchComposeAndSend(oc.GrpcClient, []sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, valAddr)
-	h.Require().NoError(err)
-}
-
 func (h *helperTestSuite) TestQueryPrice() {
 	rp := common.NewRetryPools()
-	oc, err := NewJoltifyBridge(h.network.Validators[0].APIAddress, h.network.Validators[0].RPCAddress, nil, nil, rp)
+	oc, err := NewJoltifyBridge(h.network.Validators[0].APIAddress, h.network.Validators[0].RPCAddress, h.network.Validators[0].ClientCtx, nil, nil, rp)
 	h.Require().NoError(err)
-	oc.GrpcClient = h.network.Validators[0].ClientCtx
-	price, err := QueryTokenPrice(oc.GrpcClient, "", "ujolt")
+	price, err := QueryTokenPrice(oc.CosHandler.GrpcClient, "", "ujolt")
 	h.Require().NoError(err)
 	h.Require().True(price.Equal(sdk.NewDecWithPrec(12, 1)))
 }

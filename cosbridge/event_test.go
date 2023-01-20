@@ -128,7 +128,7 @@ func (e EventTestSuite) TestSubscribe() {
 	e.Require().NoError(err)
 
 	rp := common.NewRetryPools()
-	oc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl, rp)
+	oc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, e.network.Validators[0].ClientCtx, &tss, tl, rp)
 	e.Require().NoError(err)
 	defer func() {
 		err := oc.TerminateBridge()
@@ -136,9 +136,9 @@ func (e EventTestSuite) TestSubscribe() {
 			oc.logger.Error().Err(err).Msgf("fail to terminate the bridge")
 		}
 	}()
-	err = oc.AddSubscribe(context.Background())
+	err = oc.CosHandler.AddSubscribe(context.Background())
 	e.Require().NoError(err)
-	data := <-oc.CurrentNewBlockChan
+	data := <-oc.GetCurrentNewBlockChain()
 	e.T().Logf("new block event test %v", data.Events)
 }
 
@@ -155,7 +155,7 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 	e.Require().NoError(err)
 
 	rp := common.NewRetryPools()
-	oc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl, rp)
+	oc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, e.network.Validators[0].ClientCtx, &tss, tl, rp)
 	e.Require().NoError(err)
 	defer func() {
 		err := oc.TerminateBridge()
@@ -167,7 +167,6 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 	_, err = e.network.WaitForHeightWithTimeout(10, time.Second*30)
 	e.Require().NoError(err)
 
-	oc.GrpcClient = e.network.Validators[0].ClientCtx
 	err = oc.InitValidators(e.network.Validators[0].APIAddress)
 	e.Require().NoError(err)
 
@@ -177,8 +176,7 @@ func (e EventTestSuite) TestHandleUpdateEvent() {
 	e.Require().NoError(err)
 	e.Require().Equal(len(oc.keyGenCache), 0)
 	tss.keygenSuccess = true
-
-	oc.Keyring = e.validatorKey
+	oc.CosHandler.Keyring = e.validatorKey
 	// we set the validator key, it should run the keygen successfully
 	data := base64.StdEncoding.EncodeToString(e.validators[0].GetPubkey())
 	oc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value = data
@@ -202,7 +200,7 @@ func (e EventTestSuite) TestHandleUpdateEventKeyGenFail() {
 	e.Require().NoError(err)
 
 	rp := common.NewRetryPools()
-	oc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, &tss, tl, rp)
+	oc, err := NewJoltifyBridge(e.network.Validators[0].APIAddress, e.network.Validators[0].RPCAddress, e.network.Validators[0].ClientCtx, &tss, tl, rp)
 	e.Require().NoError(err)
 	defer func() {
 		err := oc.TerminateBridge()
@@ -214,7 +212,6 @@ func (e EventTestSuite) TestHandleUpdateEventKeyGenFail() {
 	_, err = e.network.WaitForHeightWithTimeout(10, time.Second*30)
 	e.Require().NoError(err)
 
-	oc.GrpcClient = e.network.Validators[0].ClientCtx
 	err = oc.InitValidators(e.network.Validators[0].APIAddress)
 	e.Require().NoError(err)
 
@@ -224,7 +221,7 @@ func (e EventTestSuite) TestHandleUpdateEventKeyGenFail() {
 	// e.Require().NoError(err)
 	// e.Require().Equal(len(oc.keyGenCache), 0)
 	tss.keygenSuccess = false
-	oc.Keyring = e.validatorKey
+	oc.CosHandler.Keyring = e.validatorKey
 	// we set the validator key, it should run the keygen successfully
 	data := base64.StdEncoding.EncodeToString(e.validators[0].GetPubkey())
 	oc.myValidatorInfo.Result.ValidatorInfo.PubKey.Value = data

@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"strings"
 
+	types2 "github.com/tendermint/tendermint/proto/tendermint/types"
+
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	zlog "github.com/rs/zerolog/log"
 	bcommon "gitlab.com/joltify/joltifychain-bridge/common"
@@ -23,7 +25,7 @@ const alreadyKnown = "already known"
 
 // ProcessInBoundERC20 process the inbound contract token top-up
 func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, chainType string, txInfo *Erc20TxInfo, txBlockHeight uint64) error {
-	err := pi.processInboundERC20Tx(tx.Hash().Hex()[2:], chainType, txBlockHeight, txInfo.receiverAddr, txInfo.tokenAddress, txInfo.Amount, txInfo.tokenAddress)
+	err := pi.processInboundERC20Tx(tx.Hash().Hex()[2:], chainType, txBlockHeight, txInfo.receiverAddr, txInfo.Amount, txInfo.tokenAddress)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to process the inbound tx")
 		return err
@@ -31,20 +33,33 @@ func (pi *Instance) ProcessInBoundERC20(tx *ethTypes.Transaction, chainType stri
 	return nil
 }
 
-// ProcessNewBlock process the blocks received from the public pub_chain
-func (pi *Instance) ProcessNewBlock(chainType string, chainInfo *ChainInfo, number *big.Int, feeModule map[string]*bcommon.FeeModule, oppyGrpc string) error {
+// ProcessNewERC20Block process the blocks received from the public pub_chain
+func (pi *Instance) ProcessNewERC20Block(chainType string, chainInfo *Erc20ChainInfo, number *big.Int, feeModule map[string]*bcommon.FeeModule, oppyGrpc string) error {
 	block, err := chainInfo.GetBlockByNumberWithLock(number)
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to retrieve the block")
 		return err
 	}
 	// we need to put the block height in which we find the tx
-	pi.processEachBlock(chainType, chainInfo, block, number.Int64(), feeModule, oppyGrpc)
+	pi.processEachERC20Block(chainType, chainInfo, block, number.Int64(), feeModule, oppyGrpc)
 	return nil
 }
 
-func (pi *Instance) processInboundERC20Tx(txID, chainType string, txBlockHeight uint64, receiverAddr types.AccAddress, to common.Address, value *big.Int, addr common.Address) error {
-	// this is repeated check for tokenAddr which is cheked at function 'processEachBlock'
+func (pi *Instance) ProcessNewCosmosBlock(block *types2.Block, pools []*bcommon.PoolInfo, cosmosBlockHeight int64) {
+	for _, el := range block.Data.Txs {
+		items, err := pi.CosChain.processEachCosmosTx(el, pools, cosmosBlockHeight)
+		if err != nil {
+			pi.logger.Error().Err(err).Msg("fail to process each cosmos tx")
+			continue
+		}
+		for _, el := range items {
+			pi.AddInBoundItem(el)
+		}
+	}
+}
+
+func (pi *Instance) processInboundERC20Tx(txID, chainType string, txBlockHeight uint64, receiverAddr types.AccAddress, value *big.Int, addr common.Address) error {
+	// this is repeated check for tokenAddr which is cheked at function 'processEachERC20Block'
 	tokenItem, exit := pi.TokenList.GetTokenInfoByAddressAndChainType(strings.ToLower(addr.Hex()), chainType)
 	if !exit {
 		pi.logger.Error().Msgf("Token is not on our token list")
@@ -70,7 +85,7 @@ func (pi *Instance) processInboundERC20Tx(txID, chainType string, txBlockHeight 
 	}
 
 	tx.Token.Amount = inboundAdjust(tx.Token.Amount, tokenItem.Decimals, types.Precision)
-	item := bcommon.NewAccountInboundReq(tx.ReceiverAddress, to, tx.Token, txIDBytes, int64(txBlockHeight))
+	item := bcommon.NewAccountInboundReq(tx.ReceiverAddress, tx.Token, txIDBytes, int64(txBlockHeight))
 	pi.AddInBoundItem(&item)
 	return nil
 }
@@ -147,7 +162,7 @@ func (pi *Instance) checkErc20(data []byte, to, contractAddress string) (*Erc20T
 	return nil, errors.New("invalid method for decode")
 }
 
-func (pi *Instance) processEachBlock(chainType string, chainInfo *ChainInfo, block *ethTypes.Block, txBlockHeight int64, feeModule map[string]*bcommon.FeeModule, oppyGrpc string) {
+func (pi *Instance) processEachERC20Block(chainType string, chainInfo *Erc20ChainInfo, block *ethTypes.Block, txBlockHeight int64, feeModule map[string]*bcommon.FeeModule, oppyGrpc string) {
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
 			continue
@@ -262,7 +277,7 @@ func (pi *Instance) processDstInbound(txInfo *Erc20TxInfo, txHash, chainType str
 		return errors.New("fail to get the token price")
 	}
 
-	itemReq := bcommon.NewOutboundReq(txHash, receiver, currEthAddr, token, tokenOutItem.TokenAddr, joltHeight, types.Coins{feeToValidator}, txInfo.dstChainType, true)
+	itemReq := bcommon.NewOutboundReq(txHash, receiver.Bytes(), currEthAddr.Bytes(), token, tokenOutItem.TokenAddr, joltHeight, types.Coins{feeToValidator}, txInfo.dstChainType, true)
 	pi.AddOutBoundItem(&itemReq)
 	pi.logger.Info().Msgf("Outbound Transaction in Joltify Block %v  with fee %v paid to validators", txBlockHeight, types.Coins{feeToValidator})
 	return nil
@@ -286,7 +301,7 @@ func (pi *Instance) processJoltifyInbound(memoInfo bcommon.BridgeMemo, chainType
 		return
 	}
 	balance.Amount = inboundAdjust(balance.Amount, tokenItem.Decimals, types.Precision)
-	item := bcommon.NewAccountInboundReq(dstAddr, *tx.To(), balance, tx.Hash().Bytes(), txBlockHeight)
+	item := bcommon.NewAccountInboundReq(dstAddr, balance, tx.Hash().Bytes(), txBlockHeight)
 	// we add to the retry pool to  sort the tx
 	pi.AddInBoundItem(&item)
 }
@@ -297,7 +312,7 @@ func (pi *Instance) UpdatePool(pool *vaulttypes.PoolInfo) error {
 		return errors.New("nil pool")
 	}
 	poolPubKey := pool.CreatePool.PoolPubKey
-	addr, err := misc.PoolPubKeyToOppyAddress(poolPubKey)
+	addr, err := misc.PoolPubKeyToJoltifyAddress(poolPubKey)
 	if err != nil {
 		pi.logger.Error().Err(err).Msgf("fail to convert the joltify address to eth address %v", poolPubKey)
 		return err

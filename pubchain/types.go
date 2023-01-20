@@ -9,7 +9,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
+	cossubmit "gitlab.com/joltify/joltifychain-bridge/cos_submit"
+
+	"github.com/cosmos/cosmos-sdk/simapp/params"
 	grpc1 "github.com/gogo/protobuf/grpc"
+	"gitlab.com/joltify/joltifychain-bridge/config"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -36,7 +42,7 @@ const (
 	submitBackoff     = time.Second * 4
 	GroupBlockGap     = 8
 	GroupSign         = 4
-	PRICEUPDATEGAP    = 10
+	channelSize       = 2000
 	movefundretrygap  = 3
 	ETH               = "ETH"
 	BSC               = "BSC"
@@ -85,7 +91,7 @@ type BlockHead struct {
 	ChainType string
 }
 
-type ChainInfo struct {
+type Erc20ChainInfo struct {
 	WsAddr          string
 	contractAddress string
 	ChainType       string
@@ -99,7 +105,34 @@ type ChainInfo struct {
 	ChannelQueue    chan *BlockHead
 }
 
-func NewChainInfo(wsAddress, chainType string, wg *sync.WaitGroup) (*ChainInfo, error) {
+type CosMosChainInfo struct {
+	ChainType    string
+	encoding     *params.EncodingConfig
+	logger       zerolog.Logger
+	wg           *sync.WaitGroup // this must be the wg of the pubchain instance thus te whole process can be contolled by the main progress
+	ChannelQueue chan *BlockHead
+	CosHandler   *cossubmit.CosHandler
+}
+
+func NewCosChainInfo(grpcAddr, httpAddr, chainType string, wg *sync.WaitGroup, tssServer tssclient.TssInstance) (*CosMosChainInfo, error) {
+	enc := bcommon.MakeEncodingConfig()
+	key := keyring.NewInMemory()
+	handler, err := cossubmit.NewCosOperations(grpcAddr, httpAddr, nil, key, "joltify", tssServer)
+	if err != nil {
+		return nil, err
+	}
+
+	c := CosMosChainInfo{
+		logger:     log.With().Str("module", chainType).Logger(),
+		ChainType:  chainType,
+		wg:         wg,
+		encoding:   &enc,
+		CosHandler: handler,
+	}
+	return &c, nil
+}
+
+func NewErc20ChainInfo(wsAddress, chainType string, wg *sync.WaitGroup) (*Erc20ChainInfo, error) {
 	client, err := ethclient.Dial(wsAddress)
 	if err != nil {
 		return nil, errors.New("fail to dial the network")
@@ -114,7 +147,7 @@ func NewChainInfo(wsAddress, chainType string, wg *sync.WaitGroup) (*ChainInfo, 
 		return nil, err
 	}
 
-	c := ChainInfo{
+	c := Erc20ChainInfo{
 		WsAddr:      wsAddress,
 		ChainType:   chainType,
 		Client:      client,
@@ -126,10 +159,15 @@ func NewChainInfo(wsAddress, chainType string, wg *sync.WaitGroup) (*ChainInfo, 
 	return &c, nil
 }
 
+func (ercChain *Erc20ChainInfo) Terminate() {
+	ercChain.Client.Close()
+}
+
 // Instance hold the oppy_bridge entity
 type Instance struct {
-	BSCChain             *ChainInfo
-	EthChain             *ChainInfo
+	BSCChain             *Erc20ChainInfo
+	EthChain             *Erc20ChainInfo
+	CosChain             *CosMosChainInfo
 	tokenAbi             *abi.ABI
 	logger               zerolog.Logger
 	lastTwoPools         []*bcommon.PoolInfo
@@ -150,14 +188,14 @@ type Instance struct {
 }
 
 // NewChainInstance initialize the oppy_bridge entity
-func NewChainInstance(wsBSC, wsETH string, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, wg *sync.WaitGroup, joltRetryOutBoundReq *sync.Map) (*Instance, error) {
+func NewChainInstance(cfg config.Config, tssServer tssclient.TssInstance, tl tokenlist.BridgeTokenListI, wg *sync.WaitGroup, joltRetryOutBoundReq *sync.Map) (*Instance, error) {
 	logger := log.With().Str("module", "pubchain").Logger()
 
 	retryPools := bcommon.NewRetryPools()
 
 	channelQueue := make(chan *BlockHead, sbchannelsize)
 
-	bscChainClient, err := NewChainInfo(wsBSC, "BSC", wg)
+	bscChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressBSC, "BSC", wg)
 	if err != nil {
 		logger.Error().Err(err).Msg("fail to create the eth chain client")
 		return nil, errors.New("invalid eth client")
@@ -165,13 +203,21 @@ func NewChainInstance(wsBSC, wsETH string, tssServer tssclient.TssInstance, tl t
 	bscChainClient.ChannelQueue = channelQueue
 	bscChainClient.contractAddress = OppyContractAddressBSC
 
-	ethChainClient, err := NewChainInfo(wsETH, "ETH", wg)
+	ethChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressETH, "ETH", wg)
 	if err != nil {
 		logger.Error().Err(err).Msg("fail to create the eth chain client")
 		return nil, errors.New("invalid eth client")
 	}
 	ethChainClient.ChannelQueue = channelQueue
 	ethChainClient.contractAddress = OppyContractAddressETH
+
+	// add atom chain
+	atomClient, err := NewCosChainInfo(cfg.AtomChain.GrpcAddress, cfg.AtomChain.HTTPAddress, "ATOM", wg, tssServer)
+	if err != nil {
+		logger.Error().Err(err).Msgf("fail to create the atom client")
+		return nil, err
+	}
+	atomClient.ChannelQueue = channelQueue
 
 	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
 	if err != nil {
@@ -182,6 +228,7 @@ func NewChainInstance(wsBSC, wsETH string, tssServer tssclient.TssInstance, tl t
 		logger:               logger,
 		BSCChain:             bscChainClient,
 		EthChain:             ethChainClient,
+		CosChain:             atomClient,
 		tokenAbi:             &tAbi,
 		poolLocker:           &sync.RWMutex{},
 		tssServer:            tssServer,
@@ -199,4 +246,16 @@ func NewChainInstance(wsBSC, wsETH string, tssServer tssclient.TssInstance, tl t
 		joltHandler:          NewJoltHandler(),
 		joltRetryOutBoundReq: joltRetryOutBoundReq,
 	}, nil
+}
+
+func (pi *Instance) SetKey(uid string, data, pass []byte) error {
+	return pi.CosChain.CosHandler.SetKey(uid, data, pass)
+}
+
+func (pi *Instance) GetCurrentNewBlockChain() <-chan ctypes.ResultEvent {
+	return pi.CosChain.CosHandler.GetCurrentNewBlockChain()
+}
+
+func (pi *Instance) GetChannelQueueNewBlockChain() chan ctypes.ResultEvent {
+	return pi.CosChain.CosHandler.GetChannelQueueNewBlockChain()
 }

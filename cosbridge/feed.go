@@ -3,6 +3,8 @@ package cosbridge
 import (
 	"errors"
 
+	"gitlab.com/joltify/joltifychain-bridge/common"
+
 	grpc1 "github.com/gogo/protobuf/grpc"
 	vaulttypes "github.com/joltify-finance/joltify_lending/x/vault/types"
 	zlog "github.com/rs/zerolog/log"
@@ -24,7 +26,7 @@ func (jc *JoltChainInstance) FeedTx(conn grpc1.ClientConn, lastPoolInfo *vaultty
 	}
 
 	currentPool := lastPoolInfo.CreatePool.PoolAddr
-	acc, err := queryAccount(conn, currentPool.String(), "")
+	acc, err := common.QueryAccount(conn, currentPool.String(), "")
 	if err != nil {
 		jc.logger.Error().Err(err).Msgf("fail to query the Account")
 		return errors.New("invalid Account query")

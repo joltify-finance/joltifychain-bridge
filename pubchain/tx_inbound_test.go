@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 
+	"gitlab.com/joltify/joltifychain-bridge/config"
+
 	grpc1 "github.com/gogo/protobuf/grpc"
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -162,9 +164,24 @@ func TestProcessInBound(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testDenom"}, []string{"testAddr"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	mockRetry := sync.Map{}
-	pi, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tssServer, tl, &wg, &mockRetry)
-	assert.Nil(t, err)
+	cfg := config.Config{}
+	cfg.PubChainConfig.WsAddressBSC = misc.WebsocketTest
+	cfg.PubChainConfig.WsAddressETH = misc.WebsocketTest
+
+	bscChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressBSC, "BSC", &wg)
+	assert.NoError(t, err)
+
+	ethChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressETH, "ETH", &wg)
+	assert.NoError(t, err)
+
+	pi := &Instance{
+		wg:              &wg,
+		tssServer:       &tssServer,
+		TokenList:       tl,
+		BSCChain:        bscChainClient,
+		EthChain:        ethChainClient,
+		RetryInboundReq: &sync.Map{},
+	}
 
 	toStr := "FFcf8FDEE72ac11b5c542428B35EEF5769C409f0"
 	privkey991 := "64285613d3569bcaa7a24c9d74d4cec5c18dcf6a08e4c0f66596078f3a4a35b5"
@@ -384,7 +401,7 @@ func TestProcessEachBlock(t *testing.T) {
 	defer client.Close()
 	c := ethclient.NewClient(client)
 
-	cInfo := ChainInfo{
+	cInfo := Erc20ChainInfo{
 		Client:      c,
 		ChainLocker: &sync.RWMutex{},
 	}
@@ -408,7 +425,7 @@ func TestProcessEachBlock(t *testing.T) {
 
 	err = pi.UpdatePool(&poolInfo)
 	require.Nil(t, err)
-	pi.processEachBlock("BSC", &cInfo, &tBlock, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("BSC", &cInfo, &tBlock, 10, pi.FeeModule, "")
 	// indicate nothing happens
 
 	header := &ethTypes.Header{
@@ -422,28 +439,28 @@ func TestProcessEachBlock(t *testing.T) {
 	//
 	tBlock1 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718Tx}, nil, nil, newHasher())
 
-	pi.processEachBlock("BSC", &cInfo, tBlock1, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("BSC", &cInfo, tBlock1, 10, pi.FeeModule, "")
 
 	// check not to bridge
 	tBlock2 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxNotToBridge}, nil, nil, newHasher())
-	pi.processEachBlock("BSC", &cInfo, tBlock2, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("BSC", &cInfo, tBlock2, 10, pi.FeeModule, "")
 
 	//
 	// now we top up the fee
 	tBlock3 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFee}, nil, nil, newHasher())
-	pi.processEachBlock("BSC", &cInfo, tBlock3, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("BSC", &cInfo, tBlock3, 10, pi.FeeModule, "")
 
 	tBlock3 = ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpEmptyData}, nil, nil, newHasher())
-	pi.processEachBlock("BSC", &cInfo, tBlock3, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("BSC", &cInfo, tBlock3, 10, pi.FeeModule, "")
 
 	//
 	tBlock3 = ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFee}, nil, nil, newHasher())
-	pi.processEachBlock("BSC", &cInfo, tBlock3, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("BSC", &cInfo, tBlock3, 10, pi.FeeModule, "")
 
 	//
 	//// now we top up the fee before ERC20 tx arrive
 	tBlock4 := ethTypes.NewBlock(header, []*ethTypes.Transaction{emptyEip2718TxGoodTopUpFeeBeforeERC20}, nil, nil, newHasher())
-	pi.processEachBlock("BSC", &cInfo, tBlock4, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("BSC", &cInfo, tBlock4, 10, pi.FeeModule, "")
 }
 
 type mockHandler struct{}
@@ -603,7 +620,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	defer client.Close()
 	c := ethclient.NewClient(client)
 
-	chainInfo := ChainInfo{
+	chainInfo := Erc20ChainInfo{
 		Client:          c,
 		ChainLocker:     &sync.RWMutex{},
 		contractAddress: contractAddressEth.Hex(),
@@ -612,7 +629,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 
 	// since token addr is not set, so the system should not put this tx in top-up queue
 	tBlock := ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718Tx}, nil, nil, newHasher())
-	pi.processEachBlock("BSC", &chainInfo, tBlock, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("BSC", &chainInfo, tBlock, 10, pi.FeeModule, "")
 	counter := 0
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		counter++
@@ -620,7 +637,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	})
 	assert.Equal(t, counter, 0)
 	tBlock = ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718TxNotPool}, nil, nil, newHasher())
-	pi.processEachBlock("BSC", &chainInfo, tBlock, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("BSC", &chainInfo, tBlock, 10, pi.FeeModule, "")
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		counter++
 		return true
@@ -631,7 +648,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 
 	tBlock = ethTypes.NewBlock(header, []*ethTypes.Transaction{Eip2718TxGoodPass}, nil, nil, newHasher())
 	// we test that the tx is not to the pool
-	pi.processEachBlock("BSC", &chainInfo, tBlock, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("BSC", &chainInfo, tBlock, 10, pi.FeeModule, "")
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		panic("should not have items")
 	})
@@ -643,7 +660,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	assert.Nil(t, err)
 
 	// we test the from,to the same chain
-	pi.processEachBlock("BSC", &chainInfo, tBlock, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("BSC", &chainInfo, tBlock, 10, pi.FeeModule, "")
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		counter++
 		return true
@@ -652,7 +669,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 
 	pi.joltHandler = NewMockPrice()
 	// as the outbound token list is not set, so we drop the tx
-	pi.processEachBlock("ETH", &chainInfo, tBlock, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("ETH", &chainInfo, tBlock, 10, pi.FeeModule, "")
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		counter++
 		return true
@@ -676,7 +693,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	err = pi.UpdatePool(&poolInfo)
 	assert.Nil(t, err)
 
-	pi.processEachBlock("ETH", &chainInfo, tBlock, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("ETH", &chainInfo, tBlock, 10, pi.FeeModule, "")
 	pi.joltRetryOutBoundReq.Range(func(key, value any) bool {
 		counter++
 		return true
@@ -687,7 +704,7 @@ func TestProcessEachBlockErc20(t *testing.T) {
 	pi.TokenList = tl3
 	tBlock = ethTypes.NewBlock(header, []*ethTypes.Transaction{txNative}, nil, nil, newHasher())
 	// we test that the tx is not to the pool
-	pi.processEachBlock("ETH", &chainInfo, tBlock, 10, pi.FeeModule, "")
+	pi.processEachERC20Block("ETH", &chainInfo, tBlock, 10, pi.FeeModule, "")
 	var storedToken sdk.Coins
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		data := value.(*common2.InBoundReq)
@@ -730,13 +747,31 @@ func TestProcessEachBlockErc20(t *testing.T) {
 
 func TestProcessNativeInBoundOnBSC(t *testing.T) {
 	misc.SetupBech32Prefix()
-	acc, err := generateRandomPrivKey(3)
-	assert.Nil(t, err)
-	tssServer := TssMock{acc[0].sk}
-	tl, err := tokenlist.CreateMockTokenlist([]string{"native"}, []string{"abnb"}, []string{"BSC"})
-	assert.Nil(t, err)
+	// acc, err := generateRandomPrivKey(3)
+	// assert.Nil(t, err)
+	// tssServer := TssMock{acc[0].sk}
+	// tl, err := tokenlist.CreateMockTokenlist([]string{"native"}, []string{"abnb"}, []string{"BSC"})
+	// assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pi, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tssServer, tl, &wg, nil)
+	cfg := config.Config{}
+	cfg.PubChainConfig.WsAddressBSC = misc.WebsocketTest
+	cfg.PubChainConfig.WsAddressETH = misc.WebsocketTest
+	// pi, err := NewChainInstance(cfg, &tssServer, tl, &wg, nil)
+
+	bscChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressBSC, "BSC", &wg)
+	assert.NoError(t, err)
+
+	ethChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressETH, "ETH", &wg)
+	assert.NoError(t, err)
+
+	pi := &Instance{
+		wg:              &wg,
+		BSCChain:        bscChainClient,
+		EthChain:        ethChainClient,
+		lastTwoPools:    make([]*common2.PoolInfo, 2),
+		poolLocker:      &sync.RWMutex{},
+		RetryInboundReq: &sync.Map{},
+	}
 
 	poolInfo := common2.PoolInfo{
 		EthAddress: common.HexToAddress("0x1f65cc33558b6825db119e9fe4c73b436211667e"),
@@ -752,14 +787,13 @@ func TestProcessNativeInBoundOnBSC(t *testing.T) {
 	tAbi, err := abi.JSON(strings.NewReader(generated.GeneratedMetaData.ABI))
 	assert.Nil(t, err)
 	pi.tokenAbi = &tAbi
-	pi.processEachBlock("BSC", pi.BSCChain, b, 101, pi.FeeModule, "")
+	pi.processEachERC20Block("BSC", pi.BSCChain, b, 101, pi.FeeModule, "")
 
 	pi.RetryInboundReq.Range(func(key, value any) bool {
 		item := value.(*common2.InBoundReq)
 		assert.Equal(t, item.Coin.Denom, "abnb")
 		assert.Equal(t, item.Coin.Amount.String(), "1234567890000000")
 		assert.Equal(t, common.BytesToHash(item.TxID).String(), "0xfe172d0a5c4344a31cab330163861c8fbd257fdb5ff31759abb52e63043ef396")
-		assert.Equal(t, item.ToPoolAddr.String(), "oppy12gflne2dadajtzn5h7x8z4udfpd7f22dvly0zg")
 		return true
 	})
 	wg.Wait()

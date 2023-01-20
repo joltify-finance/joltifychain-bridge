@@ -33,7 +33,7 @@ func createdTestOutBoundReqs(n int) []*common.OutBoundReq {
 			panic(err)
 		}
 		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewOutboundReq(txid, addr, addr, testCoin, "testTokenAddr", int64(i), nil, "BSC", true)
+		item := common.NewOutboundReq(txid, addr.Bytes(), addr.Bytes(), testCoin, "testTokenAddr", int64(i), nil, "BSC", true)
 		retReq[i] = &item
 	}
 	return retReq
@@ -46,12 +46,7 @@ func createdTestInBoundReqs(n int) []*common.InBoundReq {
 	for i := 0; i < n; i++ {
 		txid := fmt.Sprintf("testTXID %v", i)
 		testCoin := sdk.NewCoin("test", sdk.NewInt(32))
-		sk, err := crypto.GenerateKey()
-		if err != nil {
-			panic(err)
-		}
-		addr := crypto.PubkeyToAddress(sk.PublicKey)
-		item := common.NewAccountInboundReq(accs[i].Address, addr, testCoin, []byte(txid), int64(i))
+		item := common.NewAccountInboundReq(accs[i].Address, testCoin, []byte(txid), int64(i))
 		retReq[i] = &item
 	}
 	return retReq

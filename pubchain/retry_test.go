@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"gitlab.com/joltify/joltifychain-bridge/config"
+
 	"github.com/stretchr/testify/suite"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
@@ -17,12 +19,24 @@ type TestRetrySuite struct {
 
 func (tn *TestRetrySuite) SetupSuite() {
 	misc.SetupBech32Prefix()
-
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, nil, nil, &wg, nil)
-	if err != nil {
-		panic(err)
+	cfg := config.Config{}
+	cfg.PubChainConfig.WsAddressBSC = misc.WebsocketTest
+	cfg.PubChainConfig.WsAddressETH = misc.WebsocketTest
+
+	bscChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressBSC, "BSC", &wg)
+	tn.Require().NoError(err)
+
+	ethChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressETH, "ETH", &wg)
+	tn.Require().NoError(err)
+
+	pubChain := &Instance{
+		wg:         &wg,
+		BSCChain:   bscChainClient,
+		EthChain:   ethChainClient,
+		poolLocker: &sync.RWMutex{},
 	}
+
 	tn.pubChain = pubChain
 }
 

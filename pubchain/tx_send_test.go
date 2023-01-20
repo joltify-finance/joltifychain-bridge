@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"gitlab.com/joltify/joltifychain-bridge/config"
+
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	zlog "github.com/rs/zerolog/log"
@@ -114,7 +116,7 @@ func TestProcessOutBound(t *testing.T) {
 		panic(err)
 	}
 
-	fromAddress, err := misc.PoolPubKeyToOppyAddress(pk)
+	fromAddress, err := misc.PoolPubKeyToJoltifyAddress(pk)
 	if err != nil {
 		panic(err)
 	}
@@ -128,8 +130,23 @@ func TestProcessOutBound(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg, nil)
-	assert.Nil(t, err)
+	cfg := config.Config{}
+	cfg.PubChainConfig.WsAddressBSC = misc.WebsocketTest
+	cfg.PubChainConfig.WsAddressETH = misc.WebsocketTest
+
+	bscChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressBSC, "BSC", &wg)
+	assert.NoError(t, err)
+	ethChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressETH, "ETH", &wg)
+	assert.NoError(t, err)
+	pubChain := &Instance{
+		wg:           &wg,
+		BSCChain:     bscChainClient,
+		EthChain:     ethChainClient,
+		TokenList:    tl,
+		lastTwoPools: make([]*common.PoolInfo, 2),
+		poolLocker:   &sync.RWMutex{},
+		tssServer:    &tss,
+	}
 
 	poolInfo := vaulttypes.PoolInfo{
 		BlockHeight: "100",
@@ -235,9 +252,23 @@ func TestSendToken(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	mockqueue := sync.Map{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg, &mockqueue)
-	assert.Nil(t, err)
+	cfg := config.Config{}
+	cfg.PubChainConfig.WsAddressBSC = misc.WebsocketTest
+	cfg.PubChainConfig.WsAddressETH = misc.WebsocketTest
+
+	bscChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressBSC, "BSC", &wg)
+	assert.NoError(t, err)
+	ethChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressETH, "ETH", &wg)
+	assert.NoError(t, err)
+	pubChain := &Instance{
+		wg:           &wg,
+		BSCChain:     bscChainClient,
+		EthChain:     ethChainClient,
+		TokenList:    tl,
+		lastTwoPools: make([]*common.PoolInfo, 2),
+		poolLocker:   &sync.RWMutex{},
+		tssServer:    &tss,
+	}
 
 	// incorrect address
 	receiver := ethcommon.BytesToAddress(sk.PubKey().Address().Bytes())
@@ -270,8 +301,23 @@ func TestSendNativeToken(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg, nil)
-	assert.Nil(t, err)
+	cfg := config.Config{}
+	cfg.PubChainConfig.WsAddressBSC = misc.WebsocketTest
+	cfg.PubChainConfig.WsAddressETH = misc.WebsocketTest
+
+	bscChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressBSC, "BSC", &wg)
+	assert.NoError(t, err)
+	ethChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressETH, "ETH", &wg)
+	assert.NoError(t, err)
+	pubChain := &Instance{
+		wg:           &wg,
+		BSCChain:     bscChainClient,
+		EthChain:     ethChainClient,
+		TokenList:    tl,
+		lastTwoPools: make([]*common.PoolInfo, 2),
+		poolLocker:   &sync.RWMutex{},
+		tssServer:    &tss,
+	}
 
 	// incorrect address,thus it is clear to move fund
 	receiver := ethcommon.BytesToAddress(sk.PubKey().Address().Bytes())
@@ -320,8 +366,23 @@ func TestSendNativeTokenBatch(t *testing.T) {
 	tl, err := tokenlist.CreateMockTokenlist([]string{"testAddr"}, []string{"testDenom"}, []string{"BSC"})
 	assert.Nil(t, err)
 	wg := sync.WaitGroup{}
-	pubChain, err := NewChainInstance(misc.WebsocketTest, misc.WebsocketTest, &tss, tl, &wg, nil)
-	assert.Nil(t, err)
+	cfg := config.Config{}
+	cfg.PubChainConfig.WsAddressBSC = misc.WebsocketTest
+	cfg.PubChainConfig.WsAddressETH = misc.WebsocketTest
+
+	bscChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressBSC, "BSC", &wg)
+	assert.NoError(t, err)
+	ethChainClient, err := NewErc20ChainInfo(cfg.PubChainConfig.WsAddressETH, "ETH", &wg)
+	assert.NoError(t, err)
+	pubChain := &Instance{
+		wg:           &wg,
+		BSCChain:     bscChainClient,
+		EthChain:     ethChainClient,
+		TokenList:    tl,
+		lastTwoPools: make([]*common.PoolInfo, 2),
+		poolLocker:   &sync.RWMutex{},
+		tssServer:    &tss,
+	}
 
 	// now we test send the token with wrong nonce
 	tssWaitGroup := sync.WaitGroup{}

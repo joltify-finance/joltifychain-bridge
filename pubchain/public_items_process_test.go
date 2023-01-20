@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/joltify/joltifychain-bridge/common"
 	"gitlab.com/joltify/joltifychain-bridge/misc"
@@ -18,17 +17,17 @@ func createdTestOutBoundReqs(n int) []*common.InBoundReq {
 	for i := 0; i < n; i++ {
 		txid := fmt.Sprintf("testTXID %v", i)
 		testCoin := sdk.NewCoin("test", sdk.NewInt(32))
-		sk, err := crypto.GenerateKey()
-		if err != nil {
-			panic(err)
-		}
-		addr := crypto.PubkeyToAddress(sk.PublicKey)
+		//sk, err := crypto.GenerateKey()
+		//if err != nil {
+		//	panic(err)
+		//}
+		//addr := crypto.PubkeyToAddress(sk.PublicKey)
 		oppyAddress := "jolt1txtsnx4gr4effr8542778fsxc20j5vzqxet7t0"
 		oaddr, err := sdk.AccAddressFromBech32(oppyAddress)
 		if err != nil {
 			panic(err)
 		}
-		item := common.NewAccountInboundReq(oaddr, addr, testCoin, []byte(txid), int64(i))
+		item := common.NewAccountInboundReq(oaddr.Bytes(), testCoin, []byte(txid), int64(i))
 		retReq[i] = &item
 	}
 	return retReq

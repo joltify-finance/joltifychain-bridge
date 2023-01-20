@@ -27,7 +27,7 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
-func (c *ChainInfo) CheckChainHealthWithLock() error {
+func (c *Erc20ChainInfo) CheckChainHealthWithLock() error {
 	c.ChainLocker.RLock()
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
@@ -59,7 +59,7 @@ func (pi *Instance) CheckPubChainHealthWithLock() error {
 	return err
 }
 
-func (c *ChainInfo) GetBlockByNumberWithLock(number *big.Int) (*types.Block, error) {
+func (c *Erc20ChainInfo) GetBlockByNumberWithLock(number *big.Int) (*types.Block, error) {
 	c.ChainLocker.RLock()
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
@@ -81,7 +81,7 @@ func (c *ChainInfo) GetBlockByNumberWithLock(number *big.Int) (*types.Block, err
 	return block, err
 }
 
-func (c *ChainInfo) getTransactionReceiptWithLock(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
+func (c *Erc20ChainInfo) getTransactionReceiptWithLock(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
 	c.ChainLocker.RLock()
 	receipt, err := c.Client.TransactionReceipt(ctx, txHash)
 	c.ChainLocker.RUnlock()
@@ -102,7 +102,7 @@ func (c *ChainInfo) getTransactionReceiptWithLock(ctx context.Context, txHash co
 }
 
 // GetFeeLimitWithLock returns fee, gasprice, gaslimit and error code
-func (c *ChainInfo) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, error) {
+func (c *Erc20ChainInfo) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
 	c.ChainLocker.RLock()
@@ -125,7 +125,7 @@ func (c *ChainInfo) GetFeeLimitWithLock() (*big.Int, *big.Int, int64, error) {
 	return totalFee, gasPrice, config.DEFAULTNATIVEGAS, nil
 }
 
-func (c *ChainInfo) GetGasPriceWithLock() (*big.Int, error) {
+func (c *Erc20ChainInfo) GetGasPriceWithLock() (*big.Int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), chainQueryTimeout)
 	defer cancel()
 	c.ChainLocker.RLock()
@@ -147,7 +147,7 @@ func (c *ChainInfo) GetGasPriceWithLock() (*big.Int, error) {
 	return gasPrice, err
 }
 
-func (c *ChainInfo) getBalanceWithLock(ctx context.Context, ethAddr common.Address) (*big.Int, error) {
+func (c *Erc20ChainInfo) getBalanceWithLock(ctx context.Context, ethAddr common.Address) (*big.Int, error) {
 	c.ChainLocker.RLock()
 	balanceBnB, err := c.Client.BalanceAt(ctx, ethAddr, nil)
 	c.ChainLocker.RUnlock()
@@ -167,7 +167,7 @@ func (c *ChainInfo) getBalanceWithLock(ctx context.Context, ethAddr common.Addre
 	return balanceBnB, err
 }
 
-func (c *ChainInfo) getPendingNonceWithLock(ctx context.Context, poolAddress common.Address) (uint64, error) {
+func (c *Erc20ChainInfo) getPendingNonceWithLock(ctx context.Context, poolAddress common.Address) (uint64, error) {
 	c.ChainLocker.RLock()
 	nonce, err := c.Client.PendingNonceAt(ctx, poolAddress)
 	c.ChainLocker.RUnlock()
@@ -187,7 +187,7 @@ func (c *ChainInfo) getPendingNonceWithLock(ctx context.Context, poolAddress com
 	return nonce, err
 }
 
-func (c *ChainInfo) sendTransactionWithLock(ctx context.Context, tx *types.Transaction) error {
+func (c *Erc20ChainInfo) sendTransactionWithLock(ctx context.Context, tx *types.Transaction) error {
 	c.ChainLocker.RLock()
 	err := c.Client.SendTransaction(ctx, tx)
 	c.ChainLocker.RUnlock()
@@ -211,7 +211,7 @@ func (c *ChainInfo) sendTransactionWithLock(ctx context.Context, tx *types.Trans
 	return err
 }
 
-func (c *ChainInfo) renewEthClientWithLock(ethclient *ethclient.Client) error {
+func (c *Erc20ChainInfo) renewEthClientWithLock(ethclient *ethclient.Client) error {
 	c.ChainLocker.Lock()
 	// release the old one
 	if c.SubHandler != nil {
@@ -237,7 +237,7 @@ func (pi *Instance) HealthCheckAndReset() {
 	pi.EthChain.HealthCheckAndReset()
 }
 
-func (c *ChainInfo) HealthCheckAndReset() {
+func (c *Erc20ChainInfo) HealthCheckAndReset() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 	_, err := c.Client.BlockNumber(ctx)
@@ -251,7 +251,7 @@ func (c *ChainInfo) HealthCheckAndReset() {
 }
 
 // CheckTxStatus check whether the tx is already in the chain
-func (c *ChainInfo) CheckTxStatus(hashStr string) error {
+func (c *Erc20ChainInfo) CheckTxStatus(hashStr string) error {
 	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 30)
 
 	var status uint64
@@ -278,7 +278,7 @@ func (c *ChainInfo) CheckTxStatus(hashStr string) error {
 	return nil
 }
 
-func (c *ChainInfo) checkEachTx(h common.Hash) (uint64, error) {
+func (c *Erc20ChainInfo) checkEachTx(h common.Hash) (uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeOut)
 	defer cancel()
 	receipt, err := c.getTransactionReceiptWithLock(ctx, h)
@@ -317,8 +317,8 @@ func (pi *Instance) retrieveAddrfromRawTx(tx *types.Transaction) (sdk.AccAddress
 	return transferFrom, nil
 }
 
-func (pi *Instance) GetChainClient(chainType string) *ChainInfo {
-	var chainInfo *ChainInfo
+func (pi *Instance) GetChainClientERC20(chainType string) *Erc20ChainInfo {
+	var chainInfo *Erc20ChainInfo
 	switch chainType {
 	case ETH:
 		chainInfo = pi.EthChain

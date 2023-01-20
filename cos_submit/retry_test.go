@@ -1,12 +1,10 @@
-package cosbridge
+package cossubmit
 
 import (
 	"context"
 	"strconv"
 	"testing"
 	"time"
-
-	"gitlab.com/joltify/joltifychain-bridge/common"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -95,22 +93,23 @@ func (f *subscribeTestSuite) SetupSuite() {
 }
 
 func (s *subscribeTestSuite) TestSubscribe() {
-	rp := common.NewRetryPools()
-	oc, err := NewJoltifyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, nil, nil, rp)
+	key := keyring.NewInMemory()
+	handler, err := NewCosOperations(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, s.network.Validators[0].ClientCtx, key, "joltify", nil)
+
 	s.Require().NoError(err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	err = oc.AddSubscribe(ctx)
+	err = handler.AddSubscribe(ctx)
 	s.Require().NoError(err)
 
-	block := <-oc.CurrentNewBlockChan
+	block := <-handler.GetCurrentNewBlockChain()
 	currentBlockHeight1 := block.Data.(types.EventDataNewBlock).Block.Height
 
 	err = s.network.WaitForNextBlock()
 	s.Require().NoError(err)
 
-	block = <-oc.CurrentNewBlockChan
+	block = <-handler.GetCurrentNewBlockChain()
 	currentBlockHeight2 := block.Data.(types.EventDataNewBlock).Block.Height
 
 	s.Require().Equal(currentBlockHeight1+1, currentBlockHeight2)
@@ -119,20 +118,20 @@ func (s *subscribeTestSuite) TestSubscribe() {
 	current := currentBlockHeight2 + 4
 	_, err = s.network.WaitForHeight(current)
 	s.Require().NoError(err)
-	err = oc.RetryOppyChain()
+	err = handler.RetryJoltifyChain(true)
 	s.Require().NoError(err)
 
 	current += 2
 	_, err = s.network.WaitForHeight(current)
 	s.Require().NoError(err)
-	s.Require().Equal(4, len(oc.ChannelQueueNewBlock))
-	s.Require().Equal(2, len(oc.CurrentNewBlockChan))
+	s.Require().Equal(4, len(handler.GetChannelQueueNewBlockChain()))
+	s.Require().Equal(2, len(handler.GetCurrentNewBlockChain()))
 
 	// do the test again
 	current += 5
 	_, err = s.network.WaitForHeight(current)
 	s.Require().NoError(err)
-	err = oc.RetryOppyChain()
+	err = handler.RetryJoltifyChain(true)
 	s.Require().NoError(err)
 
 	current += 3
@@ -140,8 +139,8 @@ func (s *subscribeTestSuite) TestSubscribe() {
 	s.Require().NoError(err)
 
 	// 11=4+5+2
-	s.Require().Equal(11, len(oc.ChannelQueueNewBlock))
-	s.Require().Equal(3, len(oc.CurrentNewBlockChan))
+	s.Require().Equal(11, len(handler.GetChannelQueueNewBlockChain()))
+	s.Require().Equal(3, len(handler.GetCurrentNewBlockChain()))
 }
 
 func (s *subscribeTestSuite) createMockChan() <-chan coretypes.ResultEvent {
@@ -153,15 +152,14 @@ func (s *subscribeTestSuite) createMockChan() <-chan coretypes.ResultEvent {
 	return mockChan
 }
 
-func (s *subscribeTestSuite) TestProcess() {
-	rp := common.NewRetryPools()
-	oc, err := NewJoltifyBridge(s.network.Validators[0].APIAddress, s.network.Validators[0].RPCAddress, nil, nil, rp)
-	s.Require().NoError(err)
-
-	mockChan := s.createMockChan()
-	oc.CurrentNewValidator = mockChan
-	oc.ProcessNewBlockChainMoreThanOne()
-	s.Require().Equal(len(oc.ChannelQueueValidator), 2)
+func (f *subscribeTestSuite) TestProcess() {
+	key := keyring.NewInMemory()
+	handler, err := NewCosOperations(f.network.Validators[0].APIAddress, f.network.Validators[0].RPCAddress, f.network.Validators[0].ClientCtx, key, "joltify", nil)
+	f.Require().NoError(err)
+	mockChan := f.createMockChan()
+	handler.CurrentNewValidator = mockChan
+	handler.ProcessNewBlockChainMoreThanOne()
+	f.Require().Equal(len(handler.ChannelQueueValidator), 2)
 }
 
 func TestSubscribeAndRetry(t *testing.T) {

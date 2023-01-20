@@ -10,6 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+const (
+	BSC  = "BSC"
+	ETH  = "ETH"
+	ATOM = "ATOM"
+)
+
 func (o *OutBoundReq) Hash() common.Hash {
 	data, err := hex.DecodeString(o.TxID)
 	if err != nil {
@@ -19,11 +25,12 @@ func (o *OutBoundReq) Hash() common.Hash {
 	if !o.NeedMint {
 		needMintStr = "false"
 	}
-	hash := crypto.Keccak256Hash(o.OutReceiverAddress.Bytes(), []byte(o.ChainType), []byte(needMintStr), data)
+
+	hash := crypto.Keccak256Hash(o.OutReceiverAddress, []byte(o.ChainType), []byte(needMintStr), data)
 	return hash
 }
 
-func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin types.Coin, coinAddr string, txBlockHeight int64, feeToValidator types.Coins, chainType string, needMint bool) OutBoundReq {
+func NewOutboundReq(txID string, address []byte, fromPoolAddr []byte, coin types.Coin, coinAddr string, txBlockHeight int64, feeToValidator types.Coins, chainType string, needMint bool) OutBoundReq {
 	return OutBoundReq{
 		txID,
 		address,
@@ -32,6 +39,8 @@ func NewOutboundReq(txID string, address, fromPoolAddr common.Address, coin type
 		coinAddr,
 		txBlockHeight,
 		uint64(0),
+		uint64(0),
+		"",
 		common.Hash{}.Hex(),
 		feeToValidator,
 		chainType,
@@ -45,7 +54,7 @@ func (o *OutBoundReq) Index() string {
 	if err != nil {
 		panic(err)
 	}
-	hash := crypto.Keccak256Hash(o.OutReceiverAddress.Bytes(), data)
+	hash := crypto.Keccak256Hash(o.OutReceiverAddress, data)
 	lower := hash.Big().String()
 	higher := strconv.FormatInt(o.BlockHeight, 10)
 	indexStr := higher + lower
@@ -53,13 +62,15 @@ func (o *OutBoundReq) Index() string {
 }
 
 // SetItemNonce sets the block height of the tx
-func (o *OutBoundReq) SetItemNonce(fromPoolAddr common.Address, nonce uint64) {
+func (o *OutBoundReq) SetItemNonce(fromPoolAddr []byte, nonce uint64, fromPk string, accNum uint64) {
 	o.FromPoolAddr = fromPoolAddr
+	o.FromPubkey = fromPk
+	o.AccNum = accNum
 	o.Nonce = nonce
 }
 
 // GetOutBoundInfo return the outbound tx info
-func (o *OutBoundReq) GetOutBoundInfo() (common.Address, common.Address, string, *big.Int, uint64) {
+func (o *OutBoundReq) GetOutBoundInfo() ([]byte, []byte, string, *big.Int, uint64) {
 	return o.OutReceiverAddress, o.FromPoolAddr, o.TokenAddr, o.Coin.Amount.BigInt(), o.Nonce
 }
 
@@ -77,11 +88,10 @@ func (i *InBoundReq) Index() string {
 	return indexStr
 }
 
-func NewAccountInboundReq(address types.AccAddress, toPoolAddr common.Address, coin types.Coin, txid []byte, blockHeight int64) InBoundReq {
+func NewAccountInboundReq(address types.AccAddress, coin types.Coin, txid []byte, blockHeight int64) InBoundReq {
 	return InBoundReq{
 		address,
 		txid,
-		toPoolAddr,
 		coin,
 		blockHeight,
 		0,
@@ -92,8 +102,8 @@ func NewAccountInboundReq(address types.AccAddress, toPoolAddr common.Address, c
 }
 
 // GetInboundReqInfo returns the info of the inbound transaction
-func (i *InBoundReq) GetInboundReqInfo() (types.AccAddress, common.Address, types.Coin, int64) {
-	return i.UserReceiverAddress, i.ToPoolAddr, i.Coin, i.BlockHeight
+func (i *InBoundReq) GetInboundReqInfo() (types.AccAddress, types.Coin, int64) {
+	return i.UserReceiverAddress, i.Coin, i.BlockHeight
 }
 
 // SetAccountInfo sets the block height of the tx

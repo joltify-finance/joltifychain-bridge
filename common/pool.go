@@ -24,24 +24,25 @@ type MoveFundItem struct {
 
 // OutBoundReq is the entity for the outbound tx
 type OutBoundReq struct {
-	TxID               string         `json:"tx_id"`
-	OutReceiverAddress common.Address `json:"out_receiver_address"`
-	FromPoolAddr       common.Address `json:"from_pool_addr"`
-	Coin               types.Coin     `json:"Coin"`
-	TokenAddr          string         `json:"coin_address"`
-	BlockHeight        int64          `json:"block_height"`
-	Nonce              uint64         `json:"nonce"`
-	SubmittedTxHash    string         `json:"submitted_tx_hash"` // this item is used for checking whether it is accepted on pubchain
-	FeeToValidator     types.Coins    `json:"fee_to_validator"`
-	ChainType          string         `json:"chain_type"`
-	NeedMint           bool           `json:"need_mint"`
+	TxID               string      `json:"tx_id"`
+	OutReceiverAddress []byte      `json:"out_receiver_address"`
+	FromPoolAddr       []byte      `json:"from_pool_addr"`
+	Coin               types.Coin  `json:"Coin"`
+	TokenAddr          string      `json:"coin_address"`
+	BlockHeight        int64       `json:"block_height"`
+	Nonce              uint64      `json:"nonce"`
+	AccNum             uint64      `json:"acc_num"`
+	FromPubkey         string      `json:"from_pubkey"`
+	SubmittedTxHash    string      `json:"submitted_tx_hash"` // this item is used for checking whether it is accepted on pubchain
+	FeeToValidator     types.Coins `json:"fee_to_validator"`
+	ChainType          string      `json:"chain_type"`
+	NeedMint           bool        `json:"need_mint"`
 }
 
 // InBoundReq is the account that top up account info to joltify pub_chain
 type InBoundReq struct {
 	UserReceiverAddress types.AccAddress `json:"user_receiver_address"`
 	TxID                []byte           `json:"tx_id"` // this indicates the identical inbound req
-	ToPoolAddr          common.Address   `json:"to_pool_addr"`
 	Coin                types.Coin       `json:"coin"`
 	BlockHeight         int64            `json:"block_height"`
 	AccNum              uint64           `json:"acc_num"`
