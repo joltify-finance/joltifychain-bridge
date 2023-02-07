@@ -167,7 +167,7 @@ func (pi *Instance) MoveFound(height int64, chainInfo *Erc20ChainInfo, previousP
 				pi.AddMoveFundItem(previousPool, height, chainInfo.ChainType)
 				zlog.Logger.Error().Err(err).Msg("fail to dial the websocket")
 			}
-
+			defer ethClientLocal.Close()
 			myNonce := nonce + uint64(index)
 			tokenIsEmpty, err := pi.doMoveTokenFunds(chainInfo, index, myNonce, previousPool, currentPool[1].EthAddress, thisTokenAddr, ethClientLocal, tssReqChan, tssRespChan)
 			tssReqChan <- &TssReq{Index: index, Data: []byte("done")}
