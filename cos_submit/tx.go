@@ -33,7 +33,6 @@ func (cs *CosHandler) BatchComposeAndSend(conn grpc1.ClientConn, sendMsg []types
 		cs.logger.Error().Err(err).Msg("Fail to get the gas estimation")
 		return nil, err
 	}
-
 	txBuilderSeqMap, err := cs.BatchGenSendTx(sendMsg, accSeq, accNum, gasWanted, signMsg)
 	if err != nil {
 		cs.logger.Error().Err(err).Msg("fail to generate the tx")
@@ -66,12 +65,13 @@ func (cs *CosHandler) BatchComposeAndSend(conn grpc1.ClientConn, sendMsg []types
 			}
 			err = cs.waitAndSend(conn, poolAddress, accSeq)
 			if err == nil {
-				_, resp, err := cs.BroadcastTx(ctx, conn, txBytes, true)
+				_, _, err := cs.BroadcastTx(ctx, conn, txBytes, true)
 				if err != nil {
 					cs.logger.Error().Err(err).Msg("fail to broadcast the signature")
 				}
+				txHash := hex.EncodeToString(tmhash.Sum(txBytes))
 				txHashesLocker.Lock()
-				txHashes[accSeq] = resp
+				txHashes[accSeq] = txHash
 				txHashesLocker.Unlock()
 				return
 			}
@@ -135,16 +135,16 @@ func (cs *CosHandler) BroadcastTx(ctx context.Context, conn grpc1.ClientConn, tx
 		return false, hex.EncodeToString(tmhash.Sum(txBytes)), err
 	}
 
-	txHash := grpcRes.GetTxResponse().TxHash
+	txHash := hex.EncodeToString(tmhash.Sum(txBytes))
 
 	// this mean tx has been submitted by others
 	if grpcRes.GetTxResponse().Code == 19 {
-		return true, txHash, nil
+		return true, hex.EncodeToString(tmhash.Sum(txBytes)), nil
 	}
 
 	if grpcRes.GetTxResponse().Code != 0 {
 		cs.logger.Error().Err(err).Msgf("fail to broadcast with response %v", grpcRes.TxResponse)
-		return false, "", nil
+		return false, hex.EncodeToString(tmhash.Sum(txBytes)), nil
 	}
 
 	return true, txHash, nil

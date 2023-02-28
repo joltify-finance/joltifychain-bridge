@@ -2,6 +2,7 @@ package cosbridge
 
 import (
 	"html"
+	"sort"
 
 	"google.golang.org/grpc"
 
@@ -41,6 +42,11 @@ func (jc *JoltChainInstance) DoProcessInBound(conn grpc1.ClientConn, items []*co
 		return nil, err
 	}
 	roundBlockHeight := blockHeight / ROUNDBLOCK
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].AccSeq < items[j].AccSeq
+	})
+
 	for i, item := range items {
 		index := item.Hash().Hex()
 		_, _, poolAddress, poolPk := item.GetAccountInfo()

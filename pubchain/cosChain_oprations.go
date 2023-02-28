@@ -46,6 +46,7 @@ func (c *CosMosChainInfo) processMsg(txBlockHeight int64, poolAddress []sdk.AccA
 	receiver, err := sdk.AccAddressFromBech32(memo.Dest)
 	if err != nil {
 		c.logger.Error().Err(err).Msg("fail to parse the joltify receiver")
+		return nil, errors.New("invalid destination")
 	}
 
 	pool1Atom := sdk.MustBech32ifyAddressBytes("cosmos", poolAddress[0])

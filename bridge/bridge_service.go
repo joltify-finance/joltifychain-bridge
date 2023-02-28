@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -849,6 +850,9 @@ func doProcessOutBound(grpcAddr string, items []*joltcommon.OutBoundReq, pi *pub
 	}
 	roundBlockHeight := blockHeight / int64(ROUNDBLOCK)
 
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Nonce < items[j].Nonce
+	})
 	for i, item := range items {
 		atomFrom := sdk.MustBech32ifyAddressBytes("cosmos", item.FromPoolAddr)
 		receiver := item.OutReceiverAddress
@@ -916,16 +920,16 @@ func processEachOutBoundCosmos(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc stri
 				tick := html.UnescapeString("&#" + "11014" + ";")
 				zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, encodeFrom, encodeTo, item.Coin.Amount.String())
 				processSuccessfulTx(failedOutBound, oppyGrpc, localSubmitLocker, oppyChain, pi, item, txHash, item.FromPoolAddr, item.OutReceiverAddress, item.Coin.Amount.BigInt())
-				return
+				continue
 			}
-			// now we put this item back in retry
-			zlog.Logger.Warn().Msgf("the tx is fail in atom submission, we need to resend")
-			if !outBoundWait.Load() {
-				failedOutBound.Inc()
-			}
-			item.SubmittedTxHash = txHash
-			oppyChain.AddOnHoldQueue(item)
 		}
+		// now we put this item back in retry
+		zlog.Logger.Warn().Msgf("the tx %V is fail in atom submission, we need to resend", txHash)
+		if !outBoundWait.Load() {
+			failedOutBound.Inc()
+		}
+		item.SubmittedTxHash = txHash
+		oppyChain.AddOnHoldQueue(item)
 	}
 }
 
