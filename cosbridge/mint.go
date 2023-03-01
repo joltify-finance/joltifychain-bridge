@@ -47,6 +47,7 @@ func (jc *JoltChainInstance) DoProcessInBound(conn grpc1.ClientConn, items []*co
 		return items[i].AccSeq < items[j].AccSeq
 	})
 
+	itemsIndex := make([]string, len(items))
 	for i, item := range items {
 		index := item.Hash().Hex()
 		_, _, poolAddress, poolPk := item.GetAccountInfo()
@@ -67,11 +68,12 @@ func (jc *JoltChainInstance) DoProcessInBound(conn grpc1.ClientConn, items []*co
 		}
 		signMsgs[i] = &signMsg
 		issueReqs[i] = issueReq
+		itemsIndex[i] = item.Hash().Hex()
 	}
 	// as in a group, the accseq MUST has been sorted.
 	accSeq, accNum, poolAddress, _ := items[0].GetAccountInfo()
 	// for batchsigning, the signMsgs for all the members in the group is the same
-	txHashes, err := jc.CosHandler.BatchComposeAndSend(conn, issueReqs, accSeq, accNum, signMsgs[0], poolAddress.String())
+	txHashes, err := jc.CosHandler.BatchComposeAndSend(conn, issueReqs, accSeq, accNum, signMsgs[0], poolAddress.String(), itemsIndex)
 	if err != nil {
 		jc.logger.Error().Msgf("we fail to process one or more txs")
 	}

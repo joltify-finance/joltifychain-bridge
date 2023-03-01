@@ -853,6 +853,8 @@ func doProcessOutBound(grpcAddr string, items []*joltcommon.OutBoundReq, pi *pub
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].Nonce < items[j].Nonce
 	})
+
+	itemsIndex := make([]string, len(items))
 	for i, item := range items {
 		atomFrom := sdk.MustBech32ifyAddressBytes("cosmos", item.FromPoolAddr)
 		receiver := item.OutReceiverAddress
@@ -872,6 +874,7 @@ func doProcessOutBound(grpcAddr string, items []*joltcommon.OutBoundReq, pi *pub
 		}
 		signMsgs[i] = &signMsg
 		issueReqs[i] = &msg
+		itemsIndex[i] = item.Hash().Hex()
 	}
 
 	// we assume all the request in the group use the same pool account
@@ -880,7 +883,7 @@ func doProcessOutBound(grpcAddr string, items []*joltcommon.OutBoundReq, pi *pub
 	atomFromGroup := sdk.MustBech32ifyAddressBytes("cosmos", items[0].FromPoolAddr)
 
 	// for batchsigning, the signMsgs for all the members in the group is the same
-	txHashes, err := pi.CosChain.CosHandler.BatchComposeAndSend(grpcClient, issueReqs, accSeq, accNum, signMsgs[0], atomFromGroup)
+	txHashes, err := pi.CosChain.CosHandler.BatchComposeAndSend(grpcClient, issueReqs, accSeq, accNum, signMsgs[0], atomFromGroup, itemsIndex)
 	if err != nil {
 		zlog.Logger.Error().Msgf("we fail to process one or more txs")
 	}
@@ -891,6 +894,7 @@ func doProcessOutBound(grpcAddr string, items []*joltcommon.OutBoundReq, pi *pub
 		k := fmt.Sprintf("%v:%v", el.Nonce, txHash)
 		hashIndexMap[k] = el
 	}
+
 	return hashIndexMap, nil
 }
 

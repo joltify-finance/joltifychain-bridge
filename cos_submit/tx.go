@@ -27,13 +27,13 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/tssclient"
 )
 
-func (cs *CosHandler) BatchComposeAndSend(conn grpc1.ClientConn, sendMsg []types.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress string) (map[uint64]string, error) {
+func (cs *CosHandler) BatchComposeAndSend(conn grpc1.ClientConn, sendMsg []types.Msg, accSeq, accNum uint64, signMsg *tssclient.TssSignigMsg, poolAddress string, itemsIndex []string) (map[uint64]string, error) {
 	gasWanted, err := cs.GasEstimation(conn, sendMsg, accSeq, nil)
 	if err != nil {
 		cs.logger.Error().Err(err).Msg("Fail to get the gas estimation")
 		return nil, err
 	}
-	txBuilderSeqMap, err := cs.BatchGenSendTx(sendMsg, accSeq, accNum, gasWanted, signMsg)
+	txBuilderSeqMap, err := cs.BatchGenSendTx(sendMsg, accSeq, accNum, gasWanted, signMsg, itemsIndex)
 	if err != nil {
 		cs.logger.Error().Err(err).Msg("fail to generate the tx")
 		return nil, err
@@ -178,7 +178,7 @@ func (cs *CosHandler) waitAndSend(conn grpc1.ClientConn, senderAddress string, t
 	return err
 }
 
-func (cs *CosHandler) BatchGenSendTx(sdkMsg []types.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg) (map[uint64]client.TxBuilder, error) {
+func (cs *CosHandler) BatchGenSendTx(sdkMsg []types.Msg, accSeq, accNum, gasWanted uint64, tssSignMsg *tssclient.TssSignigMsg, itemsIndex []string) (map[uint64]client.TxBuilder, error) {
 	// Choose your codec: Amino or Protobuf. Here, we use Protobuf, given by the
 	// following function.
 	pubkey, err := legacybech32.UnmarshalPubKey(legacybech32.AccPK, tssSignMsg.Pk) //nolint
@@ -201,8 +201,8 @@ func (cs *CosHandler) BatchGenSendTx(sdkMsg []types.Msg, accSeq, accNum, gasWant
 		}
 		// we use the default here
 		txBuilder.SetGasLimit(gasWanted)
-		// txBuilder.SetFeeAmount(...)
-		// txBuilder.SetMemo(...)
+		//txBuilder.SetFeeAmount(items[i].Hash().Hex())
+		txBuilder.SetMemo(itemsIndex[i])
 		// txBuilder.SetTimeoutHeight(...)
 		var sigV2 signing.SignatureV2
 

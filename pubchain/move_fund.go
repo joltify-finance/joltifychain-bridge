@@ -78,7 +78,7 @@ func (pi *Instance) MoveFundCosmos(height int64, grpcClient grpc1.ClientConn, pr
 	}
 
 	previousPoolAddr := sdk.MustBech32ifyAddressBytes("cosmos", previousPool.CosAddress)
-	ret, err := pi.CosChain.CosHandler.BatchComposeAndSend(grpcClient, []sdk.Msg{&sendMsg}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, previousPoolAddr)
+	ret, err := pi.CosChain.CosHandler.BatchComposeAndSend(grpcClient, []sdk.Msg{&sendMsg}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, previousPoolAddr, []string{"move fund"})
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to move the atom")
 		pi.AddMoveFundItem(previousPool, height+movefundretrygap, pi.CosChain.ChainType)
