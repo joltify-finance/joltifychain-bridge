@@ -928,7 +928,6 @@ func processEachOutBoundCosmos(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc stri
 			}
 		}
 		// now we put this item back in retry
-		zlog.Logger.Warn().Msgf("the tx %V is fail in atom submission, we need to resend", txHash)
 		if !outBoundWait.Load() {
 			failedOutBound.Inc()
 		}
