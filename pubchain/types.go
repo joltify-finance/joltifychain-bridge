@@ -39,7 +39,7 @@ const (
 	sbchannelsize     = 20000
 	chainQueryTimeout = time.Second * 15
 	ROUNDBLOCK        = 50
-	submitBackoff     = time.Second * 4
+	submitBackoff     = time.Second * 20
 	GroupBlockGap     = 8
 	GroupSign         = 4
 	channelSize       = 2000

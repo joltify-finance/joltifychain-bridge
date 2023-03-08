@@ -931,6 +931,7 @@ func processEachOutBoundCosmos(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc stri
 		if !outBoundWait.Load() {
 			failedOutBound.Inc()
 		}
+		zlog.Logger.Info().Msgf("we add the txhash %v for the retry of tx %v", txHash, item.TxID)
 		item.SubmittedTxHash = txHash
 		oppyChain.AddOnHoldQueue(item)
 	}
