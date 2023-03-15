@@ -730,7 +730,7 @@ func processInbound(oppyGrpc string, joltChain *cosbridge.JoltChainInstance, pi 
 			}
 			defer grpcClientLocal.Close()
 
-			err := joltChain.CheckIssueTokenTxStatus(grpcClientLocal, eachIndex, 20)
+			err := joltChain.CheckIssueTokenTxStatus(grpcClientLocal, eachIndex, 10)
 			if err != nil {
 				zlog.Logger.Error().Err(err).Msgf("the tx index(%v) has not been successfully submitted retry", eachIndex)
 				if !inBoundWait.Load() {
@@ -1042,7 +1042,7 @@ func putOnHoldBlockInBoundBack(oppyGrpc string, pi *pubchain.Instance, oppyChain
 	for _, el := range itemInbound {
 		go func(each *joltcommon.InBoundReq) {
 			defer wgDump.Done()
-			err := oppyChain.CheckIssueTokenTxStatus(grpcClient, each.Hash().Hex(), 2)
+			err := oppyChain.CheckIssueTokenTxStatus(grpcClient, each.Hash().Hex(), 10)
 			if err == nil {
 				tick := html.UnescapeString("&#" + "127866" + ";")
 				zlog.Info().Msgf(" %v the tx has been submitted, we catch up with others on oppyChain", tick)
@@ -1099,7 +1099,7 @@ func putOnHoldBlockOutBoundBackCosmos(chainInfo *pubchain.CosMosChainInfo, joltC
 				joltChain.AddItem(each)
 				return
 			}
-			err := chainInfo.CosHandler.QueryTxStatus(grpcClient, each.SubmittedTxHash, 2)
+			err := chainInfo.CosHandler.QueryTxStatus(grpcClient, each.SubmittedTxHash, 10)
 			if err != nil {
 				joltChain.AddItem(each)
 				return

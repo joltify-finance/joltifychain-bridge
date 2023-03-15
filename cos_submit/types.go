@@ -21,7 +21,7 @@ import (
 
 const (
 	grpcTimeout   = time.Second * 30
-	submitBackoff = time.Second * 20
+	submitBackoff = time.Second * 2
 	channelSize   = 2000
 	capacity      = 10000
 )

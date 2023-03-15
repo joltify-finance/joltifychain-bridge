@@ -152,7 +152,7 @@ func (cs *CosHandler) BroadcastTx(ctx context.Context, conn grpc1.ClientConn, tx
 
 // CheckIssueTokenTxStatus check whether the tx has been done successfully
 func (cs *CosHandler) waitAndSend(conn grpc1.ClientConn, senderAddress string, targetSeq uint64) error {
-	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 40)
+	bf := backoff.WithMaxRetries(backoff.NewConstantBackOff(submitBackoff), 20)
 
 	alreadyPassed := false
 	op := func() error {
