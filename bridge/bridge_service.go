@@ -389,7 +389,83 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 	outBoundProcessDone := atomic.NewBool(true)
 	inKeygenInProgress := atomic.NewBool(false)
 
-	wg.Add(1)
+	wg.Add(3)
+
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case head := <-pi.EthChain.SubChannelNow:
+				if head == nil {
+					return
+				}
+				block := pubchain.BlockHead{
+					Head:      head,
+					ChainType: ETH,
+				}
+				pi.ChannelQueue <- &block
+
+			case <-ctx.Done():
+				cancelSubscription()
+				zlog.Info().Msgf("we quit the ethchain subscription")
+				return
+			}
+		}
+
+	}()
+
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case head := <-pi.BSCChain.SubChannelNow:
+
+				block := pubchain.BlockHead{
+					Head:      head,
+					ChainType: BSC,
+				}
+				pi.ChannelQueue <- &block
+
+			case <-ctx.Done():
+				cancelSubscription()
+				zlog.Info().Msgf("we quit the ethchain subscription")
+				return
+			}
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case block := <-pi.GetCurrentNewBlockChain():
+				c := pi.GetChannelQueueNewBlockChain()
+				c <- block
+
+			case <-ctx.Done():
+				cancelSubscription()
+				zlog.Info().Msgf("we quit the ethchain subscription")
+				return
+			}
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case block := <-joltifyChain.GetCurrentNewBlockChain():
+				c := joltifyChain.GetChannelQueueNewBlockChain()
+				c <- block
+
+			case <-ctx.Done():
+				cancelSubscription()
+				zlog.Info().Msgf("we quit the ethchain subscription")
+				return
+			}
+		}
+	}()
+
 	go func(wg *sync.WaitGroup) {
 		defer wg.Done()
 		for {
@@ -423,9 +499,9 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 				}
 
 			// process the new joltify block, validator may need to submit the pool address
-			case block := <-joltifyChain.GetCurrentNewBlockChain():
-				c := joltifyChain.GetChannelQueueNewBlockChain()
-				c <- block
+			//case block := <-joltifyChain.GetCurrentNewBlockChain():
+			//	c := joltifyChain.GetChannelQueueNewBlockChain()
+			//	c <- block
 
 			case block := <-joltifyChain.GetChannelQueueNewBlockChain():
 				wg.Add(1)
@@ -604,24 +680,24 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 
 				grpcClient.Close()
 
-			case head := <-pi.EthChain.SubChannelNow:
-				block := pubchain.BlockHead{
-					Head:      head,
-					ChainType: ETH,
-				}
-				pi.ChannelQueue <- &block
-
-			case head := <-pi.BSCChain.SubChannelNow:
-				block := pubchain.BlockHead{
-					Head:      head,
-					ChainType: BSC,
-				}
-				pi.ChannelQueue <- &block
+			//case head := <-pi.EthChain.SubChannelNow:
+			//	block := pubchain.BlockHead{
+			//		Head:      head,
+			//		ChainType: ETH,
+			//	}
+			//	pi.ChannelQueue <- &block
+			//
+			//case head := <-pi.BSCChain.SubChannelNow:
+			//	block := pubchain.BlockHead{
+			//		Head:      head,
+			//		ChainType: BSC,
+			//	}
+			//	pi.ChannelQueue <- &block
 
 			// process the new atom block
-			case block := <-pi.GetCurrentNewBlockChain():
-				c := pi.GetChannelQueueNewBlockChain()
-				c <- block
+			//case block := <-pi.GetCurrentNewBlockChain():
+			//	c := pi.GetChannelQueueNewBlockChain()
+			//	c <- block
 
 			case block := <-pi.GetChannelQueueNewBlockChain():
 				pubChainProcessCosmos(block, pi, joltifyChain, metric, pubRollbackGap, failedOutbound, &outboundPauseHeight, outBoundWait, outBoundProcessDone, inKeygenInProgress, &firstTimeOutbound, &previousTssBlockOutBound)
