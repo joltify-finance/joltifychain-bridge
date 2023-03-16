@@ -167,10 +167,7 @@ func (pi *Instance) processEachERC20Block(chainType string, chainInfo *Erc20Chai
 		if tx.To() == nil {
 			continue
 		}
-		status, err := chainInfo.checkEachTx(tx.Hash())
-		if err != nil || status != 1 {
-			continue
-		}
+
 		txInfo, err := pi.checkErc20(tx.Data(), tx.To().Hex(), chainInfo.contractAddress)
 		if err == nil {
 			_, exit := pi.TokenList.GetTokenInfoByAddressAndChainType(txInfo.tokenAddress.String(), chainType)
@@ -190,14 +187,24 @@ func (pi *Instance) processEachERC20Block(chainType string, chainInfo *Erc20Chai
 
 			switch txInfo.dstChainType {
 			case ETH, BSC:
-				err := pi.processDstInbound(txInfo, tx.Hash().Hex()[2:], chainType, txBlockHeight, feeModule, oppyGrpc)
+
+				status, err := chainInfo.checkEachTx(tx.Hash())
+				if err != nil || status != 1 {
+					continue
+				}
+				err = pi.processDstInbound(txInfo, tx.Hash().Hex()[2:], chainType, txBlockHeight, feeModule, oppyGrpc)
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msgf("fail to process the inbound tx for outbound from %v to %v", chainType, txInfo.dstChainType)
 					continue
 				}
 
 			case JOLTIFY:
-				err := pi.ProcessInBoundERC20(tx, chainType, txInfo, block.NumberU64())
+
+				status, err := chainInfo.checkEachTx(tx.Hash())
+				if err != nil || status != 1 {
+					continue
+				}
+				err = pi.ProcessInBoundERC20(tx, chainType, txInfo, block.NumberU64())
 				if err != nil {
 					zlog.Logger.Error().Err(err).Msg("fail to process the inbound contract message")
 					continue
@@ -216,6 +223,12 @@ func (pi *Instance) processEachERC20Block(chainType string, chainInfo *Erc20Chai
 			}
 			switch memoInfo.ChainType {
 			case JOLTIFY:
+
+				status, err := chainInfo.checkEachTx(tx.Hash())
+				if err != nil || status != 1 {
+					continue
+				}
+
 				pi.processJoltifyInbound(memoInfo, chainType, *tx, txBlockHeight)
 			default:
 				pi.logger.Warn().Msgf("unknown chain type %v", memoInfo.ChainType)
