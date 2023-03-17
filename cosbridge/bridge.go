@@ -181,6 +181,14 @@ func (jc *JoltChainInstance) CheckOutBoundTx(conn grpc1.ClientConn, txBlockHeigh
 		switch eachMsg := msg.(type) {
 		case *banktypes.MsgSend:
 
+			outboundReq, err := jc.processMsg(txBlockHeight, poolAddress, pools[1], txMemo, eachMsg, rawTx.Hash())
+			if err != nil {
+				if err.Error() != "not a top up message to the pool" {
+					jc.logger.Error().Err(err).Msgf("fail to process the message, it is not a top up message")
+					continue
+				}
+			}
+
 			t, err := bcommon.GetGivenTx(conn, rawTx.Hash())
 			if err != nil {
 				jc.logger.Error().Err(err).Msgf("fail to query the tx")
@@ -192,14 +200,7 @@ func (jc *JoltChainInstance) CheckOutBoundTx(conn grpc1.ClientConn, txBlockHeigh
 				zlog.Warn().Msgf("not a valid top up message with error code %v (%v)", t.TxResponse.Code, t.TxResponse.RawLog)
 				continue
 			}
-
-			err = jc.processMsg(txBlockHeight, poolAddress, pools[1], txMemo, eachMsg, rawTx.Hash())
-			if err != nil {
-				if err.Error() != "not a top up message to the pool" {
-					jc.logger.Error().Err(err).Msgf("fail to process the message, it is not a top up message")
-				}
-			}
-
+			jc.AddItem(outboundReq)
 		default:
 			continue
 		}

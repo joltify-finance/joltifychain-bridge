@@ -220,12 +220,12 @@ func (b BridgeTestSuite) TestBatchGenSendTx() {
 	b.Require().NoError(err)
 
 	send := banktypes.NewMsgSend(valAddr, operatorInfo.GetAddress(), sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100))})
-	_, err = oc.CosHandler.BatchGenSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 100000, &signMsg)
+	_, err = oc.CosHandler.BatchGenSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 100000, &signMsg, []string{"mock"})
 	b.Require().NoError(err)
 
 	// pubkey is invalid
 	signMsg.Pk = pk.String()
-	_, err = oc.CosHandler.BatchGenSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 100000, &signMsg)
+	_, err = oc.CosHandler.BatchGenSendTx([]sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), 100000, &signMsg, []string{"mock"})
 	b.Require().Error(err)
 
 	nodeID := oc.GetTssNodeID()

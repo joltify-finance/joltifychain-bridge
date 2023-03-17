@@ -245,11 +245,11 @@ func (h *helperTestSuite) TestBatchComposeAndSend() {
 	h.Require().NoError(err)
 
 	send := banktypes.NewMsgSend(valAddr, operatorInfo.GetAddress(), sdk.Coins{sdk.NewCoin("stake", sdk.NewInt(100))})
-	_, err = handler.BatchComposeAndSend(handler.GrpcClient, []sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, valAddr.String())
+	_, err = handler.BatchComposeAndSend(handler.GrpcClient, []sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, valAddr.String(), []string{"mock"})
 	h.Require().Error(err, "operator.info: key not found")
 
 	handler.Keyring = h.validatorkey
-	_, err = handler.BatchComposeAndSend(handler.GrpcClient, []sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, valAddr.String())
+	_, err = handler.BatchComposeAndSend(handler.GrpcClient, []sdk.Msg{send}, acc.GetSequence(), acc.GetAccountNumber(), &signMsg, valAddr.String(), []string{"mock"})
 	h.Require().NoError(err)
 }
 

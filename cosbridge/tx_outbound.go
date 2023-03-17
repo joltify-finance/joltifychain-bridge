@@ -14,10 +14,10 @@ import (
 	"gitlab.com/joltify/joltifychain-bridge/misc"
 )
 
-func (jc *JoltChainInstance) processOutBoundRequest(msg *banktypes.MsgSend, txID string, txBlockHeight int64, currentPool *bcommon.PoolInfo, memo bcommon.BridgeMemo) error {
+func (jc *JoltChainInstance) processOutBoundRequest(msg *banktypes.MsgSend, txID string, txBlockHeight int64, currentPool *bcommon.PoolInfo, memo bcommon.BridgeMemo) (*bcommon.OutBoundReq, error) {
 	tokenItem, tokenExist := jc.TokenList.GetTokenInfoByDenomAndChainType(msg.Amount[0].GetDenom(), memo.ChainType)
 	if !tokenExist {
-		return errors.New("token is not on our token list")
+		return nil, errors.New("token is not on our token list")
 	}
 
 	item := jc.processDemonAndFee(txID, msg.FromAddress, tokenItem.TokenAddr, txBlockHeight, memo.Dest, msg.Amount[0].GetDenom(), msg.Amount[0].Amount, memo.ChainType)
@@ -28,7 +28,7 @@ func (jc *JoltChainInstance) processOutBoundRequest(msg *banktypes.MsgSend, txID
 		case "ATOM":
 			a, err := bcommon.AddressStringToBytes("cosmos", item.OutReceiverAddress)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			itemReq = bcommon.NewOutboundReq(txID, a.Bytes(), currentPool.CosAddress.Bytes(), item.Token, tokenItem.TokenAddr, txBlockHeight, types.Coins{item.Fee}, memo.ChainType, false)
 		default:
@@ -37,37 +37,33 @@ func (jc *JoltChainInstance) processOutBoundRequest(msg *banktypes.MsgSend, txID
 			a := ethcommon.HexToAddress(item.OutReceiverAddress)
 			itemReq = bcommon.NewOutboundReq(txID, a.Bytes(), currentPool.EthAddress.Bytes(), item.Token, tokenItem.TokenAddr, txBlockHeight, types.Coins{item.Fee}, memo.ChainType, false)
 		}
-		jc.AddItem(&itemReq)
 		jc.logger.Info().Msgf("chain %v Outbound Transaction in Block %v (Current Block %v) with fee %v paid to validators", memo.ChainType, txBlockHeight, jc.CurrentHeight, types.Coins{item.Fee})
-		return nil
+		return &itemReq, nil
 	}
-	return nil
+	return nil, errors.New("empty request")
 }
 
 // processMsg handle the oppychain transactions
-func (jc *JoltChainInstance) processMsg(txBlockHeight int64, address []types.AccAddress, currentPool *bcommon.PoolInfo, memo bcommon.BridgeMemo, msg *banktypes.MsgSend, txHash []byte) error {
+func (jc *JoltChainInstance) processMsg(txBlockHeight int64, address []types.AccAddress, currentPool *bcommon.PoolInfo, memo bcommon.BridgeMemo, msg *banktypes.MsgSend, txHash []byte) (*bcommon.OutBoundReq, error) {
 	if msg.Amount.IsZero() {
-		return errors.New("zero amount")
+		return nil, errors.New("zero amount")
 	}
 	txID := strings.ToLower(hex.EncodeToString(txHash))
 
 	toAddress, err := types.AccAddressFromBech32(msg.ToAddress)
 	if err != nil {
 		jc.logger.Error().Err(err).Msg("fail to parse the to outReceiverAddress")
-		return err
+		return nil, err
 	}
 
 	// we check whether it is the message to the pool
 	if !(toAddress.Equals(address[0]) || toAddress.Equals(address[1])) {
 		jc.logger.Warn().Msg("not a top up message to the pool")
-		return errors.New("not a top up message to the pool")
+		return nil, errors.New("not a top up message to the pool")
 	}
 
-	err = jc.processOutBoundRequest(msg, txID, txBlockHeight, currentPool, memo)
-	if err != nil {
-		return fmt.Errorf("fail to process the outbound erc20 request %w", err)
-	}
-	return nil
+	outboundReq, err := jc.processOutBoundRequest(msg, txID, txBlockHeight, currentPool, memo)
+	return outboundReq, err
 }
 
 func (jc *JoltChainInstance) processDemonAndFee(txID, fromAddress string, tokenAddr string, blockHeight int64, receiverAddr string, demonName string, demonAmount types.Int, chainType string) *OutboundTx {

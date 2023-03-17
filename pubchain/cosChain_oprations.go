@@ -116,30 +116,31 @@ func (c *CosMosChainInfo) processEachCosmosTx(rawTx types2.Tx, pools []*common.P
 	poolAddrs := []sdk.AccAddress{pools[0].CosAddress, pools[1].CosAddress}
 	var items []*common.InBoundReq
 
+	txClient := cosTx.NewServiceClient(grpcClient)
 	for _, msg := range txWithMemo.GetMsgs() {
 		switch eachMsg := msg.(type) {
 		case *banktypes.MsgSend:
-			txClient := cosTx.NewServiceClient(grpcClient)
+			item, err := c.processMsg(txBlockHeight, poolAddrs, txMemo, eachMsg, rawTx.Hash())
+			if err != nil {
+				if err.Error() != "not a top up message to the pool" {
+					c.logger.Error().Err(err).Msgf("fail to process the message, it is not a top up message")
+				}
+				continue
+			}
+
 			txquery := cosTx.GetTxRequest{Hash: hex.EncodeToString(rawTx.Hash())}
 			t, err := txClient.GetTx(ctx, &txquery)
 			if err != nil {
 				c.logger.Error().Err(err).Msgf("fail to query the tx")
 				continue
 			}
-
 			if t.TxResponse.Code != 0 {
 				// this means this tx is not a successful tx
 				zlog.Warn().Msgf("not a valid inbound message with error code %v (%v)", t.TxResponse.Code, t.TxResponse.RawLog)
 				continue
 			}
-			item, err := c.processMsg(txBlockHeight, poolAddrs, txMemo, eachMsg, rawTx.Hash())
-			if err != nil {
-				if err.Error() != "not a top up message to the pool" {
-					c.logger.Error().Err(err).Msgf("fail to process the message, it is not a top up message")
-				}
-			}
-			items = append(items, item)
 
+			items = append(items, item)
 		default:
 			continue
 		}

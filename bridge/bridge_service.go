@@ -498,11 +498,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 					continue
 				}
 
-			// process the new joltify block, validator may need to submit the pool address
-			//case block := <-joltifyChain.GetCurrentNewBlockChain():
-			//	c := joltifyChain.GetChannelQueueNewBlockChain()
-			//	c <- block
-
 			case block := <-joltifyChain.GetChannelQueueNewBlockChain():
 				wg.Add(1)
 				go func() {
@@ -679,25 +674,6 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 				}
 
 				grpcClient.Close()
-
-			//case head := <-pi.EthChain.SubChannelNow:
-			//	block := pubchain.BlockHead{
-			//		Head:      head,
-			//		ChainType: ETH,
-			//	}
-			//	pi.ChannelQueue <- &block
-			//
-			//case head := <-pi.BSCChain.SubChannelNow:
-			//	block := pubchain.BlockHead{
-			//		Head:      head,
-			//		ChainType: BSC,
-			//	}
-			//	pi.ChannelQueue <- &block
-
-			// process the new atom block
-			//case block := <-pi.GetCurrentNewBlockChain():
-			//	c := pi.GetChannelQueueNewBlockChain()
-			//	c <- block
 
 			case block := <-pi.GetChannelQueueNewBlockChain():
 				pubChainProcessCosmos(block, pi, joltifyChain, metric, pubRollbackGap, failedOutbound, &outboundPauseHeight, outBoundWait, outBoundProcessDone, inKeygenInProgress, &firstTimeOutbound, &previousTssBlockOutBound)

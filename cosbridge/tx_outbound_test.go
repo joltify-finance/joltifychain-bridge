@@ -304,42 +304,43 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 		EthAddress: accs[3].commAddr,
 	}
 
-	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, []byte("msg1"))
+	_, err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "zero amount")
 
 	msg.FromAddress = o.network.Validators[0].Address.String()
-	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, []byte("msg1"))
+	_, err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "zero amount")
 
 	ret := oc.CosHandler.CheckWhetherIssueTokenAlreadyExist(o.grpc, "testindex")
 	o.Require().True(ret)
 
 	msg.ToAddress = accs[3].joltAddr.String()
-	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, []byte("msg1"))
+	_, err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "zero amount")
 
 	msg.ToAddress = accs[1].joltAddr.String()
-	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, []byte("msg1"))
+	_, err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, []byte("msg1"))
 	o.Require().EqualError(err, "zero amount")
 
 	coin2 := sdk.NewCoin("invalidToken", sdk.NewInt(1))
 	coin3 := sdk.NewCoin("invalidToken2", sdk.NewInt(100))
 
 	msg.Amount = sdk.Coins{coin2, coin3}
-	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, []byte("msg1"))
-	o.Require().EqualError(err, "fail to process the outbound erc20 request token is not on our token list")
+	_, err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, []byte("msg1"))
+	o.Require().EqualError(err, "token is not on our token list")
 
 	// test ERC20 token
 	txID := "5dd520d7ebcd1fc1c070d0c595839991c544cc45dcdbfa43aa86370daa258676"
 	txIDByte, err := hex.DecodeString(txID)
 	o.Require().NoError(err)
-	msg.Amount = sdk.NewCoins(sdk.NewCoin("ujolt", sdk.NewInt(20)))
-	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, txIDByte)
+	msg.Amount = sdk.NewCoins(sdk.NewCoin("ujolt", sdk.NewInt(2000000)))
+	item, err := oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, txIDByte)
 	o.Require().NoError(err)
+	oc.AddItem(item)
 
 	oc.RetryOutboundReq.Range(func(key, value any) bool {
 		item := value.(*common2.OutBoundReq)
-		o.Require().Equal(item.Coin.Amount, sdk.NewInt(100))
+		o.Require().Equal(item.Coin.Amount, sdk.NewInt(1916667))
 		oc.RetryOutboundReq.Delete(key)
 		return true
 	})
@@ -348,12 +349,13 @@ func (o OutBoundTestSuite) TestProcessMsg() {
 	txID = "d03fb2b6ae7690afa037ecc44a24e67de2676777b75efcbd1a9bea9e6cc16581"
 	txIDByte, err = hex.DecodeString(txID)
 	o.Require().NoError(err)
-	err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, txIDByte)
+	item, err = oc.processMsg(baseBlockHeight, []sdk.AccAddress{accs[1].joltAddr, accs[2].joltAddr}, poolInfo, memo, &msg, txIDByte)
 	o.Require().NoError(err)
+	oc.AddItem(item)
 
 	oc.RetryOutboundReq.Range(func(key, value any) bool {
 		item := value.(*common2.OutBoundReq)
-		o.Require().Equal(item.Coin.Amount.String(), sdk.NewInt(0).String())
+		o.Require().Equal(item.Coin.Amount.String(), sdk.NewInt(1916667).String())
 		return true
 	})
 }
@@ -400,7 +402,8 @@ func (o OutBoundTestSuite) TestProcessToken() {
 	memo.ChainType = "BSC"
 	msg.Amount = sdk.Coins{coin1}
 
-	err = oc.processOutBoundRequest(&msg, txID, int64(blockHeight), poolInfo, memo)
+	item, err := oc.processOutBoundRequest(&msg, txID, int64(blockHeight), poolInfo, memo)
+	oc.AddItem(item)
 	o.Require().NoError(err)
 
 	r := oc.PopItem(1, "BSC")
@@ -425,7 +428,8 @@ func (o OutBoundTestSuite) TestProcessToken() {
 	coin2 := sdk.NewCoin("abnb", amount)
 	memo.ChainType = "BSC"
 	msg.Amount = sdk.Coins{coin2}
-	err = oc.processOutBoundRequest(&msg, txID, int64(blockHeight), poolInfo, memo)
+	item, err = oc.processOutBoundRequest(&msg, txID, int64(blockHeight), poolInfo, memo)
+	oc.AddItem(item)
 	o.Require().NoError(err)
 
 	r = oc.PopItem(1, "BSC")
@@ -434,7 +438,8 @@ func (o OutBoundTestSuite) TestProcessToken() {
 	o.Require().True(ok)
 	coin2.Amount = amount
 	msg.Amount = sdk.Coins{coin2}
-	err = oc.processOutBoundRequest(&msg, txID, int64(blockHeight), poolInfo, memo)
+	item, err = oc.processOutBoundRequest(&msg, txID, int64(blockHeight), poolInfo, memo)
+	oc.AddItem(item)
 	o.Require().NoError(err)
 	r = oc.PopItem(1, "BSC")
 
@@ -458,7 +463,8 @@ func (o OutBoundTestSuite) TestProcessToken() {
 	coin3 := sdk.NewCoin("sbnb", amount)
 	memo.ChainType = "BSC"
 	msg.Amount = sdk.Coins{coin3}
-	err = oc.processOutBoundRequest(&msg, txID, int64(blockHeight), poolInfo, memo)
+	item, err = oc.processOutBoundRequest(&msg, txID, int64(blockHeight), poolInfo, memo)
+	oc.AddItem(item)
 	o.Require().Error(err)
 }
 
