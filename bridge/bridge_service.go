@@ -1004,7 +1004,7 @@ func processEachOutBoundErc20(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc strin
 	for i, el := range needToBeProcessedItems {
 		fmt.Printf("%v:%v,", i, el.TxID)
 	}
-	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+	fmt.Printf("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
 
 	emptyHash := common.Hash{}.Hex()
 	tssWaitGroup := &sync.WaitGroup{}

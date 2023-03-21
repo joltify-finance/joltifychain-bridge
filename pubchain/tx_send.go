@@ -3,7 +3,6 @@ package pubchain
 import (
 	"context"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -77,10 +76,11 @@ func (pi *Instance) SendNativeTokenBatch(chainInfo *Erc20ChainInfo, index int, s
 	pi.logger.Info().Msgf("we send %v with paid fee %v\n", amount, totalFee)
 	txo.Value = amount
 
-	data, err := hex.DecodeString(reqTxId)
-	if err != nil {
-		panic(err)
-	}
+	// data, err := hex.DecodeString(reqTxId)
+	//if err != nil {
+	//	panic(err)
+	//}
+	var data []byte
 	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: uint64(gas), To: &receiver, Value: txo.Value, Data: data})
 
 	signedTx, err := txo.Signer(sender, tx)
