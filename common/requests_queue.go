@@ -2,7 +2,6 @@ package common
 
 import (
 	"encoding/hex"
-	"math/big"
 	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/types"
@@ -67,11 +66,6 @@ func (o *OutBoundReq) SetItemNonce(fromPoolAddr []byte, nonce uint64, fromPk str
 	o.FromPubkey = fromPk
 	o.AccNum = accNum
 	o.Nonce = nonce
-}
-
-// GetOutBoundInfo return the outbound tx info
-func (o *OutBoundReq) GetOutBoundInfo() ([]byte, []byte, string, *big.Int, uint64) {
-	return o.OutReceiverAddress, o.FromPoolAddr, o.TokenAddr, o.Coin.Amount.BigInt(), o.Nonce
 }
 
 func (i *InBoundReq) Hash() common.Hash {

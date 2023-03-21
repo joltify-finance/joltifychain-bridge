@@ -3,8 +3,11 @@ package pubchain
 import (
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	joltcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"html"
 	"math/big"
 	"time"
@@ -13,7 +16,6 @@ import (
 
 	"github.com/cenkalti/backoff"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -58,7 +60,7 @@ func (pi *Instance) waitToSend(chainInfo *Erc20ChainInfo, poolAddress common.Add
 }
 
 // SendNativeTokenBatch sends the native token to the public chain
-func (pi *Instance) SendNativeTokenBatch(chainInfo *Erc20ChainInfo, index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, bool, error) {
+func (pi *Instance) SendNativeTokenBatch(chainInfo *Erc20ChainInfo, index int, sender, receiver common.Address, amount *big.Int, nonce *big.Int, reqTxId string, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (common.Hash, bool, error) {
 	totalFee, gasPrice, gas, err := chainInfo.GetFeeLimitWithLock()
 	if err != nil {
 		pi.logger.Error().Err(err).Msg("fail to get the suggested gas price")
@@ -75,7 +77,10 @@ func (pi *Instance) SendNativeTokenBatch(chainInfo *Erc20ChainInfo, index int, s
 	pi.logger.Info().Msgf("we send %v with paid fee %v\n", amount, totalFee)
 	txo.Value = amount
 
-	var data []byte
+	data, err := hex.DecodeString(reqTxId)
+	if err != nil {
+		panic(err)
+	}
 	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: uint64(gas), To: &receiver, Value: txo.Value, Data: data})
 
 	signedTx, err := txo.Signer(sender, tx)
@@ -259,12 +264,21 @@ func (pi *Instance) SendToken(chainInfo *Erc20ChainInfo, signerPk string, sender
 }
 
 // ProcessOutBound send the money to public chain
-func (pi *Instance) ProcessOutBound(chainInfo *Erc20ChainInfo, index int, toAddr, fromAddr common.Address, tokenAddr string, amount *big.Int, nonce uint64, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (string, error) {
+func (pi *Instance) ProcessOutBound(chainInfo *Erc20ChainInfo, index int, reqItem *joltcommon.OutBoundReq, tssReqChan chan *TssReq, tssRespChan chan map[string][]byte) (string, error) {
+
+	toAddr := common.BytesToAddress(reqItem.OutReceiverAddress)
+	fromAddr := common.BytesToAddress(reqItem.FromPoolAddr)
+	tokenAddr := reqItem.TokenAddr
+	amount := reqItem.Coin.Amount.BigInt()
+	nonce := reqItem.Nonce
+	reqTxID := reqItem.TxID // the tx id that request to send the outbound tx
+
 	pi.logger.Info().Msgf(">>>>from addr %v to addr %v with amount %v of %v\n", fromAddr, toAddr, sdk.NewDecFromBigIntWithPrec(amount, 18), tokenAddr)
+
 	var txHash common.Hash
 	var err error
 	if tokenAddr == config.NativeSign {
-		txHash, _, err = pi.SendNativeTokenBatch(chainInfo, index, fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce), tssReqChan, tssRespChan)
+		txHash, _, err = pi.SendNativeTokenBatch(chainInfo, index, fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce), reqTxID, tssReqChan, tssRespChan)
 		tssReqChan <- &TssReq{Index: index, Data: []byte("done")}
 	} else {
 		txHash, err = pi.SendTokenBatch(chainInfo, index, fromAddr, toAddr, amount, new(big.Int).SetUint64(nonce), tokenAddr, tssReqChan, tssRespChan)

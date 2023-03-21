@@ -3,6 +3,7 @@ package cosbridge
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"math/big"
 	"strconv"
 	"testing"
@@ -263,11 +264,10 @@ func (o OutBoundTestSuite) TestOutBoundReq() {
 	o.Require().NoError(err)
 	boundReq := common2.NewOutboundReq("testID", accs[0].commAddr.Bytes(), accs[1].commAddr.Bytes(), sdk.NewCoin("JUSD", sdk.NewInt(1)), AddrJUSD, 101, nil, "BSC", true)
 	boundReq.SetItemNonce(accs[1].commAddr.Bytes(), 100, "", 0)
-	a, b, _, amount, h := boundReq.GetOutBoundInfo()
-	o.Require().True(bytes.Equal(a, accs[0].commAddr.Bytes()))
-	o.Require().True(bytes.Equal(b, accs[1].commAddr.Bytes()))
-	o.Require().Equal(amount.String(), "1")
-	o.Require().Equal(h, uint64(100))
+	o.Require().True(bytes.Equal(boundReq.OutReceiverAddress, accs[0].commAddr.Bytes()))
+	o.Require().True(bytes.Equal(boundReq.FromPoolAddr, accs[1].commAddr.Bytes()))
+	o.Require().Equal(boundReq.Coin.Amount.String(), "1")
+	o.Require().Equal(boundReq.Nonce, uint64(100))
 }
 
 func (o OutBoundTestSuite) TestProcessMsg() {
@@ -429,8 +429,7 @@ func (o OutBoundTestSuite) TestProcessToken() {
 	memo.ChainType = "BSC"
 	msg.Amount = sdk.Coins{coin2}
 	item, err = oc.processOutBoundRequest(&msg, txID, int64(blockHeight), poolInfo, memo)
-	oc.AddItem(item)
-	o.Require().NoError(err)
+	o.Require().Error(err, errors.New("empty request"))
 
 	r = oc.PopItem(1, "BSC")
 	o.Require().Len(r, 0)
@@ -464,8 +463,7 @@ func (o OutBoundTestSuite) TestProcessToken() {
 	memo.ChainType = "BSC"
 	msg.Amount = sdk.Coins{coin3}
 	item, err = oc.processOutBoundRequest(&msg, txID, int64(blockHeight), poolInfo, memo)
-	oc.AddItem(item)
-	o.Require().Error(err)
+	o.Require().Error(err, errors.New("empty request"))
 }
 
 func TestTxOutBound(t *testing.T) {

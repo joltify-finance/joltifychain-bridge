@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html"
 	"log"
-	"math/big"
 	"os"
 	"os/signal"
 	"path"
@@ -702,7 +701,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 					default:
 						// we must have at least one item in itemsRecv
 						chainInfo := pi.GetChainClientERC20(itemsRecv[0].ChainType)
-						processEachOutBound(chainInfo, oppyGrpc, joltifyChain, pi, itemsRecv, failedOutbound, outBoundWait, &localSubmitLocker)
+						processEachOutBoundErc20(chainInfo, oppyGrpc, joltifyChain, pi, itemsRecv, failedOutbound, outBoundWait, &localSubmitLocker)
 					}
 				}()
 
@@ -851,7 +850,7 @@ func needToBeProcessed(chainInfo *pubchain.Erc20ChainInfo, oppyChain *cosbridge.
 	return needToBeProcessedItems
 }
 
-func processSuccessfulTx(failedOutBound *atomic.Int32, oppyGrpc string, localSubmitLocker *sync.Mutex, oppyChain *cosbridge.JoltChainInstance, pi *pubchain.Instance, item *joltcommon.OutBoundReq, txHash string, fromAddr, toAddr []byte, amount *big.Int) {
+func processSuccessfulTx(failedOutBound *atomic.Int32, oppyGrpc string, localSubmitLocker *sync.Mutex, oppyChain *cosbridge.JoltChainInstance, pi *pubchain.Instance, item *joltcommon.OutBoundReq, txHash string) {
 	failedOutBound.Store(0)
 	// now we submit our public chain tx to oppychain
 	localSubmitLocker.Lock()
@@ -883,7 +882,7 @@ func processSuccessfulTx(failedOutBound *atomic.Int32, oppyGrpc string, localSub
 	}
 }
 
-// doProcessOutBound mint the token on the joltify chain
+// doProcessOutBound process the outbound tx
 func doProcessOutBound(grpcAddr string, items []*joltcommon.OutBoundReq, pi *pubchain.Instance) (map[string]*joltcommon.OutBoundReq, error) {
 	grpcClient, err := grpc.Dial(grpcAddr, grpc.WithInsecure())
 	if err != nil {
@@ -975,7 +974,7 @@ func processEachOutBoundCosmos(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc stri
 				encodeTo := sdk.MustBech32ifyAddressBytes("cosmos", item.OutReceiverAddress)
 				tick := html.UnescapeString("&#" + "11014" + ";")
 				zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, encodeFrom, encodeTo, item.Coin.Amount.String())
-				processSuccessfulTx(failedOutBound, oppyGrpc, localSubmitLocker, oppyChain, pi, item, txHash, item.FromPoolAddr, item.OutReceiverAddress, item.Coin.Amount.BigInt())
+				processSuccessfulTx(failedOutBound, oppyGrpc, localSubmitLocker, oppyChain, pi, item, txHash)
 				continue
 			}
 		}
@@ -989,7 +988,7 @@ func processEachOutBoundCosmos(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc stri
 	}
 }
 
-func processEachOutBound(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc string, oppyChain *cosbridge.JoltChainInstance, pi *pubchain.Instance, items []*joltcommon.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
+func processEachOutBoundErc20(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc string, oppyChain *cosbridge.JoltChainInstance, pi *pubchain.Instance, items []*joltcommon.OutBoundReq, failedOutBound *atomic.Int32, outBoundWait *atomic.Bool, localSubmitLocker *sync.Mutex) {
 	needToBeProcessedItems := needToBeProcessed(chainInfo, oppyChain, pi, items, false)
 	if len(needToBeProcessedItems) == 0 {
 		failedOutBound.Store(0)
@@ -997,6 +996,10 @@ func processEachOutBound(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc string, op
 	}
 
 	// now we process each tx
+	sort.Slice(needToBeProcessedItems, func(i, j int) bool {
+		return needToBeProcessedItems[i].Nonce < needToBeProcessedItems[j].Nonce
+	})
+
 	emptyHash := common.Hash{}.Hex()
 	tssWaitGroup := &sync.WaitGroup{}
 	bc := pubchain.NewBroadcaster()
@@ -1008,26 +1011,26 @@ func processEachOutBound(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc string, op
 			var txHash string
 			var err, checkTxErr error
 			defer tssWaitGroup.Done()
-			toAddr, fromAddr, tokenAddr, amount, nonce := item.GetOutBoundInfo()
 			tssRespChan, err := bc.Subscribe(int64(index))
 			if err != nil {
 				panic("should not been subscribed!!")
 			}
 			defer bc.Unsubscribe(int64(index))
 
-			txHash, err = pi.ProcessOutBound(chainInfo, index, common.BytesToAddress(toAddr), common.BytesToAddress(fromAddr), tokenAddr, amount, nonce, tssReqChan, tssRespChan)
+			txHash, err = pi.ProcessOutBound(chainInfo, index, item, tssReqChan, tssRespChan)
 
 			if err != nil {
 				zlog.Logger.Error().Err(err).Msg("fail to broadcast the tx")
 			}
 			if txHash != emptyHash {
+				amount := item.Coin.Amount.BigInt()
 				checkTxErr = chainInfo.CheckTxStatus(txHash)
 				if checkTxErr == nil {
-					encodeFrom := common.BytesToAddress(fromAddr)
-					encodeTo := common.BytesToAddress(toAddr)
+					encodeFrom := common.BytesToAddress(item.FromPoolAddr)
+					encodeTo := common.BytesToAddress(item.OutReceiverAddress)
 					tick := html.UnescapeString("&#" + "11014" + ";")
 					zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, encodeFrom.String(), encodeTo.String(), amount.String())
-					processSuccessfulTx(failedOutBound, oppyGrpc, localSubmitLocker, oppyChain, pi, item, txHash, fromAddr, toAddr, amount)
+					processSuccessfulTx(failedOutBound, oppyGrpc, localSubmitLocker, oppyChain, pi, item, txHash)
 				}
 			}
 			zlog.Logger.Warn().Msgf("the tx is fail in submission, we need to resend")

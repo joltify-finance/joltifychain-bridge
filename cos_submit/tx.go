@@ -201,7 +201,8 @@ func (cs *CosHandler) BatchGenSendTx(sdkMsg []types.Msg, accSeq, accNum, gasWant
 		}
 		// we use the default here
 		txBuilder.SetGasLimit(gasWanted)
-		//txBuilder.SetFeeAmount(items[i].Hash().Hex())
+		// txBuilder.SetFeeAmount(items[i].Hash().Hex())
+		// since we set the memo here, each msg to send is unique even though they have the same sender, receiver and amount
 		txBuilder.SetMemo(itemsIndex[i])
 		// txBuilder.SetTimeoutHeight(...)
 		var sigV2 signing.SignatureV2

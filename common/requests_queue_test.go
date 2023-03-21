@@ -56,8 +56,7 @@ func TestOutBoundTx(t *testing.T) {
 	outboundreqs[0].SetItemNonce(addr.Bytes(), 23, "", 0)
 	h := outboundreqs[0].Hash()
 	assert.NotNil(t, h.Bytes())
-	_, _, _, _, nonce := outboundreqs[0].GetOutBoundInfo()
-	assert.Equal(t, nonce, uint64(23))
+	assert.Equal(t, outboundreqs[0].Nonce, uint64(23))
 }
 
 func TestInBoundTx(t *testing.T) {

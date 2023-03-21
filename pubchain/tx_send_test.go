@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"sync"
 	"testing"
@@ -179,11 +180,27 @@ func TestProcessOutBound(t *testing.T) {
 			assert.Nil(t, err)
 			defer bc.Unsubscribe(int64(index))
 			if index == 0 {
-				_, err = pubChain.ProcessOutBound(pubChain.BSCChain, index, fromAddrEth, fromAddrEth, tokenAddrTest, testAmounts[index], nonce+uint64(index), tssReqChan, tssRespChan)
+				item := common.OutBoundReq{
+					OutReceiverAddress: fromAddress,
+					FromPoolAddr:       fromAddress,
+					Nonce:              nonce + uint64(index),
+					TokenAddr:          tokenAddrTest,
+					Coin:               types.NewCoin("test", types.NewIntFromBigInt(testAmounts[index])),
+				}
+
+				_, err = pubChain.ProcessOutBound(pubChain.BSCChain, index, &item, tssReqChan, tssRespChan)
 				assert.Nil(t, err)
 
 			} else {
-				_, err = pubChain.ProcessOutBound(pubChain.BSCChain, index, fromAddrEth, fromAddrEth, "native", testAmounts[index], nonce+uint64(index), tssReqChan, tssRespChan)
+				item := common.OutBoundReq{
+					OutReceiverAddress: fromAddress,
+					FromPoolAddr:       fromAddress,
+					Nonce:              nonce + uint64(index),
+					TokenAddr:          tokenAddrTest,
+					Coin:               types.NewCoin("test", types.NewIntFromBigInt(testAmounts[index])),
+				}
+
+				_, err = pubChain.ProcessOutBound(pubChain.BSCChain, index, &item, tssReqChan, tssRespChan)
 				assert.NotNil(t, err)
 			}
 		}(i)
@@ -399,12 +416,13 @@ func TestSendNativeTokenBatch(t *testing.T) {
 	amounts := []*big.Int{big.NewInt(22830000000000000), v2}
 	for i := 0; i < 2; i++ {
 		go func(index int) {
+
 			defer tssWaitGroup.Done()
 			tssRespChan, err := bc.Subscribe(int64(index))
 			assert.Nil(t, err)
 			defer bc.Unsubscribe(int64(index))
 			indexSend := int64(nonce) + int64(index)
-			_, _, err = pubChain.SendNativeTokenBatch(pubChain.BSCChain, index, fromAddrEth, fromAddrEth, amounts[index], big.NewInt(indexSend), tssReqChan, tssRespChan)
+			_, _, err = pubChain.SendNativeTokenBatch(pubChain.BSCChain, index, fromAddrEth, fromAddrEth, amounts[index], big.NewInt(indexSend), fmt.Sprintf("req Hex %v", i), tssReqChan, tssRespChan)
 			if index == 0 {
 				assert.Nil(t, err)
 			} else {
