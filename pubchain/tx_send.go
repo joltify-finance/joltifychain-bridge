@@ -5,11 +5,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	joltcommon "gitlab.com/joltify/joltifychain-bridge/common"
 	"html"
 	"math/big"
 	"time"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	joltcommon "gitlab.com/joltify/joltifychain-bridge/common"
 
 	"gitlab.com/joltify/joltifychain-bridge/config"
 
@@ -76,10 +77,6 @@ func (pi *Instance) SendNativeTokenBatch(chainInfo *Erc20ChainInfo, index int, s
 	pi.logger.Info().Msgf("we send %v with paid fee %v\n", amount, totalFee)
 	txo.Value = amount
 
-	// data, err := hex.DecodeString(reqTxId)
-	//if err != nil {
-	//	panic(err)
-	//}
 	var data []byte
 	tx := types.NewTx(&types.LegacyTx{Nonce: nonce.Uint64(), GasPrice: gasPrice, Gas: uint64(gas), To: &receiver, Value: txo.Value, Data: data})
 

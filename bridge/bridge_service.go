@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html"
 	"log"
+	"math/big"
 	"os"
 	"os/signal"
 	"path"
@@ -16,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	tendertypes "github.com/tendermint/tendermint/types" //nolint
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -388,7 +390,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 	outBoundProcessDone := atomic.NewBool(true)
 	inKeygenInProgress := atomic.NewBool(false)
 
-	wg.Add(3)
+	wg.Add(5)
 
 	go func() {
 		defer wg.Done()
@@ -728,6 +730,7 @@ func addEventLoop(ctx context.Context, wg *sync.WaitGroup, joltifyChain *cosbrid
 			}
 		}
 	}(wg)
+	wg.Wait()
 }
 
 func processInbound(oppyGrpc string, joltChain *cosbridge.JoltChainInstance, pi *pubchain.Instance, items []*joltcommon.InBoundReq, inBoundWait *atomic.Bool, failedInbound *atomic.Int32) {
@@ -1000,11 +1003,11 @@ func processEachOutBoundErc20(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc strin
 		return needToBeProcessedItems[i].Nonce < needToBeProcessedItems[j].Nonce
 	})
 
-	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>need to be processed>>>>>>>>>>>>>>>>>>\n")
+	allTxs := make([][]byte, len(needToBeProcessedItems))
 	for i, el := range needToBeProcessedItems {
-		fmt.Printf("%v:%v,", i, el.TxID)
+		allTxs[i] = el.Hash().Bytes()
 	}
-	fmt.Printf("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+	txSeqHash := crypto.Keccak256Hash(allTxs...)
 
 	emptyHash := common.Hash{}.Hex()
 	tssWaitGroup := &sync.WaitGroup{}
@@ -1078,8 +1081,10 @@ func processEachOutBoundErc20(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc strin
 			bc.Broadcast(nil)
 			return
 		}
-		blockHeight := int64(latest.NumberU64()) / pubchain.ROUNDBLOCK
-		signature, err := pi.TssSignBatch(allsignMSgs, lastPool.Pk, blockHeight)
+		val := new(big.Int).Add(latest.Number(), txSeqHash.Big())
+		consensusFig := new(big.Int).Mod(val, new(big.Int).SetUint64(9223372036854775807))
+		adjBlockHeight := consensusFig.Int64() / pubchain.ROUNDBLOCK
+		signature, err := pi.TssSignBatch(allsignMSgs, lastPool.Pk, adjBlockHeight)
 		if err != nil {
 			zlog.Info().Msgf("fail to run batch keysign")
 		}

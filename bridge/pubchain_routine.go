@@ -1,7 +1,6 @@
 package bridge
 
 import (
-	"fmt"
 	"math/big"
 
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -263,12 +262,6 @@ func pubChainProcessCosmos(block ctypes.ResultEvent, pi *pubchain.Instance, jolt
 			zlog.Logger.Error().Err(err).Msgf("fail to feed the tx")
 			return
 		}
-
-		fmt.Printf("\n****************************\n")
-		for _, el := range outboundItems {
-			fmt.Printf(">>>%v\n", el.TxID)
-		}
-		fmt.Printf("\n****************************\n")
 
 		previousTssBlockOutBound.SetHeight(processableBlockHeight, pi.CosChain.ChainType)
 		*firstTimeOutbound = true
