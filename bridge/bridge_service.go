@@ -1000,6 +1000,12 @@ func processEachOutBoundErc20(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc strin
 		return needToBeProcessedItems[i].Nonce < needToBeProcessedItems[j].Nonce
 	})
 
+	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>need to be processed>>>>>>>>>>>>>>>>>>\n")
+	for i, el := range needToBeProcessedItems {
+		fmt.Printf("%v:%v,", i, el.TxID)
+	}
+	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+
 	emptyHash := common.Hash{}.Hex()
 	tssWaitGroup := &sync.WaitGroup{}
 	bc := pubchain.NewBroadcaster()
