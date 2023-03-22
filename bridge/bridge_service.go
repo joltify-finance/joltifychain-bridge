@@ -1040,6 +1040,7 @@ func processEachOutBoundErc20(chainInfo *pubchain.Erc20ChainInfo, oppyGrpc strin
 					tick := html.UnescapeString("&#" + "11014" + ";")
 					zlog.Logger.Info().Msgf("%v we have send outbound tx(%v) from %v to %v (%v)", tick, txHash, encodeFrom.String(), encodeTo.String(), amount.String())
 					processSuccessfulTx(failedOutBound, oppyGrpc, localSubmitLocker, oppyChain, pi, item, txHash)
+					return
 				}
 			}
 			zlog.Logger.Warn().Msgf("the tx is fail in submission, we need to resend")
